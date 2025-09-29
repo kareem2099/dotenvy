@@ -1,0 +1,92 @@
+name: Bug Report
+description: Create a report to help us improve dotenvy
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+      placeholder: Tell us what you expected to happen, and what actually happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: To Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Scroll down to '....'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: A clear and concise description of what you expected to happen.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VS Code Version
+      description: What version of VS Code are you using? (Help > About)
+      placeholder: "e.g. 1.50.0"
+    validations:
+      required: true
+
+  - type: input
+    id: dotenvy-version
+    attributes:
+      label: dotenvy Version
+      description: What version of dotenvy are you using?
+      placeholder: "e.g. 1.0.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add any other context about the problem here, such as error messages, screenshots, environment files, or configuration details.
+      placeholder: |
+        If applicable, attach:
+        - Screenshots
+        - Your `.dotenvy.json` configuration (remove any sensitive data)
+        - Environment file structure
+        - Error messages from VS Code developer console
+
+        Note: Please do not share actual secret values from your environment files.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

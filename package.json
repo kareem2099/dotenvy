@@ -1,0 +1,166 @@
+{
+  "name": "dotenvy",
+  "displayName": "dotenvy – VS Code Environment Manager",
+  "description": "Effortlessly manage and switch between .env files directly inside VS Code",
+  "version": "1.0.0",
+  "main": "./out/extension.js",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "bin": {
+    "dotenvy-hook": "./out/git-hook.js"
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "categories": [
+    "Other"
+  ],
+
+  "contributes": {
+    "configuration": {
+      "title": "dotenvy",
+      "properties": {
+        "dotenvy.backupPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to store encrypted backups of .env files. Leave empty to use workspace folder."
+        },
+        "dotenvy.encryptBackups": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable AES-256 encryption for backup files"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "dotenvy.scanSecrets",
+        "title": "dotenvy: Scan for Secrets",
+        "icon": "$(search-view-icon)"
+      },
+      {
+        "command": "dotenvy.switchEnvironment",
+        "title": "dotenvy: Switch Environment"
+      },
+      {
+        "command": "dotenvy.openEnvironmentPanel",
+        "title": "dotenvy: Open Environment Panel"
+      },
+      {
+        "command": "dotenvy.validateEnvironment",
+        "title": "dotenvy: Validate Environment Files"
+      },
+      {
+        "command": "dotenvy.diffEnvironment",
+        "title": "dotenvy: Diff Environment Files"
+      },
+      {
+        "command": "dotenvy.installGitHook",
+        "title": "dotenvy: Install Git Commit Hook"
+      },
+      {
+        "command": "dotenvy.removeGitHook",
+        "title": "dotenvy: Remove Git Commit Hook"
+      },
+      {
+        "command": "dotenvy.pullFromCloud",
+        "title": "dotenvy: Pull Environment from Cloud"
+      },
+      {
+        "command": "dotenvy.pushToCloud",
+        "title": "dotenvy: Push Environment to Cloud"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dotenvy",
+          "title": "dotenvy",
+          "icon": "./resources/icons/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "dotenvy": [
+        {
+          "id": "dotenvy.environments",
+          "name": "Environment Manager",
+          "type": "webview",
+          "icon": "$(settings-gear)"
+        }
+      ],
+      "explorer": [
+        {
+          "id": "dotenvy.explorer-environments",
+          "name": "Environments",
+          "icon": "$(settings-gear)"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "dotenvy.switchEnvironment",
+          "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
+          "group": "navigation"
+        },
+        {
+          "command": "dotenvy.openEnvironmentPanel",
+          "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
+          "group": "navigation"
+        },
+        {
+          "command": "dotenvy.validateEnvironment",
+          "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
+          "group": "navigation"
+        },
+        {
+          "command": "dotenvy.diffEnvironment",
+          "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
+          "group": "navigation"
+        },
+        {
+          "command": "dotenvy.installGitHook",
+          "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
+          "group": "7_modification"
+        },
+        {
+          "command": "dotenvy.removeGitHook",
+          "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
+          "group": "7_modification"
+        }
+      ]
+    }
+  },
+  "keywords": ["env", "environment", "dotenv", "switch", "management"],
+  "author": "Kareem Ehab",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kareem2099/dotenvy"
+  },
+  "homepage": "https://github.com/kareem2099/dotenvy",
+  "bugs": {
+    "url": "https://github.com/kareem2099/dotenvy/issues"
+  },
+  "publisher": "FreeRave",
+  "devDependencies": {
+    "@types/mocha": "^9.1.1",
+    "@types/node": "14.x",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^5.1.0",
+    "@typescript-eslint/parser": "^5.1.0",
+    "@types/glob": "^7.2.0",
+    "eslint": "^8.37.0",
+    "glob": "^7.2.3",
+    "mocha": "^9.2.1",
+    "typescript": "^4.8.3",
+    "@vscode/test-electron": "^2.3.0"
+  }
+}

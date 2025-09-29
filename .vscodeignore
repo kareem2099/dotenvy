@@ -1,0 +1,11 @@
+.vscode/**
+src/**
+.gitignore
+.yarnrc
+yarn.lock
+tsconfig.json
+vsc-extension-quickstart.md
+**/*.ts
+**/*.map
+.nyc_output
+coverage
