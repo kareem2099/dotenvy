@@ -1,0 +1,9 @@
+{
+  "environments": {},
+  "cloudSync": {
+    "provider": "doppler",
+    "project": "your-project-name",
+    "config": "development",
+    "token": "dp.pt.your_doppler_token_here"
+  }
+}
