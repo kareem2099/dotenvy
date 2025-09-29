@@ -3,6 +3,7 @@
   "displayName": "dotenvy – VS Code Environment Manager",
   "description": "Effortlessly manage and switch between .env files directly inside VS Code",
   "version": "1.0.0",
+  "icon": "resources/icons/icon.png",
   "main": "./out/extension.js",
   "engines": {
     "vscode": "^1.74.0"
@@ -82,7 +83,7 @@
         {
           "id": "dotenvy",
           "title": "dotenvy",
-          "icon": "./resources/icons/icon.svg"
+          "icon": "./resources/icons/icon.png"
         }
       ]
     },
