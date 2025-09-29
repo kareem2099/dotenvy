@@ -1,51 +1,75 @@
 # dotenvy – VS Code Environment Manager
 
-🚀 **dotenvy** makes it effortless to manage and switch between your `.env` files directly inside VS Code. No more manual renaming or copy-pasting—just pick your environment and code.
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Publisher](https://img.shields.io/badge/publisher-FreeRave-red.svg)](https://marketplace.visualstudio.com/publishers/FreeRave)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![VS Code Marketplace](https://img.shields.io/badge/vscode-marketplace-007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+
+🚀 **dotenvy** makes it effortless to manage and switch between your `.env` files directly inside VS Code. No more manual renaming or copy-pasting—just pick your environment and start coding immediately!
+
+**[📥 Install from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)** • **[📖 Documentation](https://github.com/kareem2099/dotenvy#readme)** • **[🐛 Report Issues](https://github.com/kareem2099/dotenvy/issues)**
 
 ---
 
 ## ✨ Features
 
-* 🔄 **One-Click Switching**
-  Switch between `.env.development`, `.env.staging`, `.env.production`, or any custom `.env.*` file.
+### 🔄 **Environment Switching**
+Effortlessly switch between `.env.development`, `.env.staging`, `.env.production`, or any custom `.env.*` file with a single click.
 
-* 📂 **Auto Detection**
-  Automatically scans your workspace for `.env` files.
+### 📂 **Auto Detection & Sync**
+Automatically scans your workspace for `.env` files and syncs seamlessly across multi-workspace setups.
 
-* 🔀 **Git Branch Auto-Switching**
-  Automatically switch environments based on Git branch (develop → .env.development, staging → .env.staging, etc.)
+### 🌿 **Git Branch Auto-Switching**
+Automatically switch environments based on Git branch changes (develop → `.env.development`, staging → `.env.staging`, etc.)
 
-* ✅ **Environment Validation**
-  Validate .env files for syntax errors, required variables, and type checking
+### ✅ **Environment Validation**
+Validate .env files for syntax errors, required variables, and type checking with custom regex patterns.
 
-* 📄 **Diff View**
-  Compare environment files side-by-side to see changes before switching
+### 📄 **Diff View**
+Compare environment files side-by-side before switching to preview changes and avoid surprises.
 
-* � **Git Commit Hook** 🆕
-  Prevent committing sensitive environment data with pre-commit security checks
+### 🛡️ **Git Commit Security**
+Prevent committing sensitive data with pre-commit hooks that scan for secrets, validation errors, and block `.env` files.
 
-* �🔀 **Multi-Workspace Support**
-  Handle multiple workspace folders simultaneously with independent environment management
+### ☁️ **Cloud Sync Support**
+Bidirectional cloud sync with Doppler Secrets Manager for team-based environment variable management.
 
-* 💾 **Backup & Restore**
-  Keeps a backup of your current `.env` before switching, so nothing gets lost.
+### 💾 **Backup & Recovery**
+Automatic backup creation before switching, with configurable backup paths and encryption options.
 
-* 🌍 **Status Bar Indicator**
-  Always see which environment is currently active.
+### 📊 **Status Bar Integration**
+Real-time environment indicator in status bar showing current configuration, validation status, and cloud sync state.
 
-* ⚠️ **Secrets Guard** *(optional)*
-  Warns you if you're about to commit `.env` files with sensitive data.
+### 🔍 **Secrets Guard**
+Advanced secret detection with configurable warnings for potential sensitive data exposure.
 
 ---
 
 ## 📦 Installation
 
-1. Open VS Code.
-2. Go to the Extensions view (`Ctrl+Shift+X` or `⌘+Shift+X`).
-3. Search for **dotenvy**.
-4. Click **Install**.
+### Quick Install
+1. Open VS Code
+2. Go to Extensions (`Ctrl+Shift+X` / `⌘+Shift+X`)
+3. Search for "**dotenvy**"
+4. Click **Install**
 
-Or download from [VS Code Marketplace](https://marketplace.visualstudio.com).
+### Alternative Methods
+- **[Download from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)**
+- **Manual**: Download `.vsix` file and install via VS Code
+
+### Requirements
+- VS Code 1.74.0 or later
+- Node.js (for cloud sync features)
+
+## 🏗️ Supported Environments
+
+Default environment files are automatically detected:
+- `.env.development`
+- `.env.staging`
+- `.env.production`
+- `.env.test`
+
+**Custom environments** can be configured in `.dotenvy.json`.
 
 ---
 
@@ -116,6 +140,36 @@ You can add a config file to define custom environments, git branch auto-switchi
 
 ---
 
+## ☁️ Cloud Sync Setup
+
+### Doppler Integration
+
+dotenvy supports bidirectional sync with [Doppler](https://www.doppler.com/) for team-based environment variable management.
+
+#### Setup Steps:
+1. **Create Doppler Account** and project at [doppler.com](https://www.doppler.com/)
+2. **Generate Service Token** from Doppler dashboard
+3. **Add to .dotenvy.json**:
+
+```jsonc
+{
+  "cloudSync": {
+    "provider": "doppler",
+    "project": "your-project-name",
+    "config": "development",
+    "token": "dp.pt.your_token_here"
+  }
+}
+```
+
+#### Available Commands:
+- **Pull from Cloud**: `dotenvy: Pull Environment from Cloud`
+- **Push to Cloud**: `dotenvy: Push Environment to Cloud`
+
+**Note**: Doppler tokens are stored securely using VS Code secrets storage.
+
+---
+
 ## 🗺️ Roadmap
 
 * [x] Auto-switch env based on Git branch
@@ -124,6 +178,11 @@ You can add a config file to define custom environments, git branch auto-switchi
 * [x] Multi-workspace support
 * [x] Git commit hook to block secrets
 * [x] Cloud sync with Doppler
+
+* [ ] Support for other cloud providers (Vault, AWS Secrets Manager)
+* [ ] Environment variable encryption at rest
+* [ ] Shareable environment templates
+* [ ] Integration with Docker environments
 
 ---
 
