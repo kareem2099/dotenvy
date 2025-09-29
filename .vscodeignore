@@ -4,8 +4,24 @@ src/**
 .yarnrc
 yarn.lock
 tsconfig.json
+.eslintrc.json
 vsc-extension-quickstart.md
 **/*.ts
 **/*.map
 .nyc_output
 coverage
+
+# Environment files - should not be in extension package
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+.env.test
+!.env.example
+
+# Test files
+test-*.js
+demo-modern-ui.html
+.dotenvy.json
