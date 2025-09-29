@@ -8,6 +8,7 @@ import { RemoveGitHookCommand } from './commands/removeGitHook';
 import { PullFromCloudCommand } from './commands/pullFromCloud';
 import { PushToCloudCommand } from './commands/pushToCloud';
 import { ScanSecretsCommand } from './commands/scanSecrets';
+import { FeedbackCommand } from './commands/feedback';
 import { WorkspaceManager } from './providers/workspaceManager';
 import { EnvironmentTreeProvider } from './providers/environmentTreeProvider';
 import { EnvironmentWebviewProvider } from './providers/environmentWebviewProvider';
@@ -57,6 +58,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	const pullFromCloudCommand = new PullFromCloudCommand();
 	const pushToCloudCommand = new PushToCloudCommand();
 	const scanSecretsCommand = new ScanSecretsCommand();
+	const feedbackCommand = new FeedbackCommand();
 
 	context.subscriptions.push(switchEnvCommand);
 	context.subscriptions.push(openPanelCommand);
@@ -67,6 +69,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(pullFromCloudCommand);
 	context.subscriptions.push(pushToCloudCommand);
 	context.subscriptions.push(scanSecretsCommand);
+	context.subscriptions.push(feedbackCommand);
 
 	// Register the openEnvironmentPanel command
 	const openPanelDisposable = vscode.commands.registerCommand('dotenvy.openEnvironmentPanel', () => {
@@ -106,6 +109,11 @@ export async function activate(context: vscode.ExtensionContext) {
 		scanSecretsCommand.execute();
 	});
 
+	// Register the feedback command
+	const feedbackDisposable = vscode.commands.registerCommand('dotenvy.feedback', () => {
+		feedbackCommand.execute();
+	});
+
 	context.subscriptions.push(openPanelDisposable);
 	context.subscriptions.push(validateDisposable);
 	context.subscriptions.push(diffDisposable);
@@ -114,6 +122,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(pullFromCloudDisposable);
 	context.subscriptions.push(pushToCloudDisposable);
 	context.subscriptions.push(scanSecretsDisposable);
+	context.subscriptions.push(feedbackDisposable);
 }
 
 export function deactivate() {
