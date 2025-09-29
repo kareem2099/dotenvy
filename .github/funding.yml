@@ -1,12 +1,20 @@
 # These are supported funding model platforms
 
-github: # Replace with your GitHub username or organization name
-patreon: # Replace with a single Patreon username
-open_collective: # Replace with a single Open Collective username
-ko_fi: # Replace with a single Ko-fi username
-tidelift: # Replace with a single Tidelift platform-name/package-name e.g., npm/babel
-community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
-liberapay: # Replace with a single Liberapay username
-issuehunt: # Replace with a single IssueHunt username
-otechie: # Replace with a single Otechie username
-custom: # Replace with a single custom sponsorship URL
+# GitHub Sponsors (primary)
+github: kareem2099
+
+# Alternative platforms
+patreon: # Add Patreon username
+open_collective: # Add Open Collective username
+ko_fi: menedev # Ko-fi profile for the developer
+tidelift: # Only for commercial dependencies
+community_bridge: # Community Bridge project-name
+liberapay: # Liberapay username
+issuehunt: # Add IssueHunt username
+otechie: # Add Otechie username
+
+# Custom donation links (PayPal, Buy Me a Coffee, etc.)
+custom: [
+  "https://paypal.me/freerave1",
+  "https://buymeacoffee.com/freerave"
+]
