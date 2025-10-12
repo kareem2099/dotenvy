@@ -4,6 +4,8 @@ Thank you for your interest in contributing to dotenvy! We welcome contributions
 
 ## Development Setup
 
+### Main Extension (TypeScript)
+
 1. **Fork and Clone:**
    ```bash
    git clone https://github.com/kareem2099/dotenvy.git
@@ -28,6 +30,31 @@ Thank you for your interest in contributing to dotenvy! We welcome contributions
    npx vsce package
    ```
    Install the generated `.vsix` file to test release builds
+
+### Custom LLM Service (Python) 🧠
+
+The extension includes a custom Large Language Model service for advanced secret detection:
+
+1. **Setup LLM Service:**
+   ```bash
+   cd python-llm
+   chmod +x deploy.sh
+   ./deploy.sh
+   ```
+
+2. **Verify LLM Integration:**
+   ```bash
+   curl http://127.0.0.1:8000/health
+   # Should return: {"status":"ok","llm_ready":true}
+   ```
+
+3. **LLM Service Features:**
+   - Custom transformer architecture
+   - 14-dimensional feature analysis
+   - Real-time secret confidence scoring
+   - Automatic fallback to traditional analysis
+
+**Note:** The LLM service runs separately from the VS Code extension and auto-starts with the extension when available.
 
 ## Development Workflow
 
