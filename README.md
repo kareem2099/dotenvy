@@ -40,8 +40,13 @@ Automatic backup creation before switching, with configurable backup paths and e
 ### 📊 **Status Bar Integration**
 Real-time environment indicator in status bar showing current configuration, validation status, and cloud sync state.
 
-### 🔍 **Secrets Guard**
-Advanced secret detection with configurable warnings for potential sensitive data exposure.
+### 🔍 **Secrets Guard** 🧠
+Advanced secret detection powered by custom **Large Language Model (LLM)** for superior accuracy in identifying potential sensitive data exposure. Features:
+- **AI-Powered Analysis**: Custom transformer model trained specifically for secret patterns
+- **Confidence Scoring**: High/Medium/Low confidence classification
+- **Real-time Scanning**: Instant detection during file changes
+- **Learning Capability**: Improves accuracy from user feedback
+- **Fallback Protection**: Traditional entropy-based analysis when AI unavailable
 
 ---
 
