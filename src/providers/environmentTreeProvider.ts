@@ -5,10 +5,12 @@ import { Environment } from '../types/environment';
 export class EnvironmentTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined | void> = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
     readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> = this._onDidChangeTreeData.event;
+    private cachedEnvironments: vscode.TreeItem[] | null = null;
 
     constructor(private workspaceRoot: string) {}
 
     refresh(): void {
+        this.cachedEnvironments = null; // Clear cache on refresh
         this._onDidChangeTreeData.fire();
     }
 
@@ -24,16 +26,23 @@ export class EnvironmentTreeProvider implements vscode.TreeDataProvider<vscode.T
                 return [new WelcomeItem()];
             }
 
+            // Return cached environments if available
+            if (this.cachedEnvironments) {
+                return this.cachedEnvironments;
+            }
+
             // Root level - show all environments
             const provider = new EnvironmentProvider(this.workspaceRoot);
             const environments = await provider.getEnvironments();
 
-            return environments.map(env => new EnvironmentItem(
+            this.cachedEnvironments = environments.map(env => new EnvironmentItem(
                 env.name,
                 env.fileName,
                 vscode.TreeItemCollapsibleState.None,
                 env
             ));
+
+            return this.cachedEnvironments;
         }
 
         return [];
