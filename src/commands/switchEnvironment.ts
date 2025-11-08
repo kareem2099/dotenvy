@@ -8,6 +8,7 @@ import { EnvironmentValidator } from '../utils/environmentValidator';
 import { EnvironmentDiffer } from '../utils/environmentDiffer';
 import { ConfigUtils } from '../utils/configUtils';
 import { WorkspaceManager } from '../providers/workspaceManager';
+import { HistoryManager } from '../utils/historyManager';
 
 export class SwitchEnvironmentCommand implements vscode.Disposable {
 	constructor() {
@@ -153,7 +154,74 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 					}
 				}
 
+				// Read current .env content for history (before switching)
+				let previousContent = '';
+				let previousEnvironment = 'none';
+
+				if (await this.fileExists(currentEnvPath)) {
+					try {
+						const currentEnvUri = vscode.Uri.file(currentEnvPath);
+						const content = await vscode.workspace.fs.readFile(currentEnvUri);
+						previousContent = content.toString();
+
+						// Try to determine previous environment name
+						const environments = await environmentProvider.getEnvironments();
+						for (const env of environments) {
+							try {
+								const envContent = await vscode.workspace.fs.readFile(vscode.Uri.file(env.filePath));
+								if (envContent.toString() === previousContent) {
+									previousEnvironment = env.name;
+									break;
+								}
+							} catch (error) {
+								// Continue checking other environments
+							}
+						}
+					} catch (error) {
+						console.warn('Failed to read current .env for history:', error);
+					}
+				}
+
+				// Read new environment content for diff
+				let newContent = '';
+				try {
+					const newEnvUri = vscode.Uri.file(selected.env.filePath);
+					const content = await vscode.workspace.fs.readFile(newEnvUri);
+					newContent = content.toString();
+				} catch (error) {
+					console.warn('Failed to read new environment file:', error);
+				}
+
+				// Calculate diff if we have both contents
+				let diff: any = undefined;
+				if (previousContent && newContent) {
+					try {
+						diff = EnvironmentDiffer.compareFiles(currentEnvPath, selected.env.filePath);
+					} catch (error) {
+						console.warn('Failed to calculate diff for history:', error);
+					}
+				}
+
 				await FileUtils.switchToEnvironment(selected.env, rootPath);
+
+				// Record history entry
+				try {
+					await HistoryManager.recordEntry(
+						rootPath,
+						'switch',
+						selected.env.name,
+						newContent,
+						selected.env.fileName,
+						{
+							previousEnvironment: previousEnvironment !== 'none' ? previousEnvironment : undefined,
+							reason: `Switched from ${previousEnvironment} to ${selected.env.name}`,
+							source: 'auto',
+							diff
+						}
+					);
+				} catch (error) {
+					console.warn('Failed to record history entry:', error);
+				}
 
 				// Warn if secrets detected in selected file
 				const warnings = SecretsGuard.checkFile(selected.env.filePath);

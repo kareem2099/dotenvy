@@ -12,8 +12,9 @@ import * as path from 'path';
 export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private environmentProvider?: EnvironmentProvider;
+    private cachedDashboardData: any | null = null;
 
-    constructor(private context: vscode.ExtensionContext) {}
+    constructor(private readonly context: vscode.ExtensionContext) {}
 
     resolveWebviewView(view: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken): void | Thenable<void> {
         this._view = view;
@@ -136,8 +137,8 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
             currentEnvName = 'local';
         }
 
-        // Send comprehensive dashboard data
-        this._view.webview.postMessage({
+        // Prepare dashboard data
+        const dashboardData = {
             type: 'refresh',
             environments: enhancedEnvironments,
             currentFile,
@@ -150,7 +151,17 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
                 path: backupPath,
                 encrypt: encryptBackups
             }
-        });
+        };
+
+        // Cache the data persistently
+        const cacheKey = `dashboard-cache-${rootPath}`;
+        this.context.globalState.update(cacheKey, dashboardData);
+
+        // Cache the data in memory
+        this.cachedDashboardData = dashboardData;
+
+        // Send comprehensive dashboard data
+        this._view.webview.postMessage(dashboardData);
     }
 
     private async getCloudSyncStatus(rootPath: string, config: any) {
@@ -210,12 +221,22 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
+    private displayCachedDashboard(): void {
+        if (this._view && this.cachedDashboardData) {
+            this._view.webview.postMessage(this.cachedDashboardData);
+        }
+    }
+
     private async handleMessage(message: any): Promise<void> {
         if (!this.environmentProvider) return;
 
         const rootPath = this.environmentProvider['rootPath'];
 
         switch (message.type) {
+            case 'refresh':
+                await this.refreshEnvironments();
+                break;
+
             case 'switchEnvironment':
                 const selectedEnv = (await this.environmentProvider.getEnvironments())
                     .find(env => env.name === message.environment);
@@ -243,6 +264,7 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
                 break;
 
             case 'editFile':
+                // Ensure fileName is passed and used correctly
                 const fileUri = vscode.Uri.file(path.join(rootPath, message.fileName));
                 const doc = await vscode.workspace.openTextDocument(fileUri);
                 await vscode.window.showTextDocument(doc);
@@ -392,7 +414,7 @@ DEBUG=false
                     const crypto = require('crypto');
                     const algorithm = 'aes-256-cbc';
                     const password = 'dotenvy-backup-secure-key'; // In production, would use proper key management
-                    const iv = crypto.randomBytes(16);
+                    // const iv = crypto.randomBytes(16); // Removed unused variable 'iv'
                     const cipher = crypto.createCipher(algorithm, password);
                     let encrypted = cipher.update(content, 'utf8', 'hex');
                     encrypted += cipher.final('hex');

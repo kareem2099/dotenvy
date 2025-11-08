@@ -1,6 +1,6 @@
 # dotenvy – VS Code Environment Manager
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
 [![Publisher](https://img.shields.io/badge/publisher-FreeRave-red.svg)](https://marketplace.visualstudio.com/publishers/FreeRave)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![VS Code Marketplace](https://img.shields.io/badge/vscode-marketplace-007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
@@ -47,6 +47,62 @@ Advanced secret detection powered by custom **Large Language Model (LLM)** for s
 - **Real-time Scanning**: Instant detection during file changes
 - **Learning Capability**: Improves accuracy from user feedback
 - **Fallback Protection**: Traditional entropy-based analysis when AI unavailable
+
+---
+
+## 📋 Commands
+
+dotenvy provides a comprehensive set of commands to manage your environment files. All commands are accessible via the Command Palette (`Ctrl+Shift+P` / `⌘+Shift+P`).
+
+### 🔄 Environment Manager
+Core commands for managing and switching between environment files:
+
+- **`dotenvy: Switch Environment`** - Switch between different `.env` files (development, staging, production, etc.)
+- **`dotenvy: Open Environment Panel`** - Open the interactive environment management panel
+- **`dotenvy: Validate Environment Files`** - Validate .env files for syntax errors and required variables
+- **`dotenvy: Diff Environment Files`** - Compare environment files side-by-side before switching
+
+### 📊 Environment History
+Track and manage environment file changes over time:
+
+- **`dotenvy: View Environment History`** - View historical changes to environment files with timestamps and git integration
+
+### 🛡️ Git Integration
+Secure your commits with pre-commit hooks:
+
+- **`dotenvy: Install Git Commit Hook`** - Install pre-commit hook to prevent committing secrets and validation errors
+- **`dotenvy: Remove Git Commit Hook`** - Remove the installed git commit hook
+
+### ☁️ Cloud Sync
+Bidirectional synchronization with cloud secret managers:
+
+- **`dotenvy: Pull Environment from Cloud`** - Pull environment variables from Doppler (or other cloud providers)
+- **`dotenvy: Push Environment to Cloud`** - Push local environment variables to Doppler
+
+### 🔍 Security
+Advanced security scanning for sensitive data:
+
+- **`dotenvy: Scan for Secrets`** - Scan workspace for potential secrets using AI-powered analysis
+
+### 💬 Support
+Get help and provide feedback:
+
+- **`dotenvy: Feedback & Support`** - Access feedback form and support resources
+
+### ⌨️ Keyboard Shortcuts
+To improve productivity, consider setting up keyboard shortcuts for frequently used commands:
+
+1. Open Keyboard Shortcuts (`Ctrl+K Ctrl+S` / `⌘+K ⌘+S`)
+2. Search for "dotenvy"
+3. Assign shortcuts to your most-used commands (e.g., `Ctrl+Alt+E` for Switch Environment)
+
+### 🎮 List Commands Feature
+For easy command discovery and execution, use **`dotenvy: List Commands`** which provides:
+
+- **Interactive Quick Pick Menu**: Browse all commands organized by category
+- **Command Descriptions**: Detailed explanations of what each command does
+- **Direct Execution**: Click to run any command immediately
+- **Keyboard Shortcuts Setup**: Built-in assistance for setting up shortcuts
 
 ---
 

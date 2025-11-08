@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.1] - 2025-12-10
+## [1.1.0] - 2025-11-08
+
+### Added
+- 🎨 **History Tree View**: Added tree-like organization to history viewer with collapsible sections and better categorization
+- 🗂️ **Tabbed Main Interface**: Implemented tabbed interface for main panel with Overview, Environments, History, and Settings tabs
+- 🏷️ **Smart Environment Categorization**: Added intelligent grouping of environment files by type (local, development, staging, production)
+- 🔍 **Enhanced Search & Filtering**: Improved search functionality with advanced filters for environment management
+
+### Enhanced
+- **UI Organization**: Improved overall user interface organization and usability across the extension
+
+## [1.0.2] - 2025-10-12
 
 ### Added
 - 🧠 **AI-Powered Secret Detection**: Custom Large Language Model (LLM) service for superior secret analysis

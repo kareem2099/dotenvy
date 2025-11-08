@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import { EnvironmentProvider } from '../providers/environmentProvider';
 import { EnvironmentDiffer } from '../utils/environmentDiffer';
 import { WorkspaceManager } from '../providers/workspaceManager';
 

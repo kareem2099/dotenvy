@@ -2,7 +2,7 @@
   "name": "dotenvy",
   "displayName": "dotenvy – VS Code Environment Manager",
   "description": "Effortlessly manage and switch between .env files directly inside VS Code",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "icon": "resources/icons/icon.png",
   "main": "./out/extension.js",
   "engines": {
@@ -36,6 +36,40 @@
           "type": "boolean",
           "default": false,
           "description": "Enable AES-256 encryption for backup files"
+        },
+        "dotenvy.history.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable environment history tracking"
+        },
+        "dotenvy.history.retentionDays": {
+          "type": "number",
+          "default": 180,
+          "minimum": 1,
+          "maximum": 3650,
+          "description": "Number of days to retain environment history (1-3650 days)"
+        },
+        "dotenvy.history.maxEntries": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 10,
+          "maximum": 10000,
+          "description": "Maximum number of history entries to keep (10-10000)"
+        },
+        "dotenvy.history.autoCleanup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically clean up old history entries"
+        },
+        "dotenvy.history.trackManualEdits": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track manual edits to .env files in history"
+        },
+        "dotenvy.history.includeGitInfo": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include git user and commit information in history entries"
         }
       }
     },
@@ -80,6 +114,10 @@
       {
         "command": "dotenvy.feedback",
         "title": "dotenvy: Feedback & Support"
+      },
+      {
+        "command": "dotenvy.viewEnvironmentHistory",
+        "title": "dotenvy: View Environment History"
       }
     ],
     "viewsContainers": {
@@ -98,6 +136,18 @@
           "name": "Environment Manager",
           "type": "webview",
           "icon": "$(settings-gear)"
+        },
+        {
+          "id": "dotenvy.historyViewer",
+          "name": "Environment History",
+          "type": "webview",
+          "icon": "$(history)"
+        },
+        {
+          "id": "dotenvy.commands",
+          "name": "Environment Commands",
+          "type": "tree",
+          "icon": "$(tools)"
         }
       ],
       "explorer": [

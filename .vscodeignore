@@ -21,7 +21,40 @@ coverage
 .env.test
 !.env.example
 
-# Test files
-test-*.js
-demo-modern-ui.html
-.dotenvy.json
+# Python virtual environment - huge and unnecessary for extension
+python-llm/venv/
+python-llm/service.log
+
+# Test files and demo (include these in package)
+!test/**
+!demo-modern-ui.html
+!.dotenvy.json
+
+# Node modules and build artifacts
+node_modules/
+out/
+dist/
+tsconfig.tsbuildinfo
+package-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log
+logs/
+
+# IDE files
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+.github/
+
+# VS Code extension package should not include compiled JS
+!out/extension.js
+!out/extension.js.map
+!out/git-hook.js
+!out/git-hook.js.map

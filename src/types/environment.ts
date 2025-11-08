@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { EnvDiff } from '../utils/environmentDiffer';
 
 export interface Environment {
 	name: string;
@@ -34,6 +35,7 @@ export interface QuickEnvConfig {
 	validation?: EnvironmentValidationRules;
 	gitCommitHook?: GitCommitHookConfig;
 	cloudSync?: CloudSyncConfig;
+	history?: HistoryConfig;
 }
 
 export interface StatusBarItem {
@@ -82,4 +84,45 @@ export interface StatusBarSegment {
 	command?: string;
 	priority: number;
 	show: boolean;
+}
+
+// History & Rollback Types
+export interface HistoryEntry {
+	id: string;
+	timestamp: Date;
+	action: 'switch' | 'manual_edit' | 'rollback' | 'import' | 'initial' | 'modify';
+	environmentName: string;
+	fileName?: string; // Added fileName property
+	previousEnvironment?: string;
+	user?: string;
+	commitHash?: string;
+	diff?: EnvDiff; // This is the field that needs to be compatible with the updated EnvDiff
+	fileContent: string;
+	metadata: HistoryMetadata;
+}
+
+export interface HistoryMetadata {
+	workspace: string;
+	reason?: string;
+	tags?: string[];
+	source?: 'auto' | 'manual' | 'git';
+	checksum?: string; // For integrity verification
+}
+
+export interface HistoryConfig {
+	enabled: boolean;
+	retentionDays: number;
+	maxEntries: number;
+	autoCleanup: boolean;
+	trackManualEdits: boolean;
+	includeGitInfo: boolean;
+	storagePath?: string;
+}
+
+export interface HistoryStats {
+	totalEntries: number;
+	oldestEntry?: Date;
+	newestEntry?: Date;
+	entriesByAction: Record<string, number>;
+	storageSize: number;
 }
