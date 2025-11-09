@@ -30,11 +30,17 @@ if __name__ == "__main__":
     if not os.getenv('LOG_FORMAT'):
         os.environ['LOG_FORMAT'] = 'console'  # Use 'json' for production
 
+    # Get port from Railway (or default to 8000 for local development)
+    port = int(os.getenv('PORT', '8000'))
+
+    print(f"🚀 Starting LLM Service on port {port}")
+    print(f"🌍 Environment: {os.getenv('ENVIRONMENT', 'development')}")
+
     # Run the server
     uvicorn.run(
         "src.service:app",
         host="0.0.0.0",
-        port=8000,
+        port=port,
         reload=os.getenv('ENVIRONMENT') == 'development',
         log_level=os.getenv('LOG_LEVEL', 'info').lower(),
         access_log=True
