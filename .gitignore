@@ -95,6 +95,19 @@ jspm_packages/
 .dotenvyGit.json
 # Keep .dotenvy.json in git if you want to track config structure, but comment out sensitive data
 
+# LLM Service Files (separate repository: llm-service)
+python-llm/
+llm-service/
+*.py
+src/**/*.py
+requirements.txt
+Dockerfile
+docker-compose.yml
+railway.json
+nginx.conf
+SECURITY.md
+RAILWAY-DEPLOYMENT.md
+
 # JetBrains IDEs
 .idea/
 
