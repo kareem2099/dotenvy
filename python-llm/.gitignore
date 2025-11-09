@@ -23,6 +23,12 @@
 .railway-credentials.json
 railway-credentials.json
 
+# Key Generation Scripts (security risk - can create committable secrets)
+generate-keys.py
+keygen.py
+*keygen*
+*generate*key*
+
 # Database Files
 *.db
 *.sqlite
