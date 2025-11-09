@@ -1,0 +1,16 @@
+numpy
+scipy
+fastapi
+uvicorn[standard]
+pydantic
+python-jose[cryptography]
+python-multipart
+passlib[bcrypt]
+redis
+psycopg2-binary
+sqlalchemy
+alembic
+prometheus-client
+python-json-logger
+PyJWT
+psutil
