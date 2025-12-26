@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-11-16
+
+### Added
+- 🔐 **End-to-End Encrypted Cloud Sync**: Complete cloud synchronization with AES-256-GCM encryption protecting environment secrets
+- **AES-256-GCM Encryption Core**: Industrial-strength encryption with authenticated encryption mode, 12-byte IV, and workspace-specific keys
+- **EncryptedCloudSyncManager**: Transparent wrapper that encrypts before pushing to cloud and decrypts after pulling, with automatic key management
+- **Cloud Encryption Configuration**: Added encryptCloudSync boolean flag to CloudSyncConfig with backward compatibility
+- **Workspace-Specific Key Management**: Auto-generated per-workspace encryption keys stored securely in VSCode's globalState
+- **Push Command Encryption Integration**: Modified pushToCloud command to detect encryption settings and use encrypted manager when enabled
+- **Pull Command Decryption Integration**: Updated pullFromCloud command to handle encrypted payloads and decrypt automatically
+- **Status Bar Encryption Indicators**: Added visual encryption status to status bar with 🔐 lock icon for encrypted connections
+- **Extension Context Integration**: Properly integrated with VSCode extension context for secure key storage
+
+### Enhanced
+- 🛡️ **Enhanced Encryption Security Parameters (OWASP 2025 Compliance)**: Upgraded cryptographic parameters to modern security standards with format versioning and key rotation
+- **PBKDF2 Parameter Enhancement**: Increased PBKDF2 iterations from 100,000 to 310,000 (OWASP 2025 recommended minimum) for stronger password-based key derivation
+- **Enhanced Salt Management**: Increased salt length to 32 bytes (256-bit) and migrated salt storage to workspace-specific state for better isolation
+- **Encryption Format Versioning**: Implemented format version 2 with full backward compatibility for existing encrypted variables (supports v1 migration)
+- **Key Rotation Support**: Added EncryptionHealthUtils class with secure key rotation functionality for generating new master keys and re-encrypting variables
+- **Enhanced Cloud Encryption Metadata**: Updated cloud encryption format to version 2.0 with algorithm metadata and improved payload structure
+- **Encryption Health Monitoring**: Implemented health check utilities to assess encryption strength and recommend parameter updates
+- **TypeScript Code Quality**: Fixed TypeScript linting issues including removal of 'any' types and proper type safety
+- **Cryptographic Constants Transparency**: Made encryption parameters public for transparency while maintaining key secrecy (follows Kerckhoffs's principle)
+
+### Technical
+- **Encryption Algorithm**: AES-256-GCM with authenticated encryption (format v2)
+- **PBKDF2 Parameters**: 310,000 iterations (OWASP 2025 compliant), 256-bit salt
+- **Key Management**: Workspace-specific keys in VSCode globalState with key rotation support
+- **Encryption Format**: Versioned format: 'ENC[version|iv|tag|ciphertext]' with v1/v2 compatibility
+- **Architecture**: Transparent wrapper pattern around existing CloudSyncManager with health monitoring
+- **Security Features**: End-to-end encryption, authenticated encryption, per-workspace keys, format versioning
+- **Backward Compatibility**: Seamless migration from unencrypted to encrypted sync, format v1 compatibility
+
 ## [1.1.0] - 2025-11-08
 
 ### Added

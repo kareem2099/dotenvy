@@ -552,6 +552,12 @@ function chooseBackupLocation() {
     });
 }
 
+function restoreFromBackup() {
+    vscode.postMessage({
+        type: 'restoreFromBackup'
+    });
+}
+
 function scanSecrets() {
     vscode.postMessage({
         type: 'scanSecrets'

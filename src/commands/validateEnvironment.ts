@@ -35,13 +35,19 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 
 		const workspace = selectedWorkspace.workspace;
 		const rootPath = workspace.uri.fsPath;
-		const environmentProvider = selectedWorkspace.environmentProvider;
+		// Use workspace environment provider or create fallback for robustness
+		let environmentProvider = selectedWorkspace.environmentProvider;
+		if (!environmentProvider) {
+			// Fallback: create new provider if workspace data is incomplete
+			environmentProvider = new EnvironmentProvider(rootPath);
+		}
 
 		// Get validation rules
 		const validationRules = await ConfigUtils.getValidationRules();
 		if (!validationRules) {
+			const configPath = `${rootPath}/.dotenvy.json`;
 			vscode.window.showInformationMessage(
-				'No validation rules configured. Add validation rules to your .dotenvy.json file.'
+				`No validation rules configured. Add validation rules to: ${configPath}`
 			);
 			return;
 		}
@@ -54,7 +60,7 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 		}
 
 		// Validate all environment files
-		const validationResults = new Map<string, any>();
+		const validationResults = new Map<string, Record<string, unknown>>();
 
 		for (const env of environments) {
 			try {
@@ -77,7 +83,7 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 		await this.showValidationResults(validationResults);
 	}
 
-	private async showValidationResults(validationResults: Map<string, any>): Promise<void> {
+	private async showValidationResults(validationResults: Map<string, Record<string, unknown>>): Promise<void> {
 		const validEnvs = Array.from(validationResults.values()).filter(r => r.isValid);
 		const invalidEnvs = Array.from(validationResults.values()).filter(r => !r.isValid);
 
@@ -90,9 +96,9 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 
 		// Show validation issues
 		if (invalidEnvs.length === 1) {
-			const result = invalidEnvs[0];
-			const envName = result.environment.name;
-			const errorDetails = EnvironmentValidator.formatErrors(result.errors);
+			const result = invalidEnvs[0] as Record<string, unknown>;
+			const envName = (result.environment as Record<string, unknown>).name as string;
+			const errorDetails = EnvironmentValidator.formatErrors(result.errors as Array<{ type: 'type' | 'syntax' | 'missing' | 'custom'; message: string; [key: string]: unknown }>);
 
 			const showDetails = await vscode.window.showErrorMessage(
 				`❌ Validation failed for ${envName}`,
@@ -108,25 +114,31 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 			}
 		} else {
 			// Multiple invalid environments - show quick pick
-			const items = invalidEnvs.map(result => ({
-				label: `❌ ${result.environment.name}`,
-				description: `${result.errors.length} validation error(s)`,
-				detail: result.environment.fileName,
-				result: result
-			}));
+			const items = invalidEnvs.map(result => {
+				const resultRecord = result as Record<string, unknown>;
+				const env = resultRecord.environment as Record<string, unknown>;
+				return {
+					label: `❌ ${env.name as string}`,
+					description: `${(resultRecord.errors as Array<unknown>).length} validation error(s)`,
+					detail: env.fileName as string,
+					result: result
+				};
+			});
 
 			const validCount = validEnvs.length;
 			const invalidCount = invalidEnvs.length;
 			const totalCount = validationResults.size;
 
 			const selected = await vscode.window.showQuickPick(items, {
-				placeHolder: `Validation Results: ${validCount}/${totalCount} environments passed`
+				placeHolder: `Validation Results: ${validCount}/${totalCount} passed, ${invalidCount} failed`
 			});
 
 			if (selected) {
-				const errorDetails = EnvironmentValidator.formatErrors(selected.result.errors);
+				const selectedRecord = selected.result as Record<string, unknown>;
+				const env = selectedRecord.environment as Record<string, unknown>;
+				const errorDetails = EnvironmentValidator.formatErrors(selectedRecord.errors as Array<{ type: 'type' | 'syntax' | 'missing' | 'custom'; message: string; [key: string]: unknown }>);
 				const doc = await vscode.workspace.openTextDocument({
-					content: `Validation Report for ${selected.result.environment.name}:\n\n${errorDetails}`,
+					content: `Validation Report for ${env.name as string}:\n\n${errorDetails}`,
 					language: 'text'
 				});
 				await vscode.window.showTextDocument(doc, { preview: true });

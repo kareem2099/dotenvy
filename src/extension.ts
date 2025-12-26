@@ -10,11 +10,17 @@ import { PushToCloudCommand } from './commands/pushToCloud';
 import { ScanSecretsCommand } from './commands/scanSecrets';
 import { FeedbackCommand } from './commands/feedback';
 import { ViewEnvironmentHistoryCommand } from './commands/viewEnvironmentHistory';
+import { SetMasterPasswordCommand } from './commands/setMasterPassword';
+import { ExportEnvironmentCommand } from './commands/exportEnvironment';
+import { InitSecureProjectCommand } from './commands/initSecureProject';
+import { AddUserCommand } from './commands/addUser';
+import { RevokeUserCommand } from './commands/revokeUser';
 import { HistoryWebviewProvider } from './providers/historyWebviewProvider';
 import { WorkspaceManager } from './providers/workspaceManager';
 import { EnvironmentTreeProvider } from './providers/environmentTreeProvider';
 import { EnvironmentWebviewProvider } from './providers/environmentWebviewProvider';
 import { CommandsTreeProvider } from './providers/commandsTreeProvider';
+import { EnvironmentCompletionProvider } from './providers/environmentCompletionProvider';
 import { HistoryManager } from './utils/historyManager'; // Import HistoryManager
 import * as path from 'path'; // Import path module
 
@@ -30,17 +36,41 @@ export async function activate(context: vscode.ExtensionContext) {
 	const workspaceManager = WorkspaceManager.getInstance();
 	await workspaceManager.initializeWorkspaces();
 
-	// Register tree data providers for views
+	// Get Workspace Path
 	const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+	// --- Providers Initialization ---
 	const treeProvider = new EnvironmentTreeProvider(workspacePath);
 	const webviewProvider = new EnvironmentWebviewProvider(context);
 	const historyWebviewProvider = new HistoryWebviewProvider(extensionUri, context);
+	// 1. Initialize Completion Provider
+	const completionProvider = new EnvironmentCompletionProvider(workspacePath);
+	// --- Registrations ---
 	const webviewDisposable = vscode.window.registerWebviewViewProvider('dotenvy.environments', webviewProvider);
 	const historyWebviewDisposable = vscode.window.registerWebviewViewProvider(HistoryWebviewProvider.viewType, historyWebviewProvider);
 	const treeDisposable2 = vscode.window.registerTreeDataProvider('dotenvy.explorer-environments', treeProvider);
 	const commandsTreeProvider = new CommandsTreeProvider();
 	const commandsTreeDisposable = vscode.window.registerTreeDataProvider('dotenvy.commands', commandsTreeProvider);
-	context.subscriptions.push(webviewDisposable, historyWebviewDisposable, treeDisposable2, commandsTreeDisposable);
+	// 2. Register Completion Provider with specific filters (Performance Boost 🚀)
+	const supportedLanguages = [
+        'javascript', 'typescript', 'javascriptreact', 'typescriptreact', 
+        'vue', 'svelte', 'astro', 'html', 'json', 'jsonc', 'go', 'python', 'rust'
+    ];
+	const completionDisposable = vscode.languages.registerCompletionItemProvider(
+		supportedLanguages.map(lang => ({ language: lang, scheme: 'file' })),
+		completionProvider,
+		'.' // Trigger character
+	);
+	
+	//  3. Add 'completionProvider' itself to subscriptions 
+    // This ensures dispose() is called to clean up the internal FileWatcher
+	context.subscriptions.push(
+		webviewDisposable,
+		historyWebviewDisposable,
+		treeDisposable2,
+		commandsTreeDisposable,
+		completionDisposable,
+		completionProvider // Add the provider itself for proper disposal
+	);
 
 	// Listen for workspace changes
 	const workspaceWatcher = vscode.workspace.onDidChangeWorkspaceFolders(async (event) => {
@@ -69,71 +99,41 @@ export async function activate(context: vscode.ExtensionContext) {
 	const scanSecretsCommand = new ScanSecretsCommand();
 	const feedbackCommand = new FeedbackCommand();
 	const viewHistoryCommand = new ViewEnvironmentHistoryCommand();
+	const setMasterPasswordCommand = new SetMasterPasswordCommand(context);
+	const exportEnvironmentCommand = new ExportEnvironmentCommand();
+	const initSecureProjectCommand = new InitSecureProjectCommand();
+	const addUserCommand = new AddUserCommand();
+	const revokeUserCommand = new RevokeUserCommand();
 
-	context.subscriptions.push(switchEnvCommand);
-	context.subscriptions.push(openPanelCommand);
-	context.subscriptions.push(validateEnvCommand);
-	context.subscriptions.push(diffEnvCommand);
-	context.subscriptions.push(installHookCommand);
-	context.subscriptions.push(removeHookCommand);
-	context.subscriptions.push(pullFromCloudCommand);
-	context.subscriptions.push(pushToCloudCommand);
-	context.subscriptions.push(scanSecretsCommand);
-	context.subscriptions.push(feedbackCommand);
-	context.subscriptions.push(viewHistoryCommand);
+	
 
-	// Register the openEnvironmentPanel command
-	const openPanelDisposable = vscode.commands.registerCommand('dotenvy.openEnvironmentPanel', () => {
-		openPanelCommand.execute();
-	});
+	// Push commands to context
+	context.subscriptions.push(
+	switchEnvCommand,
+	openPanelCommand,
+	validateEnvCommand,
+	diffEnvCommand,
+	installHookCommand,
+	removeHookCommand,
+	pullFromCloudCommand,
+	pushToCloudCommand,
+	scanSecretsCommand,
+	feedbackCommand,
+	viewHistoryCommand,
+	setMasterPasswordCommand,
+	exportEnvironmentCommand,
+	initSecureProjectCommand,
+	addUserCommand,
+	revokeUserCommand
+	);
 
-	// Register the validateEnvironment command
-	const validateDisposable = vscode.commands.registerCommand('dotenvy.validateEnvironment', () => {
-		validateEnvCommand.execute();
-	});
-
-	// Register the diffEnvironment command
-	const diffDisposable = vscode.commands.registerCommand('dotenvy.diffEnvironment', () => {
-		diffEnvCommand.execute();
-	});
-
-	// Register the install/remove hook commands
-	const installHookDisposable = vscode.commands.registerCommand('dotenvy.installGitHook', () => {
-		installHookCommand.execute();
-	});
-
-	const removeHookDisposable = vscode.commands.registerCommand('dotenvy.removeGitHook', () => {
-		removeHookCommand.execute();
-	});
-
-	// Register the cloud sync commands
-	const pullFromCloudDisposable = vscode.commands.registerCommand('dotenvy.pullFromCloud', () => {
-		pullFromCloudCommand.execute();
-	});
-
-	const pushToCloudDisposable = vscode.commands.registerCommand('dotenvy.pushToCloud', () => {
-		pushToCloudCommand.execute();
-	});
-
-	// Register the scan secrets command
-	const scanSecretsDisposable = vscode.commands.registerCommand('dotenvy.scanSecrets', () => {
-		scanSecretsCommand.execute();
-	});
-
-	// Register the feedback command
-	const feedbackDisposable = vscode.commands.registerCommand('dotenvy.feedback', () => {
-		feedbackCommand.execute();
-	});
-
-	context.subscriptions.push(openPanelDisposable);
-	context.subscriptions.push(validateDisposable);
-	context.subscriptions.push(diffDisposable);
-	context.subscriptions.push(installHookDisposable);
-	context.subscriptions.push(removeHookDisposable);
-	context.subscriptions.push(pullFromCloudDisposable);
-	context.subscriptions.push(pushToCloudDisposable);
-	context.subscriptions.push(scanSecretsDisposable);
-	context.subscriptions.push(feedbackDisposable);
+	// Register Command Handlers
+    context.subscriptions.push(
+       
+        vscode.commands.registerCommand('dotenvy.initSecureProject', () => initSecureProjectCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.addUser', () => addUserCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.revokeUser', () => revokeUserCommand.execute())
+    );
 
     // Add listener for document save events
     const saveDocumentDisposable = vscode.workspace.onDidSaveTextDocument(async (document: vscode.TextDocument) => {
@@ -157,10 +157,10 @@ export async function activate(context: vscode.ExtensionContext) {
                     { source: 'auto' } // Source of the change
                 );
                 // Optionally, provide user feedback
-                vscode.window.showInformationMessage(`History recorded for ${fileName}`);
+                console.log(`[DotEnvy] History recorded silently for ${fileName}`);
             } catch (error) {
                 console.error(`Failed to record history for ${fileName}:`, error);
-                vscode.window.showErrorMessage(`Failed to record history for ${fileName}. See console for details.`);
+                // vscode.window.showErrorMessage(`Failed to record history for ${fileName}. See console for details.`);
             }
         }
     });

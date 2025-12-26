@@ -7,12 +7,15 @@
  */
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { HistoryEntry, HistoryConfig, HistoryStats, HistoryMetadata } from '../types/environment';
 import { ConfigUtils } from './configUtils';
 import { HistoryAnalytics, AnalyticsSummary } from './historyAnalytics';
 import { HistoryFilters, HistoryFilterOptions, FilterResult } from './historyFilters';
+import { EnvDiff, EnvironmentDiffer } from './environmentDiffer';
+import { execSync } from 'child_process';
 
 export class HistoryManager {
     private static readonly HISTORY_DIR = '.dotenvy';
@@ -87,13 +90,13 @@ export class HistoryManager {
         action: HistoryEntry['action'],
         environmentName: string,
         fileContent: string,
-        fileName: string = '', // Provide a default value for fileName
+        fileName = '', // Provide a default value for fileName
         options: {
             previousEnvironment?: string;
             reason?: string;
             tags?: string[];
             source?: HistoryMetadata['source'];
-            diff?: any;
+            diff?: EnvDiff | null;
         } = {}
     ): Promise<HistoryEntry | null> {
         const config = await this.getConfig();
@@ -194,8 +197,6 @@ export class HistoryManager {
      */
     private static async getGitInfo(rootPath: string): Promise<{ user?: string; commitHash?: string }> {
         try {
-            const { execSync } = require('child_process');
-
             // Get git user
             let user: string | undefined;
             try {
@@ -429,7 +430,7 @@ export class HistoryManager {
     /**
      * Calculate diff with blame information
      */
-    private static async calculateDiffWithBlame(rootPath: string, newContent: string): Promise<any> {
+    private static async calculateDiffWithBlame(rootPath: string, newContent: string): Promise<EnvDiff | null> {
         try {
             // Get the most recent history entry to compare against
             const recentEntries = await this.getHistory(rootPath, 1);
@@ -441,7 +442,7 @@ export class HistoryManager {
             }
 
             // Create temporary files for diff calculation
-            const tempDir = require('os').tmpdir();
+            const tempDir = os.tmpdir();
             const tempOldFile = `${tempDir}/dotenvy-diff-old-${Date.now()}.env`;
             const tempNewFile = `${tempDir}/dotenvy-diff-new-${Date.now()}.env`;
 
@@ -451,7 +452,6 @@ export class HistoryManager {
                 fs.writeFileSync(tempNewFile, newContent);
 
                 // Calculate diff
-                const { EnvironmentDiffer } = require('./environmentDiffer');
                 const diff = EnvironmentDiffer.compareFiles(tempOldFile, tempNewFile);
 
                 // Add blame information to changed variables
@@ -538,7 +538,7 @@ export class HistoryManager {
     /**
      * Get cached analytics or generate new ones
      */
-    static async getAnalytics(rootPath: string, forceRefresh: boolean = false): Promise<AnalyticsSummary> {
+    static async getAnalytics(rootPath: string, forceRefresh = false): Promise<AnalyticsSummary> {
         const cacheFile = path.join(await this.getHistoryDir(rootPath), 'analytics-cache.json');
 
         // Check if we have cached analytics and they're not too old

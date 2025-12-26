@@ -26,6 +26,7 @@ export interface CloudSyncConfig {
 	config: string;
 	token?: string; // Optional, can be set via env var or secure storage
 	baseUrl?: string; // For custom Vault installations
+	encryptCloudSync?: boolean; // Enable end-to-end encryption for cloud sync
 }
 
 export interface QuickEnvConfig {
@@ -61,6 +62,7 @@ export interface CloudSyncStatus {
 	lastSync?: Date;
 	hasConfig?: boolean;
 	error?: string;
+	encryptionEnabled?: boolean;
 }
 
 export interface GitHookStatus {
@@ -96,7 +98,7 @@ export interface HistoryEntry {
 	previousEnvironment?: string;
 	user?: string;
 	commitHash?: string;
-	diff?: EnvDiff; // This is the field that needs to be compatible with the updated EnvDiff
+	diff?: EnvDiff | null; // This is the field that needs to be compatible with the updated EnvDiff
 	fileContent: string;
 	metadata: HistoryMetadata;
 }

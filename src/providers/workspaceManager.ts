@@ -10,6 +10,7 @@ export interface WorkspaceContext {
 	statusBarProvider: StatusBarProvider;
 	gitBranchWatcher: GitBranchWatcher | null;
 	treeProvider: EnvironmentTreeProvider;
+	workspaceDisposables?: vscode.Disposable[];
 }
 
 export class WorkspaceManager {
@@ -62,6 +63,8 @@ export class WorkspaceManager {
 
 		// Initialize git branch watcher
 		let gitBranchWatcher: GitBranchWatcher | null = null;
+		const workspaceDisposables: vscode.Disposable[] = [];
+
 		try {
 			gitBranchWatcher = new GitBranchWatcher(workspacePath, statusBarProvider);
 			// Subscribe to dispose event
@@ -70,7 +73,10 @@ export class WorkspaceManager {
 					gitBranchWatcher?.dispose();
 				}
 			};
-			// Note: In real implementation, this should be added to extension context subscriptions
+
+			// Add to workspace disposables tracking for proper cleanup
+			workspaceDisposables.push(disposable);
+
 		} catch (error) {
 			// Git watcher failed to initialize, continue without it
 			console.log(`Git branch watcher not available for workspace ${workspaceName}`);
@@ -81,7 +87,8 @@ export class WorkspaceManager {
 			environmentProvider,
 			statusBarProvider,
 			gitBranchWatcher,
-			treeProvider
+			treeProvider,
+			workspaceDisposables
 		};
 
 		this.workspaces.set(workspacePath, context);
@@ -112,6 +119,11 @@ export class WorkspaceManager {
 	 */
 	clearWorkspaces(): void {
 		for (const [workspacePath, context] of this.workspaces) {
+			// Log workspace cleanup for debugging
+			console.log(`Clearing workspace: ${workspacePath}`);
+
+			// Dispose all workspace-specific resources
+			context.workspaceDisposables?.forEach(disposable => disposable.dispose());
 			context.gitBranchWatcher?.dispose();
 			context.statusBarProvider.dispose();
 		}

@@ -8,6 +8,7 @@ import { DopplerSyncManager } from '../utils/dopplerSyncManager';
 import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { EnvironmentValidator } from '../utils/environmentValidator';
 import { FileUtils } from '../utils/fileUtils';
+import { CloudEncryptionUtils } from '../utils/encryptedCloudSyncManager';
 import {
 	EnvironmentStatus,
 	CloudSyncStatus,
@@ -153,7 +154,7 @@ export class StatusBarProvider implements vscode.Disposable {
 	/**
 	 * Check cloud sync configuration and connection
 	 */
-	private async checkCloudSyncStatus(rootPath: string, config: any): Promise<CloudSyncStatus> {
+	private async checkCloudSyncStatus(rootPath: string, config: import('../types/environment').QuickEnvConfig | null): Promise<CloudSyncStatus> {
 		const status: CloudSyncStatus = {
 			connected: false,
 			hasConfig: !!config?.cloudSync
@@ -164,16 +165,18 @@ export class StatusBarProvider implements vscode.Disposable {
 		}
 
 		try {
-			const syncConfig = config.cloudSync;
-			status.provider = syncConfig.provider;
+			const syncConfig = config!.cloudSync;
+			status.provider = syncConfig!.provider;
+			// Use CloudEncryptionUtils for consistent encryption status checking
+			status.encryptionEnabled = await CloudEncryptionUtils.isCloudEncryptionEnabled(); // Will use config from workspace
 
 			let cloudManager: CloudSyncManager;
-			switch (syncConfig.provider) {
+			switch (syncConfig!.provider) {
 				case 'doppler':
-					cloudManager = new DopplerSyncManager(syncConfig);
+					cloudManager = new DopplerSyncManager(syncConfig!);
 					break;
 				default:
-					status.error = `Unsupported provider: ${syncConfig.provider}`;
+					status.error = `Unsupported provider: ${syncConfig!.provider}`;
 					return status;
 			}
 
@@ -192,7 +195,7 @@ export class StatusBarProvider implements vscode.Disposable {
 	/**
 	 * Check validation status
 	 */
-	private async checkValidationStatus(rootPath: string, envPath: string, config: any): Promise<ValidationStatus> {
+	private async checkValidationStatus(rootPath: string, envPath: string, config: import('../types/environment').QuickEnvConfig | null): Promise<ValidationStatus> {
 		const status: ValidationStatus = {
 			valid: true,
 			errors: 0,
@@ -200,6 +203,11 @@ export class StatusBarProvider implements vscode.Disposable {
 		};
 
 		if (!config?.validation || !fs.existsSync(envPath)) {
+			// Even without validation config, check for obvious security issues
+			if (fs.existsSync(envPath)) {
+				const secretWarnings = FileUtils.checkForSecrets(envPath);
+				status.warnings = secretWarnings.length;
+			}
 			return status;
 		}
 
@@ -207,6 +215,11 @@ export class StatusBarProvider implements vscode.Disposable {
 			const errors = EnvironmentValidator.validateFile(envPath, config.validation);
 			status.valid = errors.length === 0;
 			status.errors = errors.length;
+
+			// Add security check for potential secrets
+			const secretWarnings = FileUtils.checkForSecrets(envPath);
+			status.warnings = (status.warnings || 0) + secretWarnings.length;
+
 			status.lastValidated = new Date();
 		} catch (error) {
 			status.valid = false;
@@ -229,8 +242,15 @@ export class StatusBarProvider implements vscode.Disposable {
 			return;
 		}
 
-		let text = status.connected ? '☁️ ✓' : '☁️ ✗';
+		let text = '';
 		let tooltip = `Cloud Sync: ${status.provider || 'Unknown'}`;
+
+		if (status.encryptionEnabled) {
+			text = status.connected ? '🔐 ✓' : '🔐 ✗';
+			tooltip += ' (Encrypted)';
+		} else {
+			text = status.connected ? '☁️ ✓' : '☁️ ✗';
+		}
 
 		if (status.connected) {
 			tooltip += ' (Connected ✓)';

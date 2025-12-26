@@ -4,16 +4,25 @@ import { HistoryEntry } from '../types/environment';
 import { EnvironmentDiffer } from '../utils/environmentDiffer';
 import { WorkspaceManager } from '../providers/workspaceManager';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
 
 export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
+	private disposables: vscode.Disposable[] = [];
+	private commandDisposable?: vscode.Disposable;
+
 	constructor() {
 		this.registerCommand();
 	}
 
-	private registerCommand() {
-		const disposable = vscode.commands.registerCommand('dotenvy.viewEnvironmentHistory', () => {
+	private registerCommand(): vscode.Disposable {
+		this.commandDisposable = vscode.commands.registerCommand('dotenvy.viewEnvironmentHistory', () => {
 			this.execute();
 		});
+
+		// Store for proper disposal
+		this.disposables.push(this.commandDisposable);
+		return this.commandDisposable;
 	}
 
 	public async execute(): Promise<void> {
@@ -155,20 +164,21 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 	}
 
 	private async viewHistoryDiff(entry: HistoryEntry, rootPath: string): Promise<void> {
-		const currentEnvPath = `${rootPath}/.env`;
+		// Use path module for cross-platform path operations
+		const currentEnvPath = path.join(rootPath, '.env');
 
 		try {
-			// Create temporary file for historical content
-			const tempDir = require('os').tmpdir();
-			const tempFile = `${tempDir}/dotenvy-history-${entry.id}.env`;
-			require('fs').writeFileSync(tempFile, entry.fileContent);
+			// Create temporary file for historical content using path.join for proper path construction
+			const tempDir = os.tmpdir();
+			const tempFile = path.join(tempDir, `dotenvy-history-${entry.id}.env`);
+			fs.writeFileSync(tempFile, entry.fileContent);
 
 			// Generate diff
 			const diff = EnvironmentDiffer.compareFiles(tempFile, currentEnvPath);
 			const diffText = EnvironmentDiffer.formatDiffForDisplay(diff, entry.environmentName, 'Current');
 
 			// Clean up temp file
-			require('fs').unlinkSync(tempFile);
+			fs.unlinkSync(tempFile);
 
 			// Show diff
 			const doc = await vscode.workspace.openTextDocument({
@@ -225,7 +235,12 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 		}
 	}
 
-	public dispose() {
-		// Commands are disposed via vscode subscriptions
+	public dispose(): void {
+		// Dispose of all stored disposables for proper cleanup
+		this.disposables.forEach(disposable => disposable.dispose());
+		this.disposables.length = 0;
+
+		// Clear references
+		this.commandDisposable = undefined;
 	}
 }

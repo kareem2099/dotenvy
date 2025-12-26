@@ -1,4 +1,5 @@
 import { FileUtils } from './fileUtils';
+import * as vscode from 'vscode';
 
 export class SecretsGuard {
 	/**
@@ -16,8 +17,6 @@ export class SecretsGuard {
 		if (warnings.length > 0) {
 			const message = `⚠️ Potential secrets detected: ${warnings.join(', ')}. ` +
 							'Ensure you are not committing sensitive data.';
-			// Import vscode dynamically to avoid circular imports in utils
-			const vscode = require('vscode');
 			vscode.window.showWarningMessage(message);
 		}
 	}

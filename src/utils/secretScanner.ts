@@ -246,7 +246,7 @@ export class SecretScanner {
         const usedNames = new Set<string>();
 
         return secrets.map(secret => {
-            let baseName = this.generateBaseEnvVarName(secret);
+            const baseName = this.generateBaseEnvVarName(secret);
             let finalName = baseName;
             let counter = 1;
 

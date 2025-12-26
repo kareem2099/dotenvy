@@ -151,7 +151,7 @@ export class FeedbackCommand implements vscode.Disposable {
 
 	private async contactDeveloper(): Promise<void> {
 		// You can replace this with your preferred contact method
-		let contactMethod = await vscode.window.showQuickPick(
+		const contactMethod = await vscode.window.showQuickPick(
 			[
 				{
 					label: '📧 Email',

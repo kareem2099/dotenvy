@@ -452,7 +452,7 @@ export class HistoryAnalytics {
     /**
      * Get top N most frequent environments
      */
-    static getTopEnvironments(analytics: AnalyticsSummary, limit: number = 5): Array<{ name: string; count: number }> {
+    static getTopEnvironments(analytics: AnalyticsSummary, limit = 5): Array<{ name: string; count: number }> {
         return Object.entries(analytics.usagePatterns.environmentFrequency)
             .sort(([, a], [, b]) => b - a)
             .slice(0, limit)
@@ -475,7 +475,7 @@ export class HistoryAnalytics {
     /**
      * Get most changed variables
      */
-    static getMostChangedVariables(analytics: AnalyticsSummary, limit: number = 10): Array<{ name: string; changes: number }> {
+    static getMostChangedVariables(analytics: AnalyticsSummary, limit = 10): Array<{ name: string; changes: number }> {
         return Object.entries(analytics.variableAnalytics.changeFrequency)
             .sort(([, a], [, b]) => b - a)
             .slice(0, limit)

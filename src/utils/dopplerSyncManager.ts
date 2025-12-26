@@ -1,6 +1,11 @@
 import * as https from 'https';
 import { CloudSyncManager, CloudSecrets, CloudSyncResult } from './cloudSyncManager';
 
+// Doppler API response format for individual secrets
+type DopplerSecretData = {
+	computed: string;
+} | string;
+
 export class DopplerSyncManager extends CloudSyncManager {
 	private resolvedConfig?: string;
 
@@ -18,7 +23,7 @@ export class DopplerSyncManager extends CloudSyncManager {
 			// Doppler returns secrets in { key: value } format, but we need to process it
 			const secrets: CloudSecrets = {};
 
-			for (const [key, secretData] of Object.entries(parsed) as [string, any][]) {
+			for (const [key, secretData] of Object.entries(parsed) as [string, DopplerSecretData][]) {
 				if (secretData && typeof secretData === 'object' && 'computed' in secretData) {
 					secrets[key] = secretData.computed;
 				} else if (typeof secretData === 'string') {
@@ -148,7 +153,7 @@ export class DopplerSyncManager extends CloudSyncManager {
 	/**
 	 * Make authenticated request to Doppler API
 	 */
-	private async makeDopplerRequest(url: string, method: string = 'GET'): Promise<string> {
+	private async makeDopplerRequest(url: string, method = 'GET'): Promise<string> {
 		const options: https.RequestOptions = {
 			hostname: 'api.doppler.com',
 			path: url.replace('https://api.doppler.com', ''),

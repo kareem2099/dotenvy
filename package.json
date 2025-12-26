@@ -2,7 +2,7 @@
   "name": "dotenvy",
   "displayName": "dotenvy – VS Code Environment Manager",
   "description": "Effortlessly manage and switch between .env files directly inside VS Code",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "icon": "resources/icons/icon.png",
   "main": "./out/extension.js",
   "engines": {
@@ -118,6 +118,21 @@
       {
         "command": "dotenvy.viewEnvironmentHistory",
         "title": "dotenvy: View Environment History"
+      },
+      {
+        "command": "dotenvy.initSecureProject",
+        "title": "dotenvy: Init Secure Project",
+        "icon": "$(shield-lock)"
+      },
+      {
+        "command": "dotenvy.addUser",
+        "title": "dotenvy: Add User to Secure Project",
+        "icon": "$(person-add)"
+      },
+      {
+        "command": "dotenvy.revokeUser",
+        "title": "dotenvy: Revoke User Access",
+        "icon": "$(person-remove)"
       }
     ],
     "viewsContainers": {

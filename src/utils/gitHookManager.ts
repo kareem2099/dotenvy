@@ -5,6 +5,7 @@ import { SecretsGuard } from './secretsGuard';
 import { EnvironmentValidator } from './environmentValidator';
 import { ConfigUtils } from './configUtils';
 import { GitCommitHookConfig } from '../types/environment';
+import { spawn } from 'child_process';
 
 export class GitHookManager {
 	/**
@@ -172,7 +173,6 @@ exec "$HOOK_SCRIPT" "$WORKSPACE_DIR"
 	 */
 	private static async execGitCommand(cwd: string, args: string[]): Promise<string> {
 		return new Promise((resolve, reject) => {
-			const { spawn } = require('child_process');
 			const git = spawn('git', args, { cwd });
 
 			let stdout = '';

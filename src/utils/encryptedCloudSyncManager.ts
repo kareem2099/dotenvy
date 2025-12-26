@@ -1,0 +1,237 @@
+import * as crypto from 'crypto';
+import * as vscode from 'vscode';
+import { CloudSyncManager, CloudSecrets, CloudSyncResult } from './cloudSyncManager';
+import { CloudSyncConfig } from '../types/environment';
+
+/**
+ * Encrypted wrapper that provides end-to-end encryption for cloud sync operations
+ * Encrypts data before sending to cloud and decrypts after receiving from cloud
+ * Updated with modern cryptographic parameters for enhanced security
+ */
+export class EncryptedCloudSyncManager extends CloudSyncManager {
+    private static readonly CLOUD_ENCRYPT_ALGO = 'aes-256-gcm';
+    private static readonly KEY_LENGTH = 32;
+    private static readonly IV_LENGTH = 12;
+    private static readonly CLOUD_ENCRYPT_FORMAT_VERSION = '2.0'; // Include format metadata
+
+    private encryptionEnabled: boolean;
+    private wrappedManager: CloudSyncManager;
+
+    constructor(config: CloudSyncConfig, wrappedManager: CloudSyncManager, encryptionEnabled = true) {
+        super(config);
+        this.wrappedManager = wrappedManager;
+        this.encryptionEnabled = encryptionEnabled;
+    }
+
+    /**
+     * Get or create cloud encryption key for this workspace
+     */
+    private static async getCloudEncryptionKey(context: vscode.ExtensionContext): Promise<Buffer> {
+        const workspace = vscode.workspace.workspaceFolders?.[0]?.name || 'default';
+        const keyId = `cloud-key-${workspace}`;
+
+        const storedKey = context.globalState.get(keyId) as string;
+        if (storedKey) {
+            return Buffer.from(storedKey, 'base64');
+        }
+
+        // Generate new cloud encryption key
+        const key = crypto.randomBytes(this.KEY_LENGTH);
+        await context.globalState.update(keyId, key.toString('base64'));
+        return key;
+    }
+
+    /**
+     * Encrypt cloud secrets payload
+     */
+    private static encryptCloudPayload(data: CloudSecrets, key: Buffer): string {
+        const plaintext = JSON.stringify(data);
+        const iv = crypto.randomBytes(this.IV_LENGTH);
+
+        const cipher = crypto.createCipheriv(this.CLOUD_ENCRYPT_ALGO, key, iv);
+        const encrypted = Buffer.concat([
+            cipher.update(Buffer.from(plaintext, 'utf8')),
+            cipher.final()
+        ]);
+
+        const authTag = cipher.getAuthTag();
+
+        // Format: base64(iv).base64(tag).base64(encrypted)
+        const payload = [
+            iv.toString('base64'),
+            authTag.toString('base64'),
+            encrypted.toString('base64')
+        ].join('.');
+
+        return payload;
+    }
+
+    /**
+     * Decrypt cloud secrets payload
+     */
+    private static decryptCloudPayload(encryptedPayload: string, key: Buffer): CloudSecrets {
+        const parts = encryptedPayload.split('.');
+        if (parts.length !== 3) {
+            throw new Error('Invalid encrypted cloud payload format');
+        }
+
+        const [ivB64, tagB64, ctB64] = parts;
+
+        try {
+            const iv = Buffer.from(ivB64, 'base64');
+            const authTag = Buffer.from(tagB64, 'base64');
+            const ciphertext = Buffer.from(ctB64, 'base64');
+
+            const decipher = crypto.createDecipheriv(this.CLOUD_ENCRYPT_ALGO, key, iv);
+            decipher.setAuthTag(authTag);
+
+            const decrypted = Buffer.concat([
+                decipher.update(ciphertext),
+                decipher.final()
+            ]);
+
+            return JSON.parse(decrypted.toString('utf8'));
+        } catch (error) {
+            throw new Error(`Cloud payload decryption failed: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * Fetch secrets with automatic decryption
+     */
+    async fetchSecrets(context?: vscode.ExtensionContext): Promise<CloudSyncResult> {
+        const result = await this.wrappedManager.fetchSecrets();
+
+        if (!result.success || !result.secrets || !this.encryptionEnabled) {
+            return result;
+        }
+
+        if (!context) {
+            throw new Error('Extension context required for encrypted cloud sync');
+        }
+
+        try {
+            // Cloud providers may return data in special format for encrypted sync
+            // Look for encrypted payload marker
+            const encryptedKey = Object.keys(result.secrets).find(key => key.startsWith('__dotenvy_encrypted__'));
+            if (!encryptedKey) {
+                // No encryption detected - return as-is for backward compatibility
+                return result;
+            }
+
+            const encryptedPayload = result.secrets[encryptedKey];
+            const key = await EncryptedCloudSyncManager.getCloudEncryptionKey(context);
+            const decryptedSecrets = EncryptedCloudSyncManager.decryptCloudPayload(encryptedPayload, key);
+
+            return {
+                success: true,
+                secrets: decryptedSecrets
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: `Failed to decrypt cloud secrets: ${(error as Error).message}`
+            };
+        }
+    }
+
+    /**
+     * Push secrets with automatic encryption
+     */
+    async pushSecrets(secrets: CloudSecrets, context?: vscode.ExtensionContext): Promise<CloudSyncResult> {
+        if (!this.encryptionEnabled || !context) {
+            return this.wrappedManager.pushSecrets(secrets);
+        }
+
+        try {
+            const key = await EncryptedCloudSyncManager.getCloudEncryptionKey(context);
+            const encryptedPayload = EncryptedCloudSyncManager.encryptCloudPayload(secrets, key);
+
+            // Store encrypted data under special key that cloud provider will recognize
+            const encryptedSecrets: CloudSecrets = {
+                '__dotenvy_encrypted__': encryptedPayload,
+                '__dotenvy_encryption_version__': EncryptedCloudSyncManager.CLOUD_ENCRYPT_FORMAT_VERSION,
+                '__dotenvy_last_sync__': new Date().toISOString(),
+                '__dotenvy_encryption_algo__': EncryptedCloudSyncManager.CLOUD_ENCRYPT_ALGO
+            };
+
+            return await this.wrappedManager.pushSecrets(encryptedSecrets);
+        } catch (error) {
+            return {
+                success: false,
+                error: `Failed to encrypt and push secrets: ${(error as Error).message}`
+            };
+        }
+    }
+
+    /**
+     * Test connection (no encryption needed)
+     */
+    async testConnection(): Promise<CloudSyncResult> {
+        return this.wrappedManager.testConnection();
+    }
+
+    /**
+     * Get encrypted cloud manager factory
+     */
+    static async createEncryptedManager(
+        config: CloudSyncConfig,
+        context: vscode.ExtensionContext,
+        enableEncryption = true
+    ): Promise<EncryptedCloudSyncManager> {
+        let manager: CloudSyncManager;
+
+        // Import and create appropriate manager based on provider
+        switch (config.provider) {
+            case 'doppler':
+                const { DopplerSyncManager } = await import('./dopplerSyncManager');
+                manager = new DopplerSyncManager(config);
+                break;
+            default:
+                throw new Error(`Unsupported cloud provider for encryption: ${config.provider}`);
+        }
+
+        return new EncryptedCloudSyncManager(config, manager, enableEncryption);
+    }
+}
+
+/**
+ * Utility functions for cloud encryption management
+ */
+export class CloudEncryptionUtils {
+    /**
+     * Check if workspace has cloud encryption enabled
+     */
+    static async isCloudEncryptionEnabled(context?: vscode.ExtensionContext): Promise<boolean> {
+        // Parameter kept for API consistency, may be used in future for encryption settings
+        void context;
+
+        const config = vscode.workspace.getConfiguration('dotenvy');
+        const cloudConfig = config.get<Partial<CloudSyncConfig>>('cloudSync');
+        return !!(cloudConfig?.encryptCloudSync !== false); // Default to enabled
+    }
+
+    /**
+     * Get cloud encryption status for workspace
+     */
+    static async getCloudEncryptionStatus(context: vscode.ExtensionContext): Promise<{
+        enabled: boolean;
+        hasKey: boolean;
+        lastSync?: string;
+    }> {
+        const enabled = await this.isCloudEncryptionEnabled(context);
+
+        const workspace = vscode.workspace.workspaceFolders?.[0]?.name || 'default';
+        const keyId = `cloud-key-${workspace}`;
+        const hasKey = !!(context.globalState.get(keyId) as string);
+
+        // Check last sync from extensions global storage
+        const lastSync = context.globalState.get('cloud-last-encrypted-sync') as string;
+
+        return {
+            enabled,
+            hasKey,
+            lastSync
+        };
+    }
+}

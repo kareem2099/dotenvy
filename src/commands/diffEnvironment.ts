@@ -66,7 +66,16 @@ export class DiffEnvironmentCommand implements vscode.Disposable {
 
         // Perform diff
         try {
-            const diff = EnvironmentDiffer.compareFiles(sourceSelection.env.filePath, targetSelection.env.filePath);
+            // Ensure files are within workspace
+            const sourcePath = sourceSelection.env.filePath;
+            const targetPath = targetSelection.env.filePath;
+
+            if (!sourcePath.startsWith(rootPath) || !targetPath.startsWith(rootPath)) {
+                vscode.window.showErrorMessage('Environment files must be within the selected workspace.');
+                return;
+            }
+
+            const diff = EnvironmentDiffer.compareFiles(sourcePath, targetPath);
             const diffText = EnvironmentDiffer.formatDiffForDisplay(diff, sourceSelection.env.name, targetSelection.env.name);
 
             // Show diff in a new document
