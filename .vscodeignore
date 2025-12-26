@@ -13,13 +13,11 @@ coverage
 
 # Environment files - should not be in extension package
 .env
-.env.local
-.env.*.local
-.env.development
-.env.production
-.env.staging
-.env.test
+.env.*
+**/.env
+**/.env.*
 !.env.example
+!test/.env.example
 
 # Python virtual environment - huge and unnecessary for extension
 python-llm/venv/
