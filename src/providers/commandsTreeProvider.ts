@@ -12,8 +12,6 @@ export class CommandsTreeProvider implements vscode.TreeDataProvider<vscode.Tree
     private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined | void> = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
     readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> = this._onDidChangeTreeData.event;
 
-    constructor() {}
-
     refresh(): void {
         this._onDidChangeTreeData.fire();
     }
@@ -96,6 +94,24 @@ export class CommandsTreeProvider implements vscode.TreeDataProvider<vscode.Tree
                 title: 'View Environment History',
                 category: 'DotEnvy',
                 description: 'Opens the environment history viewer to see past changes'
+            },
+            {
+                command: 'dotenvy.initSecureProject',
+                title: 'Init Secure Project',
+                category: 'DotEnvy',
+                description: 'Initialize a new secure project with multi-user key wrapping encryption'
+            },
+            {
+                command: 'dotenvy.addUser',
+                title: 'Add User to Secure Project',
+                category: 'DotEnvy',
+                description: 'Add a new developer to the secure project with individual access credentials'
+            },
+            {
+                command: 'dotenvy.revokeUser',
+                title: 'Revoke User Access',
+                category: 'DotEnvy',
+                description: 'Remove a user\'s access to the secure project environment'
             }
         ];
     }

@@ -7,6 +7,8 @@ import { DopplerSyncManager } from '../utils/dopplerSyncManager';
 import { CloudSyncManager, CloudSecrets } from '../utils/cloudSyncManager';
 import { FileUtils } from '../utils/fileUtils';
 import { StatusBarProvider } from '../providers/statusBarProvider';
+import { extensionContext } from '../extension';
+import { EncryptedCloudSyncManager } from '../utils/encryptedCloudSyncManager';
 
 export class PullFromCloudCommand implements vscode.Disposable {
 	public async execute(): Promise<void> {
@@ -39,10 +41,11 @@ export class PullFromCloudCommand implements vscode.Disposable {
 
 		const workspace = selectedWorkspace.workspace;
 		const rootPath = workspace.uri.fsPath;
-		const statusBarProvider = selectedWorkspace.statusBarProvider;
+		// Use StatusBarProvider for explicit type safety and IntelliSense
+		const statusBarProvider: StatusBarProvider | undefined = selectedWorkspace.statusBarProvider;
 
 		// Check if cloud sync is configured
-		let config = await ConfigUtils.readQuickEnvConfig();
+		const config = await ConfigUtils.readQuickEnvConfig();
 		const configPath = path.join(rootPath, '.dotenvy.json');
 		if (!config?.cloudSync || !config.cloudSync.project || !config.cloudSync.config || !config.cloudSync.token) {
 			// Create basic configuration file automatically
@@ -94,15 +97,30 @@ export class PullFromCloudCommand implements vscode.Disposable {
 
 		try {
 			const syncConfig = config.cloudSync!;
-			let cloudManager: CloudSyncManager;
+			let cloudManager: CloudSyncManager | undefined;
 
-			// Initialize appropriate cloud provider
-			switch (syncConfig.provider) {
-				case 'doppler':
-					cloudManager = new DopplerSyncManager(syncConfig);
-					break;
-				default:
-					throw new Error(`Unsupported cloud provider: ${syncConfig.provider}`);
+			// Check if encrypted cloud sync is enabled (default: enabled)
+			const enableEncryption = !(syncConfig.encryptCloudSync === false);
+
+			if (enableEncryption) {
+				try {
+					// Use the global extension context from the activated extension
+					cloudManager = await EncryptedCloudSyncManager.createEncryptedManager(syncConfig, extensionContext, true);
+					vscode.window.showInformationMessage('🔐 Encrypted cloud sync enabled');
+				} catch (error) {
+					vscode.window.showWarningMessage(`Encrypted cloud sync failed to initialize: ${(error as Error).message} - falling back to standard sync`);
+				}
+			}
+
+			// Initialize standard cloud provider if encryption not used or failed
+			if (!cloudManager) {
+				switch (syncConfig.provider) {
+					case 'doppler':
+						cloudManager = new DopplerSyncManager(syncConfig);
+						break;
+					default:
+						throw new Error(`Unsupported cloud provider: ${syncConfig.provider}`);
+				}
 			}
 
 			// Test connection
@@ -191,7 +209,7 @@ export class PullFromCloudCommand implements vscode.Disposable {
 
 			// Show preview of what will be changed
 			const currentEnvPath = path.join(rootPath, '.env');
-			let currentSecrets: CloudSecrets = {};
+			const currentSecrets: CloudSecrets = {};
 
 			if (fs.existsSync(currentEnvPath)) {
 				const envContent = fs.readFileSync(currentEnvPath, 'utf8');

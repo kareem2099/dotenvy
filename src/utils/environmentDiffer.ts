@@ -99,8 +99,8 @@ export class EnvironmentDiffer {
                 j++;
             } else {
                 // Mismatch found, determine type of change
-                let startI = i;
-                let startJ = j;
+                const startI = i;
+                const startJ = j;
 
                 // Find end of differing segment in original
                 while (i < original.length && (j >= modified.length || original[i] !== modified[j])) {
@@ -209,11 +209,15 @@ export class EnvironmentDiffer {
         result += `# Changes: +${summary.addedCount} -${summary.removedCount} ~${summary.changedCount}\n\n`;
 
         // Sort variables by status and alphabetically
-        const allVars = [
-            ...diff.added.map(v => ({ type: 'added', var: v })),
-            ...diff.removed.map(v => ({ type: 'removed', var: v })),
-            ...diff.changed.map(c => ({ type: 'changed', var: c.variable, oldValue: c.oldValue, blame: c.blame, valueChanges: c.valueChanges })),
-            ...diff.unchanged.map(v => ({ type: 'unchanged', var: v }))
+        type DiffDisplayItem =
+            | { type: 'added' | 'removed' | 'unchanged'; var: EnvVariable }
+            | { type: 'changed'; var: EnvVariable; oldValue: string; blame?: EnvDiff['changed'][0]['blame']; valueChanges?: EnvDiff['changed'][0]['valueChanges'] };
+
+        const allVars: DiffDisplayItem[] = [
+            ...diff.added.map(v => ({ type: 'added' as const, var: v })),
+            ...diff.removed.map(v => ({ type: 'removed' as const, var: v })),
+            ...diff.changed.map(c => ({ type: 'changed' as const, var: c.variable, oldValue: c.oldValue, blame: c.blame, valueChanges: c.valueChanges })),
+            ...diff.unchanged.map(v => ({ type: 'unchanged' as const, var: v }))
         ].sort((a, b) => {
             // Sort by type priority, then alphabetically by key
             const typeOrder: Record<string, number> = { 'added': 0, 'removed': 1, 'changed': 2, 'unchanged': 3 };
@@ -224,9 +228,9 @@ export class EnvironmentDiffer {
 
         for (const item of allVars) {
             const { type, var: variable } = item;
-            const oldValue = (item as any).oldValue;
-            const blame = (item as any).blame;
-            const valueChanges = (item as any).valueChanges;
+            const oldValue = (item as Extract<DiffDisplayItem, { type: 'changed' }>).oldValue;
+            const blame = (item as Extract<DiffDisplayItem, { type: 'changed' }>).blame;
+            const valueChanges = (item as Extract<DiffDisplayItem, { type: 'changed' }>).valueChanges;
 
             switch (type) {
                 case 'added':

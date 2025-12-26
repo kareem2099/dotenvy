@@ -5,20 +5,27 @@ import { StatusBarProvider } from '../providers/statusBarProvider';
 import { FileUtils } from '../utils/fileUtils';
 import { SecretsGuard } from '../utils/secretsGuard';
 import { EnvironmentValidator } from '../utils/environmentValidator';
-import { EnvironmentDiffer } from '../utils/environmentDiffer';
+import { EnvironmentDiffer, EnvDiff } from '../utils/environmentDiffer';
 import { ConfigUtils } from '../utils/configUtils';
 import { WorkspaceManager } from '../providers/workspaceManager';
 import { HistoryManager } from '../utils/historyManager';
 
 export class SwitchEnvironmentCommand implements vscode.Disposable {
+	private disposables: vscode.Disposable[] = [];
+	private commandDisposable?: vscode.Disposable;
+
 	constructor() {
 		this.registerCommand();
 	}
 
-	private registerCommand() {
-		const disposable = vscode.commands.registerCommand('dotenvy.switchEnvironment', () => {
+	private registerCommand(): vscode.Disposable {
+		this.commandDisposable = vscode.commands.registerCommand('dotenvy.switchEnvironment', () => {
 			this.execute();
 		});
+
+		// Store for proper disposal lifecycle management
+		this.disposables.push(this.commandDisposable);
+		return this.commandDisposable;
 	}
 
 	public async execute(): Promise<void> {
@@ -51,12 +58,25 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 
 		const workspace = selectedWorkspace.workspace;
 		const rootPath = workspace.uri.fsPath;
-		const environmentProvider = selectedWorkspace.environmentProvider;
-		const statusBarProvider = selectedWorkspace.statusBarProvider;
+		// Use workspace providers or create fallbacks for maximum reliability
+		let environmentProvider = selectedWorkspace.environmentProvider;
+		if (!environmentProvider) {
+			// Fallback: create provider if workspace data is incomplete
+			environmentProvider = new EnvironmentProvider(rootPath);
+		}
 
-		statusBarProvider.setWorkspace(rootPath);
 
-		const environments = await environmentProvider.getEnvironments();
+		// Type-annotate for better IntelliSense and type safety throughout the method
+		const statusBarProvider: StatusBarProvider | undefined = selectedWorkspace.statusBarProvider;
+		if (!statusBarProvider) {
+			// Enhanced error message when status bar provider is unavailable
+			vscode.window.showWarningMessage('⚠️ Status bar provider unavailable. Some UI updates may not be visible.');
+		} else {
+			statusBarProvider.setWorkspace(rootPath);
+		}
+
+		// Ensure we have Environment type protection when fetching environments
+		const environments: Environment[] = await environmentProvider.getEnvironments();
 
 		if (environments.length === 0) {
 			vscode.window.showInformationMessage(`No .env.* files found in workspace "${workspace.name}".`);
@@ -193,7 +213,7 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 				}
 
 				// Calculate diff if we have both contents
-				let diff: any = undefined;
+				let diff: EnvDiff | undefined = undefined;
 				if (previousContent && newContent) {
 					try {
 						diff = EnvironmentDiffer.compareFiles(currentEnvPath, selected.env.filePath);
@@ -248,7 +268,12 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 		}
 	}
 
-	public dispose() {
-		// Commands are disposed via vscode subscriptions
+	public dispose(): void {
+		// Dispose of all stored disposables for proper cleanup
+		this.disposables.forEach(disposable => disposable.dispose());
+		this.disposables.length = 0;
+
+		// Clear references
+		this.commandDisposable = undefined;
 	}
 }

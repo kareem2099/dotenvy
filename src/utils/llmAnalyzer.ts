@@ -21,6 +21,11 @@ export interface LLMAnalysisResponse {
     error?: string;
 }
 
+export interface LLMHealthResponse {
+    status: string;
+    message?: string;
+}
+
 export interface LLMTrainingSample {
     secret_value: string;
     context: string;
@@ -32,7 +37,7 @@ export interface LLMTrainingSample {
 export class LLMAnalyzer {
     private static instance: LLMAnalyzer;
     private serviceUrl: string;
-    private isConnected: boolean = false;
+    private isConnected = false;
 
     private constructor() {
         // Default to local Python service
@@ -51,7 +56,7 @@ export class LLMAnalyzer {
      */
     public async testConnection(): Promise<boolean> {
         try {
-            const response = await this.makeRequest('/health', 'GET');
+            const response = await this.makeRequest('/health', 'GET') as LLMHealthResponse;
             this.isConnected = response && response.status === 'ok';
             return this.isConnected;
         } catch (error) {
@@ -154,7 +159,7 @@ export class LLMAnalyzer {
     /**
      * Make HTTP request to Python service
      */
-    private async makeRequest(endpoint: string, method: string = 'GET', data?: any): Promise<any> {
+    private async makeRequest(endpoint: string, method = 'GET', data?: unknown): Promise<unknown> {
         return new Promise((resolve, reject) => {
             const url = new URL(endpoint, this.serviceUrl);
             const options = {

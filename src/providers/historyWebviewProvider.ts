@@ -1,25 +1,43 @@
 import * as vscode from 'vscode';
 import { HistoryManager } from '../utils/historyManager';
-import { HistoryEntry } from '../types/environment';
+import { HistoryEntry, HistoryStats } from '../types/environment';
 import { EnvironmentDiffer } from '../utils/environmentDiffer';
 import { WorkspaceManager } from './workspaceManager';
 import { HistoryAnalytics } from '../utils/historyAnalytics';
+import { HistoryFilterOptions } from '../utils/historyFilters';
+import * as fs from 'fs';
+import * as os from 'os';
+
+interface CachedHistoryData {
+    history: HistoryEntry[];
+    stats: HistoryStats;
+}
 
 export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'dotenvy.historyViewer';
     private _view?: vscode.WebviewView;
-    private cachedHistory: any[] | null = null;
-    private cachedStats: any | null = null;
+    private cachedHistory: HistoryEntry[] | null = null;
+    private cachedStats: import('../types/environment').HistoryStats | null = null;
     private cachedWorkspacePath: string | null = null;
 
     constructor(private readonly _extensionUri: vscode.Uri, private readonly _context: vscode.ExtensionContext) {}
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
-        _context: vscode.WebviewViewResolveContext,
-        _token: vscode.CancellationToken,
+        context: vscode.WebviewViewResolveContext,
+        token: vscode.CancellationToken,
     ) {
         this._view = webviewView;
+
+        // Store context for state persistence
+        this._context.globalState.update('history-webview-context', {
+            lastResolveTime: Date.now()
+        });
+
+        // Handle cancellation token
+        token.onCancellationRequested(() => {
+            console.log('History webview resolution cancelled');
+        });
 
         webviewView.webview.options = {
             enableScripts: true,
@@ -93,7 +111,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
 
             // Try to load from persistent cache first
             const cacheKey = `history-cache-${workspacePath}`;
-            const cachedData = this._context.globalState.get(cacheKey) as any;
+            const cachedData = this._context.globalState.get(cacheKey) as CachedHistoryData;
 
             if (cachedData && cachedData.history && cachedData.stats) {
                 this.cachedHistory = cachedData.history;
@@ -132,12 +150,33 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
 
     public async loadAnalytics(workspacePath: string): Promise<void> {
         try {
-            const analytics = await HistoryManager.getAnalytics(workspacePath);
+            // Get history data for comprehensive analytics
+            const historyData = await HistoryManager.getHistory(workspacePath, 1000); // Get more data for detailed analysis
+
+            // Use HistoryAnalytics for comprehensive analytics
+            const analytics = await HistoryAnalytics.generateAnalytics(historyData);
+
+            // Get top insights for quick display
+            const topEnvironments = HistoryAnalytics.getTopEnvironments(analytics, 5);
+            const peakHours = HistoryAnalytics.getPeakHours(analytics);
+            const mostChangedVariables = HistoryAnalytics.getMostChangedVariables(analytics, 10);
+
+            // Enhanced analytics with quick insights
+            const enhancedAnalytics = {
+                ...analytics,
+                quickInsights: {
+                    topEnvironments,
+                    peakHours: peakHours.slice(0, 3), // Top 3 peak hours
+                    mostChangedVariables: mostChangedVariables.slice(0, 5), // Top 5 most changed variables
+                    totalUniqueVariables: Object.keys(analytics.variableAnalytics.changeFrequency).length,
+                    activityScore: this.calculateActivityScore(analytics)
+                }
+            };
 
             if (this._view) {
                 this._view.webview.postMessage({
                     type: 'analyticsLoaded',
-                    analytics: analytics,
+                    analytics: enhancedAnalytics,
                     workspacePath: workspacePath
                 });
             }
@@ -218,16 +257,16 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
             const currentEnvPath = `${workspacePath}/.env`;
 
             // Create temporary file for historical content
-            const tempDir = require('os').tmpdir();
+            const tempDir = os.tmpdir();
             const tempFile = `${tempDir}/dotenvy-history-${entry.id}.env`;
-            require('fs').writeFileSync(tempFile, entry.fileContent);
+            fs.writeFileSync(tempFile, entry.fileContent);
 
             // Generate diff
             const diff = EnvironmentDiffer.compareFiles(tempFile, currentEnvPath);
             const diffText = EnvironmentDiffer.formatDiffForDisplay(diff, entry.environmentName, 'Current');
 
             // Clean up temp file
-            require('fs').unlinkSync(tempFile);
+            fs.unlinkSync(tempFile);
 
             if (this._view) {
                 this._view.webview.postMessage({
@@ -258,7 +297,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    public async applyFilters(workspacePath: string, filters: any): Promise<void> {
+    public async applyFilters(workspacePath: string, filters: HistoryFilterOptions): Promise<void> {
         try {
             const result = await HistoryManager.applyFilters(workspacePath, filters);
 
@@ -377,6 +416,26 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
             console.error('Failed to confirm rollback:', error);
             vscode.window.showErrorMessage('Failed to process rollback confirmation');
         }
+    }
+
+    private calculateActivityScore(analytics: import('../utils/historyAnalytics').AnalyticsSummary): number {
+        // Calculate a simple activity score based on:
+        // - Number of entries
+        // - Stability scores
+        // - Variable change frequency
+
+        const entryScore = Math.min(analytics.dataRange.totalEntries / 10, 100); // Up to 100 points for entries
+        const stabilityScores = Object.values(analytics.stabilityMetrics.stabilityScore);
+        const averageStability = stabilityScores.length > 0
+            ? stabilityScores.reduce((sum, score) => sum + score, 0) / stabilityScores.length
+            : 50;
+
+        const variableFrequency = Object.values(analytics.variableAnalytics.changeFrequency);
+        const totalChanges = variableFrequency.reduce((sum, freq) => sum + freq, 0);
+        const frequencyScore = Math.min(totalChanges / 5, 100); // Up to 100 points for changes
+
+        // Weighted average: 40% entries, 30% stability, 30% frequency
+        return Math.round((entryScore * 0.4) + (averageStability * 0.3) + (frequencyScore * 0.3));
     }
 
     private _getHtmlForWebview(webview: vscode.Webview): string {

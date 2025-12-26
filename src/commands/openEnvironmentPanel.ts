@@ -6,8 +6,15 @@ import { GitHookManager } from '../utils/gitHookManager';
 import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { DopplerSyncManager } from '../utils/dopplerSyncManager';
 import { EnvironmentValidator } from '../utils/environmentValidator';
+import { QuickEnvConfig } from '../types/environment';
 import * as fs from 'fs';
 import * as path from 'path';
+
+interface WebviewMessage {
+    type: string;
+    environment?: string;
+    fileName?: string;
+}
 
 export class OpenEnvironmentPanelCommand implements vscode.Disposable {
     private panel?: vscode.WebviewPanel;
@@ -135,7 +142,7 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
         });
     }
 
-    private async getCloudSyncStatus(rootPath: string, config: any) {
+    private async getCloudSyncStatus(rootPath: string, config: QuickEnvConfig | null) {
         if (!config?.cloudSync) {
             return null;
         }
@@ -170,7 +177,7 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
         }
     }
 
-    private async getValidationStatus(rootPath: string, envPath: string, config: any) {
+    private async getValidationStatus(rootPath: string, envPath: string, config: QuickEnvConfig | null) {
         if (!config?.validation || !fs.existsSync(envPath)) {
             return {
                 valid: true
@@ -192,7 +199,7 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
         }
     }
 
-    private async handleMessage(message: any): Promise<void> {
+    private async handleMessage(message: WebviewMessage): Promise<void> {
         if (!this.environmentProvider) return;
 
         const rootPath = this.environmentProvider['rootPath'];
@@ -225,9 +232,11 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
                 break;
 
             case 'editFile':
-                const fileUri = vscode.Uri.file(path.join(rootPath, message.fileName));
-                const doc = await vscode.workspace.openTextDocument(fileUri);
-                await vscode.window.showTextDocument(doc);
+                if (message.fileName) {
+                    const fileUri = vscode.Uri.file(path.join(rootPath, message.fileName));
+                    const doc = await vscode.workspace.openTextDocument(fileUri);
+                    await vscode.window.showTextDocument(doc);
+                }
                 break;
 
             case 'diffEnvironment':

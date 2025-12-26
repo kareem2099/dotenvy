@@ -17,6 +17,18 @@ dist/
 *.swo
 *~
 
+# Test files
+test/encryption-test-standalone.js
+test/test-encryption.js
+test/test*.js
+test/runTest.js
+test/runTest.js.map
+test/test-scanner.js
+test/test-llm-service.sh
+test/suite/
+test/*.test.js
+test/*.test.js.map
+
 # Environment files
 .env
 .env.local

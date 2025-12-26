@@ -4,7 +4,11 @@ import * as path from 'path';
 import { GitHookManager } from '../utils/gitHookManager';
 import { GitUtils } from '../utils/gitUtils';
 import { WorkspaceManager } from '../providers/workspaceManager';
-import { ConfigUtils } from '../utils/configUtils';
+import { GitCommitHookConfig } from '../types/environment';
+
+interface GitHookFileConfig {
+    gitCommitHook?: GitCommitHookConfig;
+}
 
 export class InstallGitHookCommand implements vscode.Disposable {
 	public async execute(): Promise<void> {
@@ -62,7 +66,7 @@ export class InstallGitHookCommand implements vscode.Disposable {
 
 			// Auto-configure the gitCommitHook settings in .dotenvy.json
 			const configPath = path.join(workspacePath, '.dotenvyGit.json');
-			let config: any = {};
+			let config: GitHookFileConfig = {};
 			try {
 				if (fs.existsSync(configPath)) {
 					const content = fs.readFileSync(configPath, 'utf8');

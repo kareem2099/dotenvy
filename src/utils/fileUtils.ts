@@ -7,9 +7,10 @@ export class FileUtils {
 	/**
 	 * Backup the current .env file
 	 */
-	static async backupEnvFile(rootPath: string): Promise<void> {
-		const envPath = path.join(rootPath, '.env');
-		const backupPath = path.join(rootPath, '.env.backup');
+	static async backupEnvFile(rootPath: string | Uri): Promise<void> {
+		const rootPathStr = typeof rootPath === 'string' ? rootPath : rootPath.fsPath;
+		const envPath = path.join(rootPathStr, '.env');
+		const backupPath = path.join(rootPathStr, '.env.backup');
 
 		if (fs.existsSync(envPath)) {
 			await fs.promises.copyFile(envPath, backupPath);
@@ -19,8 +20,9 @@ export class FileUtils {
 	/**
 	 * Switch to a new environment file
 	 */
-	static async switchToEnvironment(env: Environment, rootPath: string): Promise<void> {
-		const targetPath = path.join(rootPath, '.env');
+	static async switchToEnvironment(env: Environment, rootPath: string | Uri): Promise<void> {
+		const rootPathStr = typeof rootPath === 'string' ? rootPath : rootPath.fsPath;
+		const targetPath = path.join(rootPathStr, '.env');
 
 		// Backup current
 		await this.backupEnvFile(rootPath);
@@ -32,9 +34,10 @@ export class FileUtils {
 	/**
 	 * Check if a file contains potential secrets
 	 */
-	static checkForSecrets(filePath: string): string[] {
+	static checkForSecrets(filePath: string | Uri): string[] {
 		try {
-			const content = fs.readFileSync(filePath, 'utf8');
+			const filePathStr = typeof filePath === 'string' ? filePath : filePath.fsPath;
+			const content = fs.readFileSync(filePathStr, 'utf8');
 			const lines = content.split('\n');
 			const secretIndicators = ['key', 'secret', 'password', 'token', 'auth'];
 			const warnings: string[] = [];

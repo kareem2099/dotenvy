@@ -118,9 +118,9 @@ export class GitBranchWatcher implements vscode.Disposable {
 	/**
 	 * Debounce function to limit the frequency of branch checks
 	 */
-	private debounce(func: Function, delay: number) {
+	private debounce<T extends (...args: unknown[]) => void>(func: T, delay: number): (...args: Parameters<T>) => void {
 		let timeoutId: NodeJS.Timeout;
-		return (...args: any[]) => {
+		return (...args: Parameters<T>) => {
 			clearTimeout(timeoutId);
 			timeoutId = setTimeout(() => func.apply(this, args), delay);
 		};

@@ -10,9 +10,16 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DetectedSecret, CacheStats, PerformanceMetrics } from './secretScannerTypes';
 
+// Extended performance cache entry with file size tracking
+interface PerformanceCacheEntry {
+    scanTime: number;
+    timestamp: number;
+    fileSize?: number;
+}
+
 export class CacheManager {
     private static cache: Map<string, { results: DetectedSecret[], timestamp: number }> = new Map();
-    private static performanceCache: Map<string, { scanTime: number, timestamp: number }> = new Map();
+    private static performanceCache: Map<string, PerformanceCacheEntry> = new Map();
     private static readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
     private static readonly MAX_CACHE_SIZE = 1000;
 
@@ -101,11 +108,14 @@ export class CacheManager {
         if (!fs.existsSync(filePath)) return;
 
         try {
-            const fileSize = fs.statSync(filePath).size;
+            const stats = fs.statSync(filePath);
+            const fileSize = stats.size;
+            const normalizedPath = path.normalize(filePath);
 
-            this.performanceCache.set(filePath, {
+            this.performanceCache.set(normalizedPath, {
                 scanTime,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                fileSize
             });
         } catch (error) {
             // Ignore errors in performance tracking
@@ -125,18 +135,19 @@ export class CacheManager {
         for (const entry of this.cache.values()) {
             if ((now - entry.timestamp) <= this.CACHE_DURATION) {
                 totalSize += JSON.stringify(entry.results).length;
+                hits++;
             } else {
                 misses++;
             }
         }
 
-        // Calculate hit rate (this would need to track actual hits/misses)
-        const totalRequests = this.cache.size;
+        // Calculate hit rate
+        const totalRequests = hits + misses;
         const hitRate = totalRequests > 0 ? hits / totalRequests : 0;
 
         return {
             hits,
-            misses: Math.max(0, this.cache.size - hits), // Approximate misses
+            misses,
             totalRequests,
             hitRate,
             cacheSize: totalSize,
@@ -238,6 +249,12 @@ export class CacheManager {
         averageScanTime: number;
         oldestEntry?: number;
         newestEntry?: number;
+        specificFileInfo?: {
+            cached: boolean;
+            scanTime?: number;
+            cacheAge?: number;
+            shouldRescan: boolean;
+        };
     } {
         const fileCount = this.cache.size;
         const totalSize = this.getMemoryUsage();
@@ -256,12 +273,34 @@ export class CacheManager {
             }
         }
 
+        let specificFileInfo: {
+            cached: boolean;
+            scanTime?: number;
+            cacheAge?: number;
+            shouldRescan: boolean;
+        } | undefined;
+
+        // Provide specific file information if requested
+        if (filePath) {
+            const normalizedPath = path.normalize(filePath);
+            const cacheEntry = this.cache.get(normalizedPath);
+            const perfEntry = this.performanceCache.get(normalizedPath);
+
+            specificFileInfo = {
+                cached: cacheEntry !== undefined,
+                scanTime: perfEntry?.scanTime,
+                cacheAge: cacheEntry ? Date.now() - cacheEntry.timestamp : undefined,
+                shouldRescan: this.shouldRescanFile(normalizedPath)
+            };
+        }
+
         return {
             fileCount,
             totalSize,
             averageScanTime,
             oldestEntry,
-            newestEntry
+            newestEntry,
+            specificFileInfo
         };
     }
 

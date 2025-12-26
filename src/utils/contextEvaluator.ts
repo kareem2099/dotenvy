@@ -36,6 +36,14 @@ export class ContextEvaluator {
 
         let context = lines[lineIndex]; // Current line containing the secret
 
+        // Highlight the exact position of the secret in the line
+        if (charIndex >= 0) {
+            const lineContent = lines[lineIndex];
+            const beforeSecret = lineContent.substring(0, charIndex);
+            const afterSecret = lineContent.substring(charIndex);
+            context = `${beforeSecret}[SECRET]${afterSecret}`;
+        }
+
         // Add surrounding lines with line numbers for better context
         if (startLine !== lineIndex) {
             context = `... ${lines[startLine].trim()}\n${context}`;
@@ -105,7 +113,7 @@ export class ContextEvaluator {
     private static analyzeKeywordProximity(context: string): { score: number; reasoning: string } {
         const lowerContext = context.toLowerCase();
         let score = 0;
-        let keywords: string[] = [];
+        const keywords: string[] = [];
 
         // Check high-risk keywords first
         for (const keyword of this.HIGH_RISK_KEYWORDS) {
@@ -139,7 +147,7 @@ export class ContextEvaluator {
      */
     private static analyzeAssignmentContext(context: string): { score: number; reasoning: string } {
         let score = 0;
-        let patterns: string[] = [];
+        const patterns: string[] = [];
 
         // Check for assignment patterns
         if (context.includes('=') || context.includes(': ')) {
@@ -211,7 +219,7 @@ export class ContextEvaluator {
      */
     private static analyzeStringContext(context: string, secretValue: string): { score: number; reasoning: string } {
         let score = 0;
-        let patterns: string[] = [];
+        const patterns: string[] = [];
 
         // Check for quotes around secret
         if ((context.includes('"') || context.includes("'") || context.includes('`'))) {
@@ -354,6 +362,148 @@ export class ContextEvaluator {
             variablePatterns,
             overallScore: score,
             riskAssessment: assessment
+        };
+    }
+
+    /**
+     * Enhance detected secret with context analysis
+     */
+    static enhanceDetectedSecret(secret: DetectedSecret, fileContent: string): DetectedSecret {
+        // Get context around the secret
+        const lines = fileContent.split('\n');
+        const context = this.getContextLine(lines, secret.line - 1, secret.column - 1);
+
+        // Calculate secret score based on context
+        const score = this.calculateSecretScore(secret.content, context);
+
+        // Return enhanced secret
+        const confidenceMap = { 'low': 0, 'medium': 0.5, 'high': 1 };
+        const currentConfidence = confidenceMap[secret.confidence] || 0;
+        const newConfidence = score.confidence;
+        const finalConfidence = newConfidence > currentConfidence ? score.confidence : secret.confidence;
+
+        return {
+            ...secret,
+            confidence: finalConfidence as 'high' | 'medium' | 'low',
+            context,
+            reasoning: [...(secret.reasoning || []), ...score.reasoning]
+        };
+    }
+
+    /**
+     * Analyze secret context from SecretContext interface
+     */
+    static analyzeSecretContext(secret: string, context: SecretContext): {
+        confidence: number;
+        riskLevel: 'high' | 'medium' | 'low';
+        analysis: string[];
+    } {
+        const analysis: string[] = [];
+
+        // Analyze variable name from context
+        if (context.variableName) {
+            if (this.HIGH_RISK_KEYWORDS.some(keyword => context.variableName!.toLowerCase().includes(keyword))) {
+                analysis.push(`Variable name '${context.variableName}' indicates sensitive data`);
+            }
+        }
+
+        // Analyze string context
+        if (context.isInString) {
+            analysis.push('Located within quoted string');
+        }
+
+        // Analyze assignment context
+        if (context.hasAssignment) {
+            analysis.push('Located in assignment statement');
+        }
+
+        // Analyze surrounding code context (before and after lines)
+        const surroundingCode = [...context.before, ...context.after].join('\n');
+        if (surroundingCode) {
+            const surroundingScore = this.calculateSecretScore(secret, surroundingCode);
+            analysis.push(`Surrounding code analysis: ${surroundingScore.riskLevel} risk`);
+        }
+
+        // Analyze lines before/after for patterns
+        const allLines = [...context.before, ...context.after].join(' ').toLowerCase();
+
+        // Check for auth-related context
+        if (allLines.includes('auth') || allLines.includes('login') || allLines.includes('authentication')) {
+            analysis.push('Located in authentication-related code');
+        }
+
+        // Check for config context
+        if (allLines.includes('config') || allLines.includes('settings')) {
+            analysis.push('Located in configuration context');
+        }
+
+        // Calculate confidence based on analysis
+        let confidence = 0.5; // Base confidence
+        if (context.variableName && this.HIGH_RISK_KEYWORDS.some(k => context.variableName!.includes(k))) confidence += 0.3;
+        if (context.hasAssignment) confidence += 0.2;
+        if (allLines.includes('auth') || allLines.includes('login')) confidence += 0.15;
+
+        confidence = Math.max(0, Math.min(1, confidence));
+
+        const riskLevel = this.getRiskLevelFromScore(confidence);
+
+        return {
+            confidence,
+            riskLevel,
+            analysis
+        };
+    }
+
+    /**
+     * Get comprehensive security analysis for a detected secret
+     */
+    static getComprehensiveSecurityAnalysis(secret: DetectedSecret, fileContent: string): {
+        securityScore: number;
+        recommendations: string[];
+        riskFactors: string[];
+        mitigationSteps: string[];
+        analysis: string[];
+    } {
+        const analysis: string[] = [];
+        const recommendations: string[] = [];
+        const riskFactors: string[] = [];
+        const mitigationSteps: string[] = [];
+
+        // Analyze secret properties
+        if (secret.type.includes('key') || secret.type.includes('token')) {
+            riskFactors.push('API key or token detected');
+            recommendations.push('Consider rotating this credential');
+            mitigationSteps.push('Implement key rotation policy');
+        }
+
+        if (secret.confidence === 'high') {
+            riskFactors.push('High confidence secret detection');
+            recommendations.push('Move to environment variables');
+        }
+
+        // Analyze context
+        const lines = fileContent.split('\n');
+        const context = this.getContextLine(lines, secret.line - 1, secret.column - 1);
+
+        if (context.includes('hardcoded') || context.includes('const ')) {
+            riskFactors.push('Potentially hardcoded secret');
+            recommendations.push('Never commit hardcoded secrets to version control');
+            mitigationSteps.push('Use .env files or secret management services');
+        }
+
+        // Calculate security score
+        let securityScore = secret.riskScore;
+        if (riskFactors.includes('Potentially hardcoded secret')) securityScore += 0.3;
+        if (secret.type.includes('password')) securityScore += 0.2;
+
+        securityScore = Math.min(1, securityScore);
+
+        return {
+            securityScore,
+            recommendations,
+            riskFactors,
+            mitigationSteps,
+            analysis
         };
     }
 }

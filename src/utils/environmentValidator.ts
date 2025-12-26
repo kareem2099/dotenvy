@@ -17,7 +17,8 @@ export class EnvironmentValidator {
 		const errors: ValidationError[] = [];
 
 		try {
-			const content = fs.readFileSync(filePath, 'utf8');
+			const normalizedPath = path.normalize(filePath);
+			const content = fs.readFileSync(normalizedPath, 'utf8');
 			const variables = this.parseEnvironmentFile(content);
 
 			// Check syntax errors

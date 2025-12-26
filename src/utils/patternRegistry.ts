@@ -10,7 +10,7 @@ import { PatternDefinition } from './secretScannerTypes';
 
 export class PatternRegistry {
     private static patterns: PatternDefinition[] = [];
-    private static excludePattern: string = '';
+    private static excludePattern = '';
 
     /**
      * Initialize the pattern registry with default secret detection patterns
@@ -135,9 +135,30 @@ export class PatternRegistry {
 
             // Cryptographic Keys
             {
-                regex: /\b(-----BEGIN\s+(RSA|DSA|EC|OPENSSH)?\s?PRIVATE\s+KEY-----[\s\S]*?-----END\s+\1?\s*PRIVATE\s+KEY-----)\b/gi,
-                type: 'SSH Private Key',
-                description: 'SSH private key with standard PEM headers',
+                regex: /\b-----BEGIN\s+RSA\s+PRIVATE\s+KEY-----[\s\S]*?-----END\s+RSA\s+PRIVATE\s+KEY-----\b/gi,
+                type: 'SSH RSA Private Key',
+                description: 'RSA SSH private key with PEM headers',
+                priority: 5,
+                requiresEntropyCheck: false
+            },
+            {
+                regex: /\b-----BEGIN\s+DSA\s+PRIVATE\s+KEY-----[\s\S]*?-----END\s+DSA\s+PRIVATE\s+KEY-----\b/gi,
+                type: 'SSH DSA Private Key',
+                description: 'DSA SSH private key with PEM headers',
+                priority: 5,
+                requiresEntropyCheck: false
+            },
+            {
+                regex: /\b-----BEGIN\s+EC\s+PRIVATE\s+KEY-----[\s\S]*?-----END\s+EC\s+PRIVATE\s+KEY-----\b/gi,
+                type: 'SSH EC Private Key',
+                description: 'EC SSH private key with PEM headers',
+                priority: 5,
+                requiresEntropyCheck: false
+            },
+            {
+                regex: /\b-----BEGIN\s+OPENSSH\s+PRIVATE\s+KEY-----[\s\S]*?-----END\s+OPENSSH\s+PRIVATE\s+KEY-----\b/gi,
+                type: 'SSH OpenSSH Private Key',
+                description: 'OpenSSH private key with PEM headers',
                 priority: 5,
                 requiresEntropyCheck: false
             },
@@ -283,7 +304,7 @@ export class PatternRegistry {
     /**
      * Get patterns by priority level
      */
-    static getPatternsByPriority(minPriority: number = 1): PatternDefinition[] {
+    static getPatternsByPriority(minPriority = 1): PatternDefinition[] {
         if (this.patterns.length === 0) {
             this.initialize();
         }

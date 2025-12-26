@@ -6,6 +6,8 @@ import { ConfigUtils } from '../utils/configUtils';
 import { DopplerSyncManager } from '../utils/dopplerSyncManager';
 import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { FileUtils } from '../utils/fileUtils';
+import { extensionContext } from '../extension';
+import { EncryptedCloudSyncManager } from '../utils/encryptedCloudSyncManager';
 
 export class PushToCloudCommand implements vscode.Disposable {
 	public async execute(): Promise<void> {
@@ -41,7 +43,7 @@ export class PushToCloudCommand implements vscode.Disposable {
 		const configPath = path.join(rootPath, '.dotenvy.json');
 
 		// Check if cloud sync is configured
-		let config = await ConfigUtils.readQuickEnvConfig();
+		const config = await ConfigUtils.readQuickEnvConfig();
 		if (!config?.cloudSync || !config.cloudSync.project || !config.cloudSync.config || !config.cloudSync.token) {
 			// Create basic configuration file automatically
 			const basicConfig = {
@@ -54,11 +56,15 @@ export class PushToCloudCommand implements vscode.Disposable {
 				}
 			};
 
-			await fs.promises.writeFile(
-				configPath,
-				JSON.stringify(basicConfig, null, 2),
-				'utf8'
-			);
+			// Use FileUtils.backupEnvFile as a pattern for safe file handling (backup config if it exists)
+			if (fs.existsSync(configPath)) {
+				const backupPath = `${configPath}.backup`;
+				await fs.promises.copyFile(configPath, backupPath);
+			}
+
+			// Write config file safely
+			const configJson = JSON.stringify(basicConfig, null, 2);
+			await fs.promises.writeFile(configPath, configJson, 'utf8');
 
 			// Auto-add to gitignore
 			const gitignorePath = path.join(rootPath, '.gitignore');
@@ -92,15 +98,30 @@ export class PushToCloudCommand implements vscode.Disposable {
 
 		try {
 			const syncConfig = config.cloudSync!;
-			let cloudManager: CloudSyncManager;
+			let cloudManager: CloudSyncManager | undefined;
 
-			// Initialize appropriate cloud provider
-			switch (syncConfig.provider) {
-				case 'doppler':
-					cloudManager = new DopplerSyncManager(syncConfig);
-					break;
-				default:
-					throw new Error(`Unsupported cloud provider: ${syncConfig.provider}`);
+			// Check if encrypted cloud sync is enabled (default: enabled)
+			const enableEncryption = !(syncConfig.encryptCloudSync === false);
+
+			if (enableEncryption) {
+				try {
+					// Use the global extension context from the activated extension
+					cloudManager = await EncryptedCloudSyncManager.createEncryptedManager(syncConfig, extensionContext, true);
+					vscode.window.showInformationMessage('🔐 Encrypted cloud sync enabled');
+				} catch (error) {
+					vscode.window.showWarningMessage(`Encrypted cloud sync failed to initialize: ${(error as Error).message} - falling back to standard sync`);
+				}
+			}
+
+			// Initialize standard cloud provider if encryption not used or failed
+			if (!cloudManager) {
+				switch (syncConfig.provider) {
+					case 'doppler':
+						cloudManager = new DopplerSyncManager(syncConfig);
+						break;
+					default:
+						throw new Error(`Unsupported cloud provider: ${syncConfig.provider}`);
+				}
 			}
 
 			// Test connection
@@ -196,6 +217,21 @@ export class PushToCloudCommand implements vscode.Disposable {
 			if (!fs.existsSync(envPath)) {
 				vscode.window.showErrorMessage('No .env file found to sync.');
 				return;
+			}
+
+			// Use FileUtils to check for secrets in .env file before sync
+			const secretWarnings = FileUtils.checkForSecrets(envPath);
+			if (secretWarnings.length > 0) {
+				const proceedAnyway = await vscode.window.showWarningMessage(
+					`⚠️ Detected potential secrets in .env file:\n${secretWarnings.map(w => `• ${w}`).join('\n')}\n\nAre you sure you want to sync this to the cloud?`,
+					{ modal: true },
+					'Sync Anyway',
+					'Cancel'
+				);
+
+				if (proceedAnyway !== 'Sync Anyway') {
+					return; // User cancelled due to security concerns
+				}
 			}
 
 			// Parse env file into secrets object
