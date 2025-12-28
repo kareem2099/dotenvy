@@ -22,19 +22,22 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.run = void 0;
 const path = __importStar(require("path"));
-const Mocha = __importStar(require("mocha"));
-const glob = __importStar(require("glob"));
+const mocha_1 = __importDefault(require("mocha"));
+const glob_1 = __importDefault(require("glob"));
 function run() {
-    const mocha = new Mocha({
+    const mocha = new mocha_1.default({
         ui: 'tdd',
         color: true
     });
     const testsRoot = path.resolve(__dirname, '..');
     return new Promise((c, e) => {
-        glob('**/**.test.js', { cwd: testsRoot }, (err, files) => {
+        (0, glob_1.default)('**/**.test.js', { cwd: testsRoot }, (err, files) => {
             if (err) {
                 return e(err);
             }

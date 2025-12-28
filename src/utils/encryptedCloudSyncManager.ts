@@ -2,6 +2,16 @@ import * as crypto from 'crypto';
 import * as vscode from 'vscode';
 import { CloudSyncManager, CloudSecrets, CloudSyncResult } from './cloudSyncManager';
 import { CloudSyncConfig } from '../types/environment';
+import {
+    CLOUD_SYNC_ENCRYPTED_KEY,
+    CLOUD_SYNC_VERSION_KEY,
+    CLOUD_SYNC_LAST_SYNC_KEY,
+    CLOUD_SYNC_ALGO_KEY,
+    CLOUD_ENCRYPT_ALGO,
+    CLOUD_ENCRYPT_FORMAT_VERSION,
+    CLOUD_KEY_STORAGE,
+    LAST_SYNC_STORAGE
+} from '../constants';
 
 /**
  * Encrypted wrapper that provides end-to-end encryption for cloud sync operations
@@ -9,10 +19,8 @@ import { CloudSyncConfig } from '../types/environment';
  * Updated with modern cryptographic parameters for enhanced security
  */
 export class EncryptedCloudSyncManager extends CloudSyncManager {
-    private static readonly CLOUD_ENCRYPT_ALGO = 'aes-256-gcm';
     private static readonly KEY_LENGTH = 32;
     private static readonly IV_LENGTH = 12;
-    private static readonly CLOUD_ENCRYPT_FORMAT_VERSION = '2.0'; // Include format metadata
 
     private encryptionEnabled: boolean;
     private wrappedManager: CloudSyncManager;
@@ -27,17 +35,14 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
      * Get or create cloud encryption key for this workspace
      */
     private static async getCloudEncryptionKey(context: vscode.ExtensionContext): Promise<Buffer> {
-        const workspace = vscode.workspace.workspaceFolders?.[0]?.name || 'default';
-        const keyId = `cloud-key-${workspace}`;
-
-        const storedKey = context.globalState.get(keyId) as string;
+        const storedKey = context.workspaceState.get(CLOUD_KEY_STORAGE) as string;
         if (storedKey) {
             return Buffer.from(storedKey, 'base64');
         }
 
         // Generate new cloud encryption key
         const key = crypto.randomBytes(this.KEY_LENGTH);
-        await context.globalState.update(keyId, key.toString('base64'));
+        await context.workspaceState.update(CLOUD_KEY_STORAGE, key.toString('base64'));
         return key;
     }
 
@@ -48,7 +53,7 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
         const plaintext = JSON.stringify(data);
         const iv = crypto.randomBytes(this.IV_LENGTH);
 
-        const cipher = crypto.createCipheriv(this.CLOUD_ENCRYPT_ALGO, key, iv);
+        const cipher = crypto.createCipheriv(CLOUD_ENCRYPT_ALGO, key, iv);
         const encrypted = Buffer.concat([
             cipher.update(Buffer.from(plaintext, 'utf8')),
             cipher.final()
@@ -82,7 +87,7 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
             const authTag = Buffer.from(tagB64, 'base64');
             const ciphertext = Buffer.from(ctB64, 'base64');
 
-            const decipher = crypto.createDecipheriv(this.CLOUD_ENCRYPT_ALGO, key, iv);
+            const decipher = crypto.createDecipheriv(CLOUD_ENCRYPT_ALGO, key, iv);
             decipher.setAuthTag(authTag);
 
             const decrypted = Buffer.concat([
@@ -113,7 +118,7 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
         try {
             // Cloud providers may return data in special format for encrypted sync
             // Look for encrypted payload marker
-            const encryptedKey = Object.keys(result.secrets).find(key => key.startsWith('__dotenvy_encrypted__'));
+            const encryptedKey = Object.keys(result.secrets).find(key => key === CLOUD_SYNC_ENCRYPTED_KEY);
             if (!encryptedKey) {
                 // No encryption detected - return as-is for backward compatibility
                 return result;
@@ -122,6 +127,9 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
             const encryptedPayload = result.secrets[encryptedKey];
             const key = await EncryptedCloudSyncManager.getCloudEncryptionKey(context);
             const decryptedSecrets = EncryptedCloudSyncManager.decryptCloudPayload(encryptedPayload, key);
+
+            // Update last sync timestamp on successful fetch
+            await context.workspaceState.update(LAST_SYNC_STORAGE, new Date().toISOString());
 
             return {
                 success: true,
@@ -149,13 +157,20 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
 
             // Store encrypted data under special key that cloud provider will recognize
             const encryptedSecrets: CloudSecrets = {
-                '__dotenvy_encrypted__': encryptedPayload,
-                '__dotenvy_encryption_version__': EncryptedCloudSyncManager.CLOUD_ENCRYPT_FORMAT_VERSION,
-                '__dotenvy_last_sync__': new Date().toISOString(),
-                '__dotenvy_encryption_algo__': EncryptedCloudSyncManager.CLOUD_ENCRYPT_ALGO
+                [CLOUD_SYNC_ENCRYPTED_KEY]: encryptedPayload,
+                [CLOUD_SYNC_VERSION_KEY]: CLOUD_ENCRYPT_FORMAT_VERSION,
+                [CLOUD_SYNC_LAST_SYNC_KEY]: new Date().toISOString(),
+                [CLOUD_SYNC_ALGO_KEY]: CLOUD_ENCRYPT_ALGO
             };
 
-            return await this.wrappedManager.pushSecrets(encryptedSecrets);
+            const result = await this.wrappedManager.pushSecrets(encryptedSecrets);
+
+            // Update last sync timestamp on successful push
+            if (result.success) {
+                await context.workspaceState.update(LAST_SYNC_STORAGE, new Date().toISOString());
+            }
+
+            return result;
         } catch (error) {
             return {
                 success: false,
@@ -221,12 +236,10 @@ export class CloudEncryptionUtils {
     }> {
         const enabled = await this.isCloudEncryptionEnabled(context);
 
-        const workspace = vscode.workspace.workspaceFolders?.[0]?.name || 'default';
-        const keyId = `cloud-key-${workspace}`;
-        const hasKey = !!(context.globalState.get(keyId) as string);
+        const hasKey = !!(context.workspaceState.get(CLOUD_KEY_STORAGE) as string);
 
-        // Check last sync from extensions global storage
-        const lastSync = context.globalState.get('cloud-last-encrypted-sync') as string;
+        // Check last sync from workspace storage
+        const lastSync = context.workspaceState.get(LAST_SYNC_STORAGE) as string;
 
         return {
             enabled,

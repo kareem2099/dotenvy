@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { UserManager } from '../utils/userManager';
 import { UserCredentials } from '../types/user';
+import { MIN_PASSWORD_LENGTH } from '../constants';
 
 export class InitSecureProjectCommand implements vscode.Disposable {
 
@@ -63,8 +64,8 @@ export class InitSecureProjectCommand implements vscode.Disposable {
                 password: true,
                 placeHolder: 'Strong password for project access',
                 validateInput: (value) => {
-                    if (!value || value.length < 8) {
-                        return 'Password must be at least 8 characters long';
+                    if (!value || value.length < MIN_PASSWORD_LENGTH) {
+                        return `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`;
                     }
                     return null;
                 }

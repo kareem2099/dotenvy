@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
+import { SessionManager } from './sessionManager';
 
 export class EncryptedVarsManager {
     public static readonly SECRET_STORAGE_KEY_PREFIX = 'dotenvy.master.key.';
@@ -12,8 +15,19 @@ export class EncryptedVarsManager {
 
     /**
      * Get or create master key for workspace
+     * Priority: SessionManager (new system) > VSCode workspace state (old system)
      */
     public static async ensureMasterKey(context: vscode.ExtensionContext): Promise<Buffer> {
+        // 1. Check if user is logged in with new multi-user system
+        const session = SessionManager.getInstance();
+        if (session.isLoggedIn()) {
+            const projectKey = session.getProjectKey();
+            if (projectKey) {
+                return projectKey; // Use new project key from session
+            }
+        }
+
+        // 2. Fallback to old system (shared master key)
         const workspace = vscode.workspace.workspaceFolders?.[0]?.name || 'default';
         const secretKey = `${this.SECRET_STORAGE_KEY_PREFIX}${workspace}`;
 
@@ -22,7 +36,7 @@ export class EncryptedVarsManager {
             return Buffer.from(secret, 'base64');
         }
 
-        // Generate new 256-bit key
+        // Generate new 256-bit key for old system
         const key = crypto.randomBytes(this.KEY_LENGTH);
         await context.workspaceState.update(secretKey, key.toString('base64'));
         return key;
@@ -87,22 +101,51 @@ export class EncryptedVarsManager {
         }
 
         const packData = encryptedValue.slice(4, -1); // Remove ENC[ ... ]
-        const parts = packData.split('|');
+        if (!packData) {
+            throw new Error('Empty encrypted data');
+        }
 
+        const parts = packData.split('|');
         if (parts.length !== 4) {
             throw new Error('Invalid encrypted data structure');
         }
 
         const [versionStr, ivB64, tagB64, ctB64] = parts;
-        const version = parseInt(versionStr);
+
+        // Validate all parts are present and not empty
+        if (!versionStr || !ivB64 || !tagB64 || !ctB64) {
+            throw new Error('Missing encrypted data components');
+        }
+
+        const version = parseInt(versionStr, 10);
+        if (isNaN(version)) {
+            throw new Error('Invalid version number in encrypted data');
+        }
+
+        // Validate base64 components
+        let iv: Buffer, tag: Buffer, ct: Buffer;
+        try {
+            iv = Buffer.from(ivB64, 'base64');
+            tag = Buffer.from(tagB64, 'base64');
+            ct = Buffer.from(ctB64, 'base64');
+        } catch (error) {
+            throw new Error('Invalid base64 encoding in encrypted data');
+        }
+
+        // Validate component sizes
+        if (iv.length !== this.IV_LENGTH) {
+            throw new Error('Invalid IV length in encrypted data');
+        }
+        if (tag.length !== 16) {
+            throw new Error('Invalid authentication tag length in encrypted data');
+        }
+        if (ct.length === 0) {
+            throw new Error('Empty ciphertext in encrypted data');
+        }
 
         // Handle version migration
         if (version === 1) {
             // Legacy version with weaker PBKDF2 parameters - still supported for compatibility
-            const iv = Buffer.from(ivB64, 'base64');
-            const tag = Buffer.from(tagB64, 'base64');
-            const ct = Buffer.from(ctB64, 'base64');
-
             const decipher = crypto.createDecipheriv(this.ENCRYPT_ALGO, key, iv, { authTagLength: 16 });
             decipher.setAuthTag(tag);
 
@@ -117,10 +160,6 @@ export class EncryptedVarsManager {
             }
         } else if (version === this.FORMAT_VERSION) {
             // Current version with improved parameters
-            const iv = Buffer.from(ivB64, 'base64');
-            const tag = Buffer.from(tagB64, 'base64');
-            const ct = Buffer.from(ctB64, 'base64');
-
             const decipher = crypto.createDecipheriv(this.ENCRYPT_ALGO, key, iv, { authTagLength: 16 });
             decipher.setAuthTag(tag);
 
@@ -160,6 +199,123 @@ export class EncryptedVarsManager {
     }
 
     /**
+     * Change master password with automatic key rotation for existing encrypted variables
+     * This prevents data loss when users change their password
+     */
+    public static async changeMasterPassword(oldPassword: string, newPassword: string, context: vscode.ExtensionContext): Promise<{
+        success: boolean;
+        migratedCount: number;
+        error?: string;
+    }> {
+        try {
+            const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            if (!workspace) {
+                return { success: false, migratedCount: 0, error: 'No workspace found' };
+            }
+
+            const envPath = path.join(workspace, '.env');
+            if (!await fs.promises.access(envPath, fs.constants.F_OK).then(() => true).catch(() => false)) {
+                // No .env file, just set the new password
+                await this.setMasterPassword(newPassword, context);
+                return { success: true, migratedCount: 0 };
+            }
+
+            // Derive old key from old password
+            const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name || 'default';
+            const oldKey = await this.deriveKeyFromPassword(oldPassword, context, workspaceName);
+
+            // Try to parse file with old key to verify it's correct
+            let parsedVars: Map<string, { value: string; encrypted: boolean; raw: string }>;
+            try {
+                parsedVars = await EncryptedEnvironmentFile.parseEnvFile(envPath, context, oldKey);
+            } catch (error) {
+                return {
+                    success: false,
+                    migratedCount: 0,
+                    error: 'Old password is incorrect or cannot decrypt existing variables'
+                };
+            }
+
+            // Verify that ALL encrypted variables were successfully decrypted
+            // If any variables are still encrypted after parsing, the old password is wrong
+            let hasUndecryptedVars = false;
+            for (const [, data] of parsedVars) {
+                if (data.encrypted && data.value === data.raw) {
+                    // Variable is marked as encrypted but value wasn't decrypted (still equals raw)
+                    hasUndecryptedVars = true;
+                    break;
+                }
+            }
+
+            if (hasUndecryptedVars) {
+                return {
+                    success: false,
+                    migratedCount: 0,
+                    error: 'Old password is incorrect - cannot decrypt existing variables'
+                };
+            }
+
+            // Count encrypted variables (now decrypted)
+            let encryptedCount = 0;
+            for (const [, data] of parsedVars) {
+                if (data.encrypted) encryptedCount++;
+            }
+
+            if (encryptedCount === 0) {
+                // No encrypted variables, just set new password
+                await this.setMasterPassword(newPassword, context);
+                return { success: true, migratedCount: 0 };
+            }
+
+            // Show progress for re-encryption
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Re-encrypting environment variables...',
+                cancellable: false
+            }, async (progress) => {
+                progress.report({ increment: 0, message: 'Deriving new key...' });
+
+                // Derive new key from new password
+                const newKey = await this.deriveKeyFromPassword(newPassword, context, workspaceName);
+
+                progress.report({ increment: 25, message: 'Re-encrypting variables...' });
+
+                // Re-encrypt all variables with new key
+                const reEncryptedVars = new Map<string, { value: string; encrypted: boolean }>();
+                for (const [key, data] of parsedVars) {
+                    if (data.encrypted) {
+                        // Re-encrypt with new key
+                        const reEncrypted = this.encryptValue(data.value, newKey);
+                        reEncryptedVars.set(key, { value: reEncrypted, encrypted: true });
+                    } else {
+                        reEncryptedVars.set(key, data);
+                    }
+                }
+
+                progress.report({ increment: 75, message: 'Saving changes...' });
+
+                // Write back with new key
+                await EncryptedEnvironmentFile.writeEnvFile(envPath, reEncryptedVars, context, newKey);
+
+                // Store new master key
+                const secretKey = `${this.SECRET_STORAGE_KEY_PREFIX}${workspaceName}`;
+                await context.workspaceState.update(secretKey, newKey.toString('base64'));
+
+                progress.report({ increment: 100, message: 'Complete!' });
+            });
+
+            return { success: true, migratedCount: encryptedCount };
+
+        } catch (error) {
+            return {
+                success: false,
+                migratedCount: 0,
+                error: `Password change failed: ${(error as Error).message}`
+            };
+        }
+    }
+
+    /**
      * Check if workspace has encrypted variables
      */
     public static async workspaceHasEncryptedVars(): Promise<boolean> {
@@ -179,8 +335,6 @@ export class EncryptedVarsManager {
     }
 }
 
-import * as fs from 'fs';
-import * as path from 'path';
 
 /**
  * Key rotation and encryption health utilities
@@ -281,7 +435,7 @@ export class EncryptionHealthUtils {
             const newKey = crypto.randomBytes(EncryptedVarsManager.KEY_LENGTH);
 
             // Parse and re-encrypt variables
-            const parsedVars = await EncryptedEnvironmentFile.parseEnvFile(envPath);
+            const parsedVars = await EncryptedEnvironmentFile.parseEnvFile(envPath, context);
             let rotatedCount = 0;
 
             const reEncryptedVars = new Map<string, { value: string; encrypted: boolean }>();
@@ -297,7 +451,7 @@ export class EncryptionHealthUtils {
             }
 
             // Write back with new key
-            await EncryptedEnvironmentFile.writeEnvFile(envPath, reEncryptedVars, newKey);
+            await EncryptedEnvironmentFile.writeEnvFile(envPath, reEncryptedVars, context, newKey);
 
             // Store new master key
             const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name || 'default';
@@ -322,12 +476,18 @@ export class EncryptionHealthUtils {
 export class EncryptedEnvironmentFile {
     /**
      * Parse .env file and separate encrypted/unencrypted vars
+     * Automatically uses SessionManager key if no key provided, falls back to local key
      */
-    public static async parseEnvFile(filePath: string, masterKey?: Buffer): Promise<Map<string, { value: string; encrypted: boolean; raw: string }>> {
+    public static async parseEnvFile(filePath: string, context: vscode.ExtensionContext, masterKey?: Buffer): Promise<Map<string, { value: string; encrypted: boolean; raw: string }>> {
         const vars = new Map<string, { value: string; encrypted: boolean; raw: string }>();
 
         if (!await fs.promises.access(filePath, fs.constants.F_OK).then(() => true).catch(() => false)) {
             return vars;
+        }
+
+        // If no key provided, get the appropriate key (SessionManager first, then local)
+        if (!masterKey) {
+            masterKey = await EncryptedVarsManager.ensureMasterKey(context);
         }
 
         const content = await fs.promises.readFile(filePath, 'utf8');
@@ -355,7 +515,7 @@ export class EncryptedEnvironmentFile {
                     finalValue = value;
                 }
             } else if (EncryptedVarsManager.isEncrypted(value)) {
-                // Encrypted but no key provided - keep as is
+                // Encrypted but no key available - keep as is
                 finalValue = value;
                 isEncrypted = true;
             }
@@ -372,9 +532,15 @@ export class EncryptedEnvironmentFile {
 
     /**
      * Write environment file with encrypted variables
+     * Automatically uses SessionManager key if no key provided, falls back to local key
      */
-    public static async writeEnvFile(filePath: string, vars: Map<string, { value: string; encrypted: boolean }>, masterKey?: Buffer): Promise<void> {
+    public static async writeEnvFile(filePath: string, vars: Map<string, { value: string; encrypted: boolean }>, context: vscode.ExtensionContext, masterKey?: Buffer): Promise<void> {
         const lines: string[] = [];
+
+        // If no key provided, get the appropriate key (SessionManager first, then local)
+        if (!masterKey) {
+            masterKey = await EncryptedVarsManager.ensureMasterKey(context);
+        }
 
         for (const [key, data] of vars) {
             if (data.encrypted && masterKey) {

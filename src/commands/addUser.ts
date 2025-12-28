@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { UserManager } from '../utils/userManager';
 import { UserCredentials } from '../types/user';
+import { MIN_PASSWORD_LENGTH } from '../constants';
 
 export class AddUserCommand implements vscode.Disposable {
 
@@ -34,8 +35,8 @@ export class AddUserCommand implements vscode.Disposable {
                 password: true,
                 placeHolder: 'Your admin password',
                 validateInput: (value) => {
-                    if (!value || value.length < 8) {
-                        return 'Password must be at least 8 characters long';
+                    if (!value || value.length < MIN_PASSWORD_LENGTH) {
+                        return `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`;
                     }
                     return null;
                 }
@@ -49,16 +50,12 @@ export class AddUserCommand implements vscode.Disposable {
             const newUsername = await vscode.window.showInputBox({
                 prompt: 'Enter new user username',
                 placeHolder: 'new_developer_username',
-                validateInput: async (value) => {
+                validateInput: (value) => {
                     if (!value || value.trim().length < 3) {
                         return 'Username must be at least 3 characters long';
                     }
                     if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
                         return 'Username can only contain letters, numbers, hyphens, and underscores';
-                    }
-                    // Check if user already exists
-                    if (await UserManager.userExists(value.trim())) {
-                        return 'User already exists';
                     }
                     return null;
                 }
@@ -68,14 +65,28 @@ export class AddUserCommand implements vscode.Disposable {
                 return; // User cancelled
             }
 
-            // Get new user password
+            // 🔥 UX FIX: Check existence HERE (Before asking for password)
+            // This prevents the user from wasting time typing passwords if the name is taken.
+            const userExists = await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Checking availability...'
+            }, async () => {
+                return await UserManager.userExists(newUsername.trim());
+            });
+
+            if (userExists) {
+                vscode.window.showErrorMessage(`User "${newUsername}" already exists! Please choose another name.`);
+                return;
+            }
+
+            // Get new user password (Only if username is valid)
             const newPassword = await vscode.window.showInputBox({
                 prompt: `Enter password for user "${newUsername.trim()}"`,
                 password: true,
                 placeHolder: 'Strong password for new user',
                 validateInput: (value) => {
-                    if (!value || value.length < 8) {
-                        return 'Password must be at least 8 characters long';
+                    if (!value || value.length < MIN_PASSWORD_LENGTH) {
+                        return `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`;
                     }
                     return null;
                 }
@@ -102,13 +113,13 @@ export class AddUserCommand implements vscode.Disposable {
                 return; // User cancelled
             }
 
-            // Show progress
+            // Process creation
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: 'Adding User to Secure Project',
                 cancellable: false
             }, async (progress) => {
-                progress.report({ message: 'Verifying admin credentials...' });
+                progress.report({ message: 'Verifying admin credentials & Encrypting key...' });
 
                 const adminCredentials: UserCredentials = {
                     username: adminUsername.trim(),
@@ -120,13 +131,10 @@ export class AddUserCommand implements vscode.Disposable {
                     password: newPassword
                 };
 
-                progress.report({ message: 'Encrypting user access key...' });
-
                 const result = await UserManager.addUser(adminCredentials, newUserCredentials);
 
                 if (result.success) {
                     vscode.window.showInformationMessage(result.message);
-                    progress.report({ message: 'User added successfully!' });
                 } else {
                     vscode.window.showErrorMessage(`Failed to add user: ${result.message}`);
                 }

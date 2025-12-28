@@ -112,6 +112,12 @@ export class CommandsTreeProvider implements vscode.TreeDataProvider<vscode.Tree
                 title: 'Revoke User Access',
                 category: 'DotEnvy',
                 description: 'Remove a user\'s access to the secure project environment'
+            },
+            {
+                command: 'dotenvy.loginToSecureProject',
+                title: 'Login to Secure Project',
+                category: 'DotEnvy',
+                description: 'Authenticate and unlock the secure project environment'
             }
         ];
     }

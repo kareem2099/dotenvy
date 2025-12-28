@@ -1,13 +1,35 @@
 {
   "name": "dotenvy",
-  "displayName": "dotenvy – VS Code Environment Manager",
-  "description": "Effortlessly manage and switch between .env files directly inside VS Code",
-  "version": "1.2.0",
+  "displayName": "DotEnvy – VS Code Environment Manager",
+  "description": "Effortlessly manage, secure, and sync .env files directly inside VS Code with enterprise-grade encryption.",
+  "version": "1.3.0",
   "icon": "resources/icons/icon.png",
-  "main": "./out/extension.js",
+  "publisher": "FreeRave",
+  "author": "Kareem Ehab",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.74.0"
   },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "Productivity",
+    "env",
+    "environment",
+    "dotenv",
+    "security",
+    "encryption",
+    "sync",
+    "secrets"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "workspaceContains:**/.env",
+    "workspaceContains:**/.env.*"
+  ],
+  "main": "./out/extension.js",
   "bin": {
     "dotenvy-hook": "./out/git-hook.js"
   },
@@ -19,13 +41,9 @@
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js"
   },
-  "categories": [
-    "Other"
-  ],
-
   "contributes": {
     "configuration": {
-      "title": "dotenvy",
+      "title": "DotEnvy",
       "properties": {
         "dotenvy.backupPath": {
           "type": "string",
@@ -34,112 +52,127 @@
         },
         "dotenvy.encryptBackups": {
           "type": "boolean",
-          "default": false,
-          "description": "Enable AES-256 encryption for backup files"
+          "default": true,
+          "description": "Enable AES-256 encryption for backup files."
         },
         "dotenvy.history.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable environment history tracking"
+          "description": "Enable environment history tracking."
         },
         "dotenvy.history.retentionDays": {
           "type": "number",
           "default": 180,
           "minimum": 1,
           "maximum": 3650,
-          "description": "Number of days to retain environment history (1-3650 days)"
+          "description": "Number of days to retain environment history."
         },
         "dotenvy.history.maxEntries": {
           "type": "number",
           "default": 1000,
           "minimum": 10,
           "maximum": 10000,
-          "description": "Maximum number of history entries to keep (10-10000)"
+          "description": "Maximum number of history entries to keep."
         },
         "dotenvy.history.autoCleanup": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically clean up old history entries"
+          "description": "Automatically clean up old history entries."
         },
-        "dotenvy.history.trackManualEdits": {
+        "dotenvy.cloudSync.encryptCloudSync": {
           "type": "boolean",
           "default": true,
-          "description": "Track manual edits to .env files in history"
+          "description": "Encrypt secrets before syncing to cloud (End-to-End Encryption)."
         },
-        "dotenvy.history.includeGitInfo": {
-          "type": "boolean",
-          "default": true,
-          "description": "Include git user and commit information in history entries"
+        "dotenvy.cloudSync.provider": {
+          "type": "string",
+          "default": "doppler",
+          "enum": [
+            "doppler",
+            "vercel",
+            "aws"
+          ],
+          "description": "Cloud provider to sync secrets with."
         }
       }
     },
     "commands": [
       {
         "command": "dotenvy.scanSecrets",
-        "title": "dotenvy: Scan for Secrets",
+        "title": "DotEnvy: Scan for Secrets",
         "icon": "$(search-view-icon)"
       },
       {
         "command": "dotenvy.switchEnvironment",
-        "title": "dotenvy: Switch Environment"
+        "title": "DotEnvy: Switch Environment"
       },
       {
         "command": "dotenvy.openEnvironmentPanel",
-        "title": "dotenvy: Open Environment Panel"
+        "title": "DotEnvy: Open Environment Panel"
       },
       {
         "command": "dotenvy.validateEnvironment",
-        "title": "dotenvy: Validate Environment Files"
+        "title": "DotEnvy: Validate Environment Files"
       },
       {
         "command": "dotenvy.diffEnvironment",
-        "title": "dotenvy: Diff Environment Files"
+        "title": "DotEnvy: Diff Environment Files"
       },
       {
         "command": "dotenvy.installGitHook",
-        "title": "dotenvy: Install Git Commit Hook"
+        "title": "DotEnvy: Install Git Commit Hook"
       },
       {
         "command": "dotenvy.removeGitHook",
-        "title": "dotenvy: Remove Git Commit Hook"
+        "title": "DotEnvy: Remove Git Commit Hook"
       },
       {
         "command": "dotenvy.pullFromCloud",
-        "title": "dotenvy: Pull Environment from Cloud"
+        "title": "DotEnvy: Pull Environment from Cloud"
       },
       {
         "command": "dotenvy.pushToCloud",
-        "title": "dotenvy: Push Environment to Cloud"
+        "title": "DotEnvy: Push Environment to Cloud"
       },
       {
         "command": "dotenvy.feedback",
-        "title": "dotenvy: Feedback & Support"
+        "title": "DotEnvy: Feedback & Support"
       },
       {
         "command": "dotenvy.viewEnvironmentHistory",
-        "title": "dotenvy: View Environment History"
+        "title": "DotEnvy: View Environment History"
       },
       {
         "command": "dotenvy.initSecureProject",
-        "title": "dotenvy: Init Secure Project",
+        "title": "DotEnvy: Init Secure Project",
         "icon": "$(shield-lock)"
       },
       {
         "command": "dotenvy.addUser",
-        "title": "dotenvy: Add User to Secure Project",
+        "title": "DotEnvy: Add User to Secure Project",
         "icon": "$(person-add)"
       },
       {
         "command": "dotenvy.revokeUser",
-        "title": "dotenvy: Revoke User Access",
+        "title": "DotEnvy: Revoke User Access",
         "icon": "$(person-remove)"
+      },
+      {
+        "command": "dotenvy.loginToSecureProject",
+        "title": "DotEnvy: Login to Secure Project",
+        "icon": "$(unlock)"
+      },
+      {
+        "command": "dotenvy.showChangelog",
+        "title": "DotEnvy: Show What's New",
+        "category": "DotEnvy"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
           "id": "dotenvy",
-          "title": "dotenvy",
+          "title": "DotEnvy",
           "icon": "./resources/icons/icon.png"
         }
       ]
@@ -160,9 +193,9 @@
         },
         {
           "id": "dotenvy.commands",
-          "name": "Environment Commands",
+          "name": "Secure Commands",
           "type": "tree",
-          "icon": "$(tools)"
+          "icon": "$(lock)"
         }
       ],
       "explorer": [
@@ -208,9 +241,6 @@
       ]
     }
   },
-  "keywords": ["env", "environment", "dotenv", "switch", "management"],
-  "author": "Kareem Ehab",
-  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/kareem2099/dotenvy"
@@ -219,10 +249,9 @@
   "bugs": {
     "url": "https://github.com/kareem2099/dotenvy/issues"
   },
-  "publisher": "FreeRave",
   "devDependencies": {
     "@types/mocha": "^9.1.1",
-    "@types/node": "14.x",
+    "@types/node": "16.x",
     "@types/vscode": "^1.74.0",
     "@typescript-eslint/eslint-plugin": "^5.1.0",
     "@typescript-eslint/parser": "^5.1.0",
@@ -232,5 +261,8 @@
     "mocha": "^9.2.1",
     "typescript": "^4.8.3",
     "@vscode/test-electron": "^2.3.0"
+  },
+  "dependencies": {
+    "uuid": "^9.0.0"
   }
 }

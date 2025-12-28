@@ -3,7 +3,15 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import * as vscode from 'vscode';
 import {
+  USER_ENVELOPE_FILE,
+  USER_ENVELOPE_VERSION,
+  PBKDF2_ITERATIONS,
+  PBKDF2_SALT_LENGTH,
+  KEY_LENGTH
+} from '../constants';
+import {
   UserEntry,
+  RawUserEntry,
   ProjectKeyEnvelope,
   UserCredentials,
   UserManagementResult,
@@ -11,18 +19,13 @@ import {
 } from '../types/user';
 
 export class UserManager {
-  private static readonly USERS_FILE = '.dotenvy.lock.json'; // More secure filename
-  private static readonly ENVELOPE_VERSION = 1;
-  private static readonly PBKDF2_ITERATIONS = 310000;
-  private static readonly PBKDF2_SALT_LENGTH = 32;
-  private static readonly KEY_LENGTH = 32;
 
   /**
    * Get the path to the users file
    */
   private static getUsersFilePath(): string | null {
     const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    return workspace ? path.join(workspace, this.USERS_FILE) : null;
+    return workspace ? path.join(workspace, USER_ENVELOPE_FILE) : null;
   }
 
   /**
@@ -53,7 +56,7 @@ export class UserManager {
 
       // Convert date strings back to Date objects
       envelope.metadata.createdAt = new Date(envelope.metadata.createdAt);
-      envelope.users = envelope.users.map((user: any) => ({
+      envelope.users = envelope.users.map((user: RawUserEntry) => ({
         ...user,
         createdAt: new Date(user.createdAt),
         lastAccess: user.lastAccess ? new Date(user.lastAccess) : undefined
@@ -83,17 +86,17 @@ export class UserManager {
    * Generate a new project key
    */
   private static generateProjectKey(): Buffer {
-    return crypto.randomBytes(this.KEY_LENGTH);
+    return crypto.randomBytes(KEY_LENGTH);
   }
 
   /**
    * Derive encryption key from password with salt
    */
   private static deriveKeyFromPassword(password: string, existingSalt?: string): { key: Buffer; salt: string } {
-    const saltBuffer = existingSalt ? Buffer.from(existingSalt, 'base64') : crypto.randomBytes(this.PBKDF2_SALT_LENGTH);
+    const saltBuffer = existingSalt ? Buffer.from(existingSalt, 'base64') : crypto.randomBytes(PBKDF2_SALT_LENGTH);
     const saltString = saltBuffer.toString('base64');
 
-    const key = crypto.pbkdf2Sync(password, saltBuffer, this.PBKDF2_ITERATIONS, this.KEY_LENGTH, 'sha256');
+    const key = crypto.pbkdf2Sync(password, saltBuffer, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha256');
     return { key, salt: saltString };
   }
 
@@ -165,7 +168,7 @@ export class UserManager {
 
       // Create Envelope
       const envelope: ProjectKeyEnvelope = {
-        version: this.ENVELOPE_VERSION,
+        version: USER_ENVELOPE_VERSION,
         users: [adminUser],
         metadata: {
           createdAt: new Date(),

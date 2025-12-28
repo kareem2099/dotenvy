@@ -1,58 +1,62 @@
+# 1. Ignore Development & Source Files
 .vscode/**
 src/**
 .gitignore
 .yarnrc
 yarn.lock
 tsconfig.json
+tsconfig.tsbuildinfo
 .eslintrc.json
 vsc-extension-quickstart.md
-**/*.ts
-**/*.map
 .nyc_output
-coverage
-
-# Environment files - should not be in extension package
-.env
-.env.*
-**/.env
-**/.env.*
-!.env.example
-!test/.env.example
-
-# Python virtual environment - huge and unnecessary for extension
-python-llm/venv/
-python-llm/service.log
-
-# Test files and demo (include these in package)
-!test/**
-!demo-modern-ui.html
-!.dotenvy.json
-
-# Node modules and build artifacts
+coverage/
 node_modules/
-out/
-dist/
-tsconfig.tsbuildinfo
 package-lock.json
 
-# OS files
+# 2. KILL ALL ENV FILES (The most important part) 🚫
+# يمنع أي ملف يبدأ بـ .env في أي مكان في المشروع
+**/.env
+**/.env.*
+# استثناء ملفات الأمثلة (Example) لو عايز ترفعها
+!**/.env.example
+
+# 3. Ignore Python Environment & Heavy Assets
+python-llm/venv/
+python-llm/service.log
+python-llm/__pycache__/
+**/*.pyc
+
+# 4. Ignore Test & Build Artifacts not needed for production
+test/
+infrastructure/
+k8s/
+ci-cd/
+.github/
+
+# 5. OS & IDE Junk
 .DS_Store
 Thumbs.db
 *.log
 logs/
-
-# IDE files
 .idea/
 *.swp
 *.swo
-
-# Git
 .git/
-.gitignore
-.github/
 
-# VS Code extension package should not include compiled JS
+# 6. EXCEPTION LIST (Allow these specific files to be published) ✅
+# لازم نسمح برفع الكود المترجم (JavaScript)
 !out/extension.js
 !out/extension.js.map
 !out/git-hook.js
 !out/git-hook.js.map
+!out/utils/
+!out/commands/
+!out/providers/
+
+# السماح برفع ملفات الموارد (صور، أيقونات، HTML)
+!resources/**
+!demo-modern-ui.html
+!readme.md
+!changelog.md
+!LICENSE.txt
+!.dotenvy.json
