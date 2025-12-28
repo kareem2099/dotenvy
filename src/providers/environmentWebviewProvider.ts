@@ -24,10 +24,19 @@ interface EnvironmentData {
     fileSize: number;
 }
 
+interface VariableItem {
+    key: string;
+    value: string;
+    isEncrypted: boolean;
+    raw: string;
+}
+
 interface CurrentFileData {
     content: string;
     path: string;
     variableCount: number;
+    encryptedVars?: number;
+    variables?: VariableItem[];
 }
 
 interface CloudSyncStatus {
@@ -94,7 +103,12 @@ interface BackupMessage extends BaseWebviewMessage {
     type: 'backupCurrentEnv';
 }
 
-type WebviewMessage = BaseWebviewMessage | SwitchEnvironmentMessage | EditFileMessage | DiffEnvironmentMessage | CreateEnvironmentMessage | BackupMessage;
+interface ToggleVarEncryptionMessage extends BaseWebviewMessage {
+    type: 'toggleVarEncryption';
+    key: string;
+}
+
+type WebviewMessage = BaseWebviewMessage | SwitchEnvironmentMessage | EditFileMessage | DiffEnvironmentMessage | CreateEnvironmentMessage | BackupMessage | ToggleVarEncryptionMessage;
 
 export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
@@ -225,16 +239,23 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
                 }
 
                 // Parse environment file with possible decryption
-                const parsedVars = await EncryptedEnvironmentFile.parseEnvFile(envPath, masterKey);
+                const parsedVars = await EncryptedEnvironmentFile.parseEnvFile(envPath, this.context, masterKey);
 
-                // Reconstruct content with decrypted values
+                // Build variables list with encryption state for UI
+                const variablesList = [];
                 const lines: string[] = [];
+
                 for (const [key, data] of parsedVars) {
-                    if (data.encrypted) {
-                        lines.push(`${key}=${data.value}`); // Show decrypted value
-                    } else {
-                        lines.push(`${key}=${data.value}`);
-                    }
+                    // Reconstruct content for file preview
+                    lines.push(`${key}=${data.value}`);
+
+                    // Build rich data for UI list with lock states
+                    variablesList.push({
+                        key: key,
+                        value: data.value, // Decrypted value for display
+                        isEncrypted: data.encrypted, // Lock state for UI
+                        raw: data.raw // Original encrypted/raw value
+                    });
                 }
 
                 const content = lines.join('\n');
@@ -242,7 +263,8 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
                     content,
                     path: envPath,
                     variableCount: parsedVars.size,
-                    encryptedVars: Array.from(parsedVars.values()).filter(v => v.encrypted).length
+                    encryptedVars: Array.from(parsedVars.values()).filter(v => v.encrypted).length,
+                    variables: variablesList // Send to frontend for lock icons
                 };
             } catch (error) {
                 console.log('Error reading current .env file:', error);
@@ -668,6 +690,53 @@ DEBUG=false
                 const validateCommand = new ValidateEnvironmentCommand();
                 await validateCommand.execute();
                 await this.refreshEnvironments();
+                break;
+
+            case 'toggleVarEncryption':
+                // Handle individual variable encryption toggle
+                const toggleMsg = message as any; // { type: 'toggleVarEncryption', key: 'API_KEY' }
+                const targetKey = toggleMsg.key;
+
+                if (!targetKey) {
+                    vscode.window.showErrorMessage('No variable key provided for encryption toggle');
+                    return;
+                }
+
+                const envFilePath = path.join(rootPath, '.env');
+
+                try {
+                    // 1. Get the appropriate key (Cloud or Local)
+                    let cryptoKey = await EncryptedVarsManager.ensureMasterKey(this.context);
+
+                    // 2. Parse current environment file
+                    const currentVars = await EncryptedEnvironmentFile.parseEnvFile(envFilePath, this.context, cryptoKey);
+
+                    // 3. Find and toggle the target variable
+                    const varData = currentVars.get(targetKey);
+                    if (!varData) {
+                        vscode.window.showErrorMessage(`Variable '${targetKey}' not found in .env file`);
+                        return;
+                    }
+
+                    // 4. Toggle encryption state
+                    varData.encrypted = !varData.encrypted;
+
+                    // Update the map
+                    currentVars.set(targetKey, varData);
+
+                    // 5. Write back the file with the toggled variable
+                    await EncryptedEnvironmentFile.writeEnvFile(envFilePath, currentVars, this.context, cryptoKey);
+
+                    // 6. Refresh UI and show feedback
+                    await this.refreshEnvironments();
+
+                    const action = varData.encrypted ? 'Encrypted' : 'Decrypted';
+                    const icon = varData.encrypted ? '🔒' : '🔓';
+                    vscode.window.showInformationMessage(`${icon} ${action} variable '${targetKey}'`);
+
+                } catch (error) {
+                    vscode.window.showErrorMessage(`Failed to toggle encryption for '${targetKey}': ${(error as Error).message}`);
+                }
                 break;
 
             case 'restoreFromBackup':

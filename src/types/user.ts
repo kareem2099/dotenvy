@@ -9,6 +9,18 @@ export interface UserEntry {
   role: 'admin' | 'developer';
 }
 
+// Raw JSON representation of UserEntry (before Date conversion)
+export interface RawUserEntry {
+  username: string;
+  wrappedKey: string;
+  salt: string;
+  iv: string;
+  authTag?: string;
+  createdAt: string; // ISO date string from JSON
+  lastAccess?: string; // ISO date string from JSON
+  role: 'admin' | 'developer';
+}
+
 export interface ProjectKeyEnvelope {
   version: number;
   projectKeyEncrypted?: string; // Optional: kept for backward compatibility, but each user now has their own wrapped key

@@ -5,6 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-12-28
+
+### 🛡️ **Multi-User Key Wrapping (Envelope Encryption)** - Enterprise-Grade Security
+Complete implementation of envelope encryption enabling secure multi-user access to environment secrets without shared passwords. Each team member gets individual credentials while maintaining centralized project key management.
+
+#### 🔐 **Key Wrapping Architecture**
+- **Envelope Encryption**: Project keys are wrapped with individual user passwords using AES-256-GCM
+- **Zero Shared Secrets**: Each developer has unique PBKDF2-derived credentials (310,000 iterations, OWASP 2025 compliant)
+- **Individual Authentication**: Per-user access control with complete audit trail via Git
+- **Instant Revocation**: Remove user access immediately without password rotation for entire team
+- **Forward Secrecy**: Revoked users lose access instantly with no cryptographic dependencies
+
+#### 👥 **User Management System**
+- **Init Secure Project**: Create admin user and establish encrypted project foundation
+- **Add User**: Invite team members with individual password-based access envelopes
+- **Revoke User**: Instantly remove access with admin verification and self-revocation protection
+- **Login to Secure Project**: Authenticate individual users and establish session access
+- **Git-Based Audit Trail**: Complete non-repudiation with all user management operations tracked in version control
+
+#### 🔒 **Individual Variable Encryption UI**
+- **Lock/Unlock Toggle**: Interactive 🔒/🔓 icons for granular control over individual environment variables
+- **Real-time Encryption**: Encrypt/decrypt specific variables with visual feedback and loading states
+- **Professional UI**: Modern CSS styling with hover effects and responsive design
+- **State Management**: Rich variable tracking with encryption status and UI synchronization
+
+#### 🛡️ **Critical Security Fixes**
+- **Data Loss Bug Fix**: Resolved critical password change bug that caused permanent encrypted variable loss
+- **Enhanced Input Validation**: Comprehensive validation for encrypted data format, base64 encoding, and component sizes
+- **OWASP 2025 Compliance**: Updated cryptographic parameters with modern security standards
+- **Workspace Key Management**: Fixed encryption key accessibility issues when workspace folders change
+- **Cloud Sync Security**: Improved encrypted payload lookup with exact key matching
+
+#### 🔔 **Professional Update System**
+- **What's New Notifications**: Automatic version update notifications with changelog access
+- **Native Integration**: VS Code markdown preview for professional changelog display
+- **Welcome Messages**: Appropriate messaging for new vs returning users
+- **Persistent State**: Version tracking to avoid repeated notifications
+
+#### 📊 **Advanced User Experience**
+- **Fail-Fast Validation**: Early username availability checking prevents wasted user input
+- **Progress Indicators**: Professional loading bars for encryption and user management operations
+- **QuickPick Interfaces**: Intuitive user selection with rich metadata display (username, role, access time)
+- **Modal Confirmations**: Critical operation safeguards with explicit user consent
+- **Comprehensive Error Handling**: User-friendly messages with actionable guidance
+
+#### 🏗️ **Architecture & Code Quality**
+- **Constants Centralization**: Organized all hardcoded values into maintainable constants file
+- **TypeScript Enhancements**: Complete type safety with proper interfaces and removed 'any' usage
+- **ESLint Compliance**: Resolved all linting issues and improved code standards
+- **Session Management**: In-memory secure storage for decrypted project keys with VS Code integration
+- **Hybrid Mode Support**: Seamless fallback between multi-user and legacy single-password systems
+
+### 🔧 **Technical Enhancements**
+- **AES-256-GCM Authenticated Encryption**: Industry-standard encryption with 12-byte IV and 16-byte auth tags
+- **PBKDF2 Key Derivation**: 310,000 iterations with 256-bit salts per OWASP 2025 recommendations
+- **Git Integration**: Distributed audit trail eliminating single points of failure
+- **Zero-Knowledge Design**: Project keys never exist in plaintext outside encrypted memory
+- **Enterprise Security Model**: Following AWS/Google cloud envelope encryption patterns
+- **TypeScript Type Safety**: Comprehensive interfaces ensuring protocol compliance
+- **VSCode Lifecycle Management**: Proper extension integration with activation and command registration
+
+### 📚 **Documentation & Testing**
+- **Comprehensive Test Coverage**: Extended master key migration tests with malformed data validation
+- **Security Architecture Analysis**: Complete review of dual encryption systems and OWASP compliance
+- **Code Quality Improvements**: Enhanced TypeScript compilation and linting standards
+- **Professional UX Patterns**: Modal confirmations, progress feedback, and fail-fast validation
+
+---
+
 ## [1.2.0] - 2025-11-16
 
 ### Added
