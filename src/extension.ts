@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path'; // Import path module
+import * as fs from 'fs'; // Import fs for file operations
+
+// Import Commands
 import { SwitchEnvironmentCommand } from './commands/switchEnvironment';
 import { OpenEnvironmentPanelCommand } from './commands/openEnvironmentPanel';
 import { ValidateEnvironmentCommand } from './commands/validateEnvironment';
@@ -17,6 +20,8 @@ import { InitSecureProjectCommand } from './commands/initSecureProject';
 import { AddUserCommand } from './commands/addUser';
 import { RevokeUserCommand } from './commands/revokeUser';
 import { LoginToSecureProjectCommand } from './commands/loginToSecureProject';
+
+// Import Providers & Managers
 import { HistoryWebviewProvider } from './providers/historyWebviewProvider';
 import { WorkspaceManager } from './providers/workspaceManager';
 import { EnvironmentTreeProvider } from './providers/environmentTreeProvider';
@@ -24,7 +29,8 @@ import { EnvironmentWebviewProvider } from './providers/environmentWebviewProvid
 import { CommandsTreeProvider } from './providers/commandsTreeProvider';
 import { EnvironmentCompletionProvider } from './providers/environmentCompletionProvider';
 import { HistoryManager } from './utils/historyManager';
-import { UpdateManager } from './managers/UpdateManager'; // ✅ Added UpdateManager
+import { UpdateManager } from './managers/UpdateManager'; 
+
 
 export let extensionUri: vscode.Uri;
 export let extensionContext: vscode.ExtensionContext;
@@ -128,7 +134,7 @@ export async function activate(context: vscode.ExtensionContext) {
             
             // Check if it's an .env file
             if (fileName === '.env' || fileName.startsWith('.env.')) {
-                // 🔥 Dynamic Workspace Detection (Fix for Multi-root workspaces)
+                // Dynamic Workspace Detection (Fix for Multi-root workspaces)
                 const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
                 if (!workspaceFolder) return; // File is outside any workspace
 

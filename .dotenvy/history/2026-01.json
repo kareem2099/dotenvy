@@ -1,0 +1,101 @@
+[
+  {
+    "id": "214d17e6-9534-4072-8325-20b33f987b7c",
+    "timestamp": "2026-01-24T19:45:57.250Z",
+    "action": "modify",
+    "environmentName": "local",
+    "fileName": ".env",
+    "fileContent": "# LLM Service Configuration\nDOTENVY_LLM_SERVICE_URL=\"https://python-llm-production.up.railway.app\"\nLLM_API_KEY=\"llm_I8mlefRvV39nftSjvnHgvajI4MMB\"\n",
+    "diff": {
+      "added": [],
+      "removed": [],
+      "changed": [
+        {
+          "variable": {
+            "key": "DOTENVY_LLM_SERVICE_URL",
+            "value": "\"https://python-llm-production.up.railway.app\"",
+            "line": 2
+          },
+          "oldValue": "https://python-llm-production.up.railway.app",
+          "newValue": "\"https://python-llm-production.up.railway.app\"",
+          "valueChanges": [
+            {
+              "type": "replace",
+              "original": "https://python-llm-production.up.railway.app",
+              "modified": "\"https://python-llm-production.up.railway.app\"",
+              "position": 0
+            }
+          ],
+          "blame": {
+            "user": "kareem2099",
+            "timestamp": "2026-01-24T19:45:41.557Z",
+            "commitHash": "222ca15958c7f9ce059d1510f61ffae1f6f47e79"
+          }
+        }
+      ],
+      "unchanged": [
+        {
+          "key": "LLM_API_KEY",
+          "value": "\"llm_I8mlefRvV39nftSjvnHgvajI4MMB\"",
+          "line": 3
+        }
+      ]
+    },
+    "metadata": {
+      "workspace": "/home/kareem/StudioProjects/DotEnvy",
+      "source": "auto",
+      "checksum": "4b0993bf884bf030"
+    },
+    "user": "kareem2099",
+    "commitHash": "222ca15958c7f9ce059d1510f61ffae1f6f47e79"
+  },
+  {
+    "id": "95ff2deb-bac2-4168-b1b3-7f13f2d6faec",
+    "timestamp": "2026-01-24T19:45:41.557Z",
+    "action": "modify",
+    "environmentName": "local",
+    "fileName": ".env",
+    "fileContent": "# LLM Service Configuration\nDOTENVY_LLM_SERVICE_URL=https://python-llm-production.up.railway.app\nLLM_API_KEY=\"llm_I8mlefRvV39nftSjvnHgvajI4MMB\"\n",
+    "diff": {
+      "added": [
+        {
+          "key": "DOTENVY_LLM_SERVICE_URL",
+          "value": "https://python-llm-production.up.railway.app",
+          "line": 2
+        }
+      ],
+      "removed": [],
+      "changed": [],
+      "unchanged": [
+        {
+          "key": "LLM_API_KEY",
+          "value": "\"llm_I8mlefRvV39nftSjvnHgvajI4MMB\"",
+          "line": 3
+        }
+      ]
+    },
+    "metadata": {
+      "workspace": "/home/kareem/StudioProjects/DotEnvy",
+      "source": "auto",
+      "checksum": "46b3d17cae5fd788"
+    },
+    "user": "kareem2099",
+    "commitHash": "222ca15958c7f9ce059d1510f61ffae1f6f47e79"
+  },
+  {
+    "id": "d38da450-7e6c-45db-b5af-65461a3cd8ca",
+    "timestamp": "2026-01-24T19:36:36.679Z",
+    "action": "modify",
+    "environmentName": "local",
+    "fileName": ".env",
+    "fileContent": "LLM_API_KEY=\"llm_I8mlefRvV39nftSjvnHgvajI4MMB\"",
+    "diff": null,
+    "metadata": {
+      "workspace": "/home/kareem/StudioProjects/DotEnvy",
+      "source": "auto",
+      "checksum": "d23a4dd6e2d79be3"
+    },
+    "user": "kareem2099",
+    "commitHash": "222ca15958c7f9ce059d1510f61ffae1f6f47e79"
+  }
+]

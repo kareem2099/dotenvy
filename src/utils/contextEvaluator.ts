@@ -402,7 +402,8 @@ export class ContextEvaluator {
 
         // Analyze variable name from context
         if (context.variableName) {
-            if (this.HIGH_RISK_KEYWORDS.some(keyword => context.variableName!.toLowerCase().includes(keyword))) {
+            const varNameLower = context.variableName.toLowerCase();
+            if (this.HIGH_RISK_KEYWORDS.some(keyword => varNameLower.includes(keyword))) {
                 analysis.push(`Variable name '${context.variableName}' indicates sensitive data`);
             }
         }
@@ -439,7 +440,12 @@ export class ContextEvaluator {
 
         // Calculate confidence based on analysis
         let confidence = 0.5; // Base confidence
-        if (context.variableName && this.HIGH_RISK_KEYWORDS.some(k => context.variableName!.includes(k))) confidence += 0.3;
+        if (context.variableName) {
+            const varNameLower = context.variableName.toLowerCase();
+            if (this.HIGH_RISK_KEYWORDS.some(keyword => varNameLower.includes(keyword))) {
+                confidence += 0.3;
+            }
+        }
         if (context.hasAssignment) confidence += 0.2;
         if (allLines.includes('auth') || allLines.includes('login')) confidence += 0.15;
 

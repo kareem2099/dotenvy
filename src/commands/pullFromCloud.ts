@@ -96,7 +96,12 @@ export class PullFromCloudCommand implements vscode.Disposable {
 		}
 
 		try {
-			const syncConfig = config.cloudSync!;
+			const syncConfig = config.cloudSync;
+			if (!syncConfig) {
+				vscode.window.showErrorMessage('Cloud sync configuration is missing.');
+				return;
+			}
+
 			let cloudManager: CloudSyncManager | undefined;
 
 			// Check if encrypted cloud sync is enabled (default: enabled)
@@ -229,7 +234,7 @@ export class PullFromCloudCommand implements vscode.Disposable {
 				}
 			}
 
-			const secrets = result.secrets!; // We've already checked for success and secrets above
+			const secrets = result.secrets;
 			// Calculate changes
 			const newKeys = Object.keys(secrets).filter(key => !currentSecrets.hasOwnProperty(key));
 			const changedKeys = Object.keys(secrets).filter(key =>
@@ -314,8 +319,10 @@ export class PullFromCloudCommand implements vscode.Disposable {
 			await fs.promises.writeFile(envPath, newEnvContent, 'utf8');
 
 			// Update status bar
-			statusBarProvider.setWorkspace(rootPath);
-			statusBarProvider.forceRefresh();
+			if (statusBarProvider) {
+				statusBarProvider.setWorkspace(rootPath);
+				statusBarProvider.forceRefresh();
+			}
 
 			vscode.window.showInformationMessage(
 				`✅ Successfully pulled ${Object.keys(result.secrets).length} secrets from ${syncConfig.provider}!`

@@ -355,13 +355,17 @@ DEBUG=false
     }
 
     private async getWebviewContent(extensionUri: vscode.Uri): Promise<string> {
+        if (!this.panel) {
+            throw new Error('Panel not initialized');
+        }
+
         // Read the HTML file
         const htmlUri = vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.html');
         let html = (await vscode.workspace.fs.readFile(htmlUri)).toString();
 
         // Create webview URIs for CSS and JS resources
-        const cssUri = this.panel!.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css'));
-        const jsUri = this.panel!.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.js'));
+        const cssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css'));
+        const jsUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.js'));
 
         // Replace placeholders with actual URIs
         html = html.replace('{{panelCssUri}}', cssUri.toString());

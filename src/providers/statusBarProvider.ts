@@ -165,18 +165,21 @@ export class StatusBarProvider implements vscode.Disposable {
 		}
 
 		try {
-			const syncConfig = config!.cloudSync;
-			status.provider = syncConfig!.provider;
+			if (!config?.cloudSync) {
+				return status;
+			}
+			const syncConfig = config.cloudSync;
+			status.provider = syncConfig.provider;
 			// Use CloudEncryptionUtils for consistent encryption status checking
 			status.encryptionEnabled = await CloudEncryptionUtils.isCloudEncryptionEnabled(); // Will use config from workspace
 
 			let cloudManager: CloudSyncManager;
-			switch (syncConfig!.provider) {
+			switch (syncConfig.provider) {
 				case 'doppler':
-					cloudManager = new DopplerSyncManager(syncConfig!);
+					cloudManager = new DopplerSyncManager(syncConfig);
 					break;
 				default:
-					status.error = `Unsupported provider: ${syncConfig!.provider}`;
+					status.error = `Unsupported provider: ${syncConfig.provider}`;
 					return status;
 			}
 

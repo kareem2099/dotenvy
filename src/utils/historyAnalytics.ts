@@ -378,10 +378,10 @@ export class HistoryAnalytics {
             // Build lifecycle
             const uniqueValues = [...new Set(changes.map(c => c.value))];
             lifecycle[key] = {
-                created: data.firstSeen!,
-                lastModified: data.lastChanged!,
+                created: data.firstSeen || new Date(),
+                lastModified: data.lastChanged || new Date(),
                 totalChanges: changes.length - 1,
-                currentValue: data.currentValue!,
+                currentValue: data.currentValue || '',
                 previousValues: uniqueValues.slice(0, -1) // All except current
             };
         }

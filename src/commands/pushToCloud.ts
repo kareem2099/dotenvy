@@ -97,7 +97,10 @@ export class PushToCloudCommand implements vscode.Disposable {
 		}
 
 		try {
-			const syncConfig = config.cloudSync!;
+			const syncConfig = config.cloudSync;
+			if (!syncConfig) {
+				vscode.window.showErrorMessage('Cloud sync is not configured in .dotenvy.json.');
+			}
 			let cloudManager: CloudSyncManager | undefined;
 
 			// Check if encrypted cloud sync is enabled (default: enabled)
