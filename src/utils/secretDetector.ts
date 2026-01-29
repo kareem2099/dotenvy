@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 import { DetectedSecret, ScanProgress } from './secretScannerTypes';
 import { PatternRegistry } from './patternRegistry';
@@ -10,11 +10,12 @@ import { llmAnalyzer } from './llmAnalyzer';
 
 export class SecretDetector {
     private static scanProgressCallback?: (progress: ScanProgress) => void;
-    private static readonly MAX_WORKERS = 4; // Parallel processing workers
+    private static readonly MAX_WORKERS = 4;
     private static fileWatcher?: vscode.FileSystemWatcher;
     private static debounceTimers = new Map<string, NodeJS.Timeout>();
-    private static readonly DEBOUNCE_DELAY = 1000; // 1 second delay for file changes
+    private static readonly DEBOUNCE_DELAY = 1000;
     private static isFileWatcherActive = false;
+    private static activeScanPromises = new Map<string, Promise<void>>();
 
     /**
      * Set progress callback for real-time updates
@@ -28,7 +29,7 @@ export class SecretDetector {
      */
     public static startFileWatcher(onSecretsFound?: (secrets: DetectedSecret[]) => void): void {
         if (this.isFileWatcherActive) {
-            return; // Already watching
+            return;
         }
 
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -36,12 +37,11 @@ export class SecretDetector {
             return;
         }
 
-        // Watch all relevant files that could contain secrets
         this.fileWatcher = vscode.workspace.createFileSystemWatcher(
-            PatternRegistry.getExcludePattern().replace('{', '{**/*').replace('}', '}'), // Watch all files except ignored ones
-            false, // Don't ignore create events
-            false, // Don't ignore change events
-            false  // Don't ignore delete events
+            '**/*',
+            false,
+            false,
+            false
         );
 
         this.fileWatcher.onDidChange(async (uri) => {
@@ -49,7 +49,7 @@ export class SecretDetector {
 
             const filePath = uri.fsPath;
             if (!PatternRegistry.shouldScanFile(filePath, workspaceFolders[0].uri.fsPath)) {
-                return; // Skip files we're not interested in
+                return;
             }
 
             this.debounceFileScan(filePath, onSecretsFound);
@@ -70,15 +70,14 @@ export class SecretDetector {
             if (uri.scheme !== 'file') return;
 
             const filePath = uri.fsPath;
-            // Clear cache and debounce timer for deleted files
             CacheManager.invalidateFileCache(filePath);
             this.clearDebounceTimer(filePath);
+            this.activeScanPromises.delete(filePath);
 
-            console.log(`Secret scanning: File deleted - ${path.basename(filePath)}`);
+            console.log(`🗑️  File deleted - ${path.basename(filePath)}`);
         });
 
         this.isFileWatcherActive = true;
-
         console.log('🔍 Real-time secret monitoring started');
     }
 
@@ -86,18 +85,25 @@ export class SecretDetector {
      * Stop file monitoring
      */
     public static stopFileWatcher(): void {
-        if (this.fileWatcher) {
-            this.fileWatcher.dispose();
+        try {
+            if (this.fileWatcher) {
+                this.fileWatcher.dispose();
+                this.fileWatcher = undefined;
+            }
+
+            this.debounceTimers.forEach((timer) => clearTimeout(timer));
+            this.debounceTimers.clear();
+            this.activeScanPromises.clear();
+
+            this.isFileWatcherActive = false;
+            console.log('🛑 Real-time secret monitoring stopped');
+        } catch (error) {
+            console.error('Error stopping file watcher:', error);
             this.fileWatcher = undefined;
+            this.debounceTimers.clear();
+            this.activeScanPromises.clear();
+            this.isFileWatcherActive = false;
         }
-
-        // Clear all debounce timers
-        this.debounceTimers.forEach((timer) => clearTimeout(timer));
-        this.debounceTimers.clear();
-
-        this.isFileWatcherActive = false;
-
-        console.log('🔍 Real-time secret monitoring stopped');
     }
 
     /**
@@ -108,51 +114,67 @@ export class SecretDetector {
     }
 
     /**
-     * Debounce file scanning to avoid excessive processing during rapid file changes
+     * Debounce file scanning to avoid excessive processing
      */
     private static debounceFileScan(filePath: string, onSecretsFound?: (secrets: DetectedSecret[]) => void): void {
-        // Clear existing timer for this file
         this.clearDebounceTimer(filePath);
 
-        // Set new debounced scan
         const timer = setTimeout(async () => {
             try {
-                // Remove from timers map
                 this.debounceTimers.delete(filePath);
 
-                console.log(`🔍 Scanning changed file: ${path.basename(filePath)}`);
-
-                // Invalidate cache for this file
-                CacheManager.invalidateFileCache(filePath);
-
-                // Scan the file for secrets
-                const secrets = await this.scanFile(filePath);
-
-                if (secrets.length > 0) {
-                    console.log(`⚠️ Found ${secrets.length} potential secret(s) in ${path.basename(filePath)}`);
-
-                    // Call callback if provided
-                    if (onSecretsFound) {
-                        onSecretsFound(secrets);
-                    } else {
-                        // Default: Show warning message
-                        vscode.window.showWarningMessage(
-                            `⚠️ ${secrets.length} potential secret(s) detected in ${path.basename(filePath)}`,
-                            'Review Secrets'
-                        ).then(selection => {
-                            if (selection === 'Review Secrets') {
-                                // Could open a panel or show details
-                                console.log('Secrets found:', secrets);
-                            }
-                        });
-                    }
+                // Check if there's already an active scan for this file
+                const activeScan = this.activeScanPromises.get(filePath);
+                if (activeScan) {
+                    await activeScan;
+                    return;
                 }
+
+                // Create new scan promise
+                const scanPromise = this.performFileScan(filePath, onSecretsFound);
+                this.activeScanPromises.set(filePath, scanPromise);
+
+                await scanPromise;
+                this.activeScanPromises.delete(filePath);
+
             } catch (error) {
                 console.error(`Error scanning file ${filePath}:`, error);
+                this.activeScanPromises.delete(filePath);
             }
         }, this.DEBOUNCE_DELAY);
 
         this.debounceTimers.set(filePath, timer);
+    }
+
+    /**
+     * Perform actual file scan
+     */
+    private static async performFileScan(
+        filePath: string,
+        onSecretsFound?: (secrets: DetectedSecret[]) => void
+    ): Promise<void> {
+        console.log(`🔍 Scanning changed file: ${path.basename(filePath)}`);
+
+        CacheManager.invalidateFileCache(filePath);
+
+        const secrets = await this.scanFile(filePath);
+
+        if (secrets.length > 0) {
+            console.log(`⚠️  Found ${secrets.length} potential secret(s) in ${path.basename(filePath)}`);
+
+            if (onSecretsFound) {
+                onSecretsFound(secrets);
+            } else {
+                vscode.window.showWarningMessage(
+                    `⚠️ ${secrets.length} potential secret(s) detected in ${path.basename(filePath)}`,
+                    'Review Secrets'
+                ).then(selection => {
+                    if (selection === 'Review Secrets') {
+                        console.log('Secrets found:', secrets);
+                    }
+                });
+            }
+        }
     }
 
     /**
@@ -181,11 +203,10 @@ export class SecretDetector {
         const rootPath = workspaceFolders[0].uri.fsPath;
 
         try {
-            // Find all relevant files
             const files = await vscode.workspace.findFiles(
                 '**/*',
                 PatternRegistry.getExcludePattern(),
-                5000 // Reasonable limit
+                5000
             );
 
             for (const fileUri of files) {
@@ -202,7 +223,7 @@ export class SecretDetector {
             console.error('Error scanning workspace:', error);
         }
 
-        return secrets;
+        return this.deduplicateSecrets(secrets);
     }
 
     /**
@@ -212,67 +233,144 @@ export class SecretDetector {
         const secrets: DetectedSecret[] = [];
 
         try {
-            const content = fs.readFileSync(filePath, 'utf8');
+            const content = await fs.readFile(filePath, 'utf8');
             const lines = content.split('\n');
 
             for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
                 const line = lines[lineIndex];
+                if (line.length > 500) continue;
 
-                for (const pattern of PatternRegistry.getPatterns()) {
-                    const matches = [...line.matchAll(new RegExp(pattern.regex.source, pattern.regex.flags))];
-
-                    for (const match of matches) {
-                        const secretValue = match[0].trim();
-                        if (EntropyAnalyzer.isLikelySecret(secretValue)) {
-                            const context = ContextEvaluator.getContextLine(lines, lineIndex, match.index!);
-                            const secretScore = ContextEvaluator.calculateSecretScore(secretValue, context);
-
-                            // Extract variable name from context if possible
-                            const variableName = this.extractVariableName(context);
-
-                            const baselineConfidence = EntropyAnalyzer.getConfidence(secretValue);
-                            const enhancedConfidence = await llmAnalyzer.analyzeSecret(secretValue, context, variableName);
-
-                            const baseSecret: DetectedSecret = {
-                                file: vscode.workspace.asRelativePath(filePath),
-                                line: lineIndex + 1,
-                                column: match.index! + 1,
-                                content: secretValue,
-                                type: pattern.type,
-                                confidence: enhancedConfidence as 'high' | 'medium' | 'low',
-                                suggestedEnvVar: '', // Will be set after processing all
-                                context: context,
-                                riskScore: secretScore.confidence,
-                                detectionMethod: secretScore.detectionMethod,
-                                reasoning: [...secretScore.reasoning, ...(enhancedConfidence !== baselineConfidence ? ['ML-enhanced confidence'] : [])]
-                            };
-
-                            secrets.push(baseSecret);
-                        }
-                    }
-                }
+                const lineSecrets = await this.scanLine(line, lineIndex, lines, filePath);
+                secrets.push(...lineSecrets);
             }
 
         } catch (error) {
-            // Skip files that can't be read
-            console.log(`Skipping file ${filePath}: ${error}`);
+            console.log(`Skipping file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
 
         return this.assignUniqueEnvVarNames(secrets);
     }
 
     /**
+     * Scan a single line for secrets
+     */
+    private static async scanLine(
+        line: string,
+        lineIndex: number,
+        allLines: string[],
+        filePath: string
+    ): Promise<DetectedSecret[]> {
+        const secrets: DetectedSecret[] = [];
+
+        for (const pattern of PatternRegistry.getPatterns()) {
+            const matches = [...line.matchAll(pattern.regex)];
+
+            for (const match of matches) {
+                const matchIndex = match.index ?? 0;
+                const secretValue = match[0].trim();
+                
+                if (EntropyAnalyzer.isLikelySecret(secretValue)) {
+                    const context = ContextEvaluator.getContextLine(allLines, lineIndex, matchIndex);
+                    const secretScore = ContextEvaluator.calculateSecretScore(secretValue, context);
+
+                    const variableName = this.extractVariableName(context);
+
+                    const baselineConfidence = EntropyAnalyzer.getConfidence(secretValue);
+                    let finalConfidence = baselineConfidence;
+                    let detectionMethod = secretScore.detectionMethod;
+                    const reasoning = [...secretScore.reasoning];
+
+                    // Try LLM analysis
+                    if (secretScore.confidence > 0.4) {
+                        try {
+                            const llmConfidence = await llmAnalyzer.analyzeSecret(secretValue, context, variableName);
+                            
+                            if (llmConfidence === 'high' || llmConfidence === 'critical') {
+                                finalConfidence = 'high';
+                                reasoning.push('✓ AI-verified');
+                                detectionMethod = 'hybrid';
+                            } else if (llmConfidence === 'medium') {
+                                finalConfidence = 'medium';
+                            } else if (llmConfidence === 'low') {
+                                finalConfidence = 'low';
+                            }
+                        } catch (e) {
+                            // Silent fallback
+                        }
+                    }
+
+                    const baseSecret: DetectedSecret = {
+                        file: vscode.workspace.asRelativePath(filePath),
+                        line: lineIndex + 1,
+                        column: matchIndex + 1,
+                        content: this.redactSecret(secretValue),
+                        type: pattern.type,
+                        confidence: finalConfidence,
+                        suggestedEnvVar: '',
+                        context: context,
+                        riskScore: secretScore.confidence,
+                        detectionMethod: detectionMethod,
+                        reasoning: reasoning
+                    };
+
+                    secrets.push(baseSecret);
+                }
+            }
+        }
+
+        return secrets;
+    }
+
+    /**
+     * Redact secret value for safety
+     */
+    private static redactSecret(secret: string): string {
+        if (secret.length <= 12) {
+            return '****' + secret.slice(-2);
+        }
+        return secret.slice(0, 4) + '****' + secret.slice(-4);
+    }
+
+    /**
+     * Deduplicate identical secrets
+     */
+    private static deduplicateSecrets(secrets: DetectedSecret[]): DetectedSecret[] {
+        const seen = new Map<string, DetectedSecret>();
+
+        for (const secret of secrets) {
+            const key = `${secret.file}:${secret.line}:${secret.column}:${secret.content}`;
+            
+            if (!seen.has(key)) {
+                seen.set(key, secret);
+            } else {
+                const existing = seen.get(key);
+                if (existing && this.getConfidenceScore(secret.confidence) > this.getConfidenceScore(existing.confidence)) {
+                    seen.set(key, secret);
+                }
+            }
+        }
+
+        return Array.from(seen.values());
+    }
+
+    /**
+     * Convert confidence to numeric score
+     */
+    private static getConfidenceScore(confidence: 'high' | 'medium' | 'low'): number {
+        const scores = { high: 3, medium: 2, low: 1 };
+        return scores[confidence];
+    }
+
+    /**
      * Generate a unique environment variable name
      */
     private static generateUniqueEnvVar(secrets: DetectedSecret[], currentSecret: DetectedSecret): string {
-        // First, check if there are any secrets that already match our type in this file
         const sameFileSecrets = secrets.filter(s =>
             s.file === currentSecret.file &&
             s.type === currentSecret.type &&
             s !== currentSecret
         );
 
-        // If same type already exists, add a suffix
         let suffix = '';
         if (sameFileSecrets.length > 0) {
             suffix = `_${sameFileSecrets.length + 1}`;
@@ -287,75 +385,42 @@ export class SecretDetector {
     private static generateBaseEnvVarName(secret: DetectedSecret): string {
         const type = secret.type;
 
-        // Type-based suggestions - Major Platforms
-        if (type.includes('AWS')) return 'AWS_ACCESS_KEY_ID';
-        if (type.includes('Stripe Secret Key')) return 'STRIPE_SECRET_KEY';
-        if (type.includes('Stripe Publishable Key')) return 'STRIPE_PUBLISHABLE_KEY';
-        if (type.includes('OpenAI')) return 'OPENAI_API_KEY';
-        if (type.includes('GitHub')) return 'GITHUB_TOKEN';
-        if (type.includes('Slack')) return 'SLACK_BOT_TOKEN';
-        if (type.includes('Discord')) return 'DISCORD_BOT_TOKEN';
-        if (type.includes('JWT')) return 'JWT_SECRET';
-        if (type.includes('Database')) return 'DATABASE_URL';
-        if (type.includes('MongoDB')) return 'MONGODB_URI';
+        const typeMap: Record<string, string> = {
+            'AWS API Key': 'AWS_ACCESS_KEY_ID',
+            'Stripe Secret Key': 'STRIPE_SECRET_KEY',
+            'Stripe Publishable Key': 'STRIPE_PUBLISHABLE_KEY',
+            'OpenAI API Key': 'OPENAI_API_KEY',
+            'GitHub Personal Access Token': 'GITHUB_TOKEN',
+            'GitHub Fine-grained PAT': 'GITHUB_TOKEN',
+            'Slack Bot Token': 'SLACK_BOT_TOKEN',
+            'Discord Bot Token': 'DISCORD_BOT_TOKEN',
+            'JWT Secret': 'JWT_SECRET',
+            'Database Connection URL': 'DATABASE_URL',
+            'MongoDB Atlas Connection': 'MONGODB_URI',
+            'SendGrid API Key': 'SENDGRID_API_KEY',
+            'Mailgun API Key': 'MAILGUN_API_KEY',
+            'Twilio Auth Token': 'TWILIO_AUTH_TOKEN',
+            'Sentry DSN': 'SENTRY_DSN',
+            'DigitalOcean Token': 'DIGITALOCEAN_TOKEN',
+            'Vercel API Token': 'VERCEL_API_TOKEN',
+            'SSH Private Key': 'SSH_PRIVATE_KEY',
+            'SSL Certificate': 'SSL_CERTIFICATE',
+            'Bearer Token': 'AUTH_BEARER_TOKEN',
+            'Password': 'PASSWORD',
+            'Secret Key': 'SECRET_KEY'
+        };
 
-        // Email & Communications
-        if (type.includes('SendGrid')) return 'SENDGRID_API_KEY';
-        if (type.includes('Mailgun')) return 'MAILGUN_API_KEY';
-        if (type.includes('Twilio')) return 'TWILIO_AUTH_TOKEN';
+        if (typeMap[type]) {
+            return typeMap[type];
+        }
 
-        // Monitoring & Error Tracking
-        if (type.includes('Sentry')) return 'SENTRY_DSN';
+        if (secret.content.startsWith('sk-')) return 'SECRET_KEY';
+        if (secret.content.startsWith('pk_')) return 'PUBLIC_KEY';
 
-        // Cloud & Infrastructure
-        if (type.includes('Firebase')) return 'FIREBASE_SERVICE_ACCOUNT';
-        if (type.includes('DigitalOcean')) return 'DIGITALOCEAN_TOKEN';
-        if (type.includes('Vultr')) return 'VULTR_API_KEY';
-        if (type.includes('Google Cloud')) return 'GOOGLE_CLOUD_KEY';
-
-        // Social Media & Marketing
-        if (type.includes('Facebook')) return 'FACEBOOK_APP_SECRET';
-        if (type.includes('Instagram')) return 'INSTAGRAM_APP_SECRET';
-        if (type.includes('Twitter')) return 'TWITTER_BEARER_TOKEN';
-        if (type.includes('LinkedIn')) return 'LINKEDIN_CLIENT_SECRET';
-        if (type.includes('Mailchimp')) return 'MAILCHIMP_API_KEY';
-
-        // Development Tools
-        if (type.includes('Cloudflare')) return 'CLOUDFLARE_API_TOKEN';
-        if (type.includes('Contentful')) return 'CONTENTFUL_ACCESS_TOKEN';
-        if (type.includes('Heroku')) return 'HEROKU_OAUTH_TOKEN';
-        if (type.includes('Vercel')) return 'VERCEL_API_TOKEN';
-
-        // Security & Cryptography
-        if (type.includes('SSH Private Key')) return 'SSH_PRIVATE_KEY';
-        if (type.includes('SSL Certificate')) return 'SSL_CERTIFICATE';
-
-        // Generic API key/token types
-        if (type.includes('Bearer Token')) return 'AUTH_BEARER_TOKEN';
-        if (type.includes('Auth Token')) return 'AUTH_TOKEN';
-        if (type.includes('API Key')) return 'API_KEY';
-        if (type.includes('Password')) return 'PASSWORD';
-        if (type.includes('Secret Key')) return 'SECRET_KEY';
-
-        // Fallback based on secret content pattern
-        if (secret.content.startsWith('sk-')) return 'STRIPE_SECRET_KEY';
-        if (secret.content.startsWith('pk_')) return 'STRIPE_PUBLISHABLE_KEY';
-        if (secret.content.startsWith('AKIAI') || secret.content.startsWith('AKIAIOS')) return 'AWS_ACCESS_KEY_ID';
-        if (secret.content.startsWith('sk-proj-')) return 'OPENAI_API_KEY';
-        if (secret.content.startsWith('ghp_')) return 'GITHUB_TOKEN';
-        if (secret.content.startsWith('xoxb-') || secret.content.startsWith('xoxp-')) return 'SLACK_TOKEN';
-        if (secret.content.startsWith('dop_v1_')) return 'DIGITALOCEAN_TOKEN';
-        if (secret.content.startsWith('vercel_')) return 'VERCEL_TOKEN';
-
-        // File-based fallback
         const fileName = path.basename(secret.file, path.extname(secret.file));
-        const baseName = fileName.toUpperCase();
-        const cleanBaseName = baseName.startsWith('.') ? `FILE_${baseName.substring(1)}` : baseName;
-
-        if (type.includes('MD5') || type.includes('Hash')) return `${cleanBaseName}_HASH`;
-        if (type.includes('Certificate') || type.includes('Key')) return `${cleanBaseName}_CERT`;
-
-        return `${cleanBaseName}_SECRET`;
+        const baseName = fileName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+        
+        return `${baseName}_SECRET`;
     }
 
     /**
@@ -369,7 +434,6 @@ export class SecretDetector {
             let finalName = baseName;
             let counter = 1;
 
-            // Ensure uniqueness
             while (usedNames.has(finalName)) {
                 finalName = `${baseName}_${counter}`;
                 counter++;
@@ -398,23 +462,20 @@ export class SecretDetector {
         const rootPath = workspaceFolders[0].uri.fsPath;
         const startTime = Date.now();
 
-        // Set progress callback
         if (progressCallback) {
             this.setProgressCallback(progressCallback);
         }
 
         try {
-            // Find all relevant files
             const files = await vscode.workspace.findFiles(
                 '**/*',
                 PatternRegistry.getExcludePattern(),
-                5000 // Reasonable limit
+                5000
             );
 
             const filesToScan: string[] = [];
             const cachedResults: DetectedSecret[] = [];
 
-            // Separate files that need scanning vs cached files
             for (const fileUri of files) {
                 if (fileUri.scheme !== 'file') continue;
 
@@ -431,7 +492,6 @@ export class SecretDetector {
                 }
             }
 
-            // Update progress
             if (this.scanProgressCallback) {
                 this.scanProgressCallback({
                     current: 0,
@@ -443,36 +503,32 @@ export class SecretDetector {
                 });
             }
 
-            // Scan files with parallel processing
             const scanPromises = filesToScan.map((filePath, index) =>
                 this.scanFileEnhanced(filePath, index, filesToScan.length, startTime)
             );
 
             const scanResults = await Promise.all(scanPromises);
 
-            // Combine cached and new results
             for (const results of scanResults) {
                 secrets.push(...results);
             }
             secrets.push(...cachedResults);
 
-            // Cache new results
-            scanResults.forEach((results, index) => {
-                CacheManager.cacheResults(filesToScan[index], results);
-            });
+            for (let i = 0; i < scanResults.length; i++) {
+                CacheManager.cacheResults(filesToScan[i], scanResults[i]);
+            }
 
         } catch (error) {
             console.error('Error in enhanced workspace scan:', error);
         }
 
-        return secrets;
+        return this.deduplicateSecrets(secrets);
     }
 
     /**
-     * Extract variable name from context (for ML learning)
+     * Extract variable name from context
      */
     private static extractVariableName(context: string): string | undefined {
-        // Look for variable assignment patterns
         const patterns = [
             /(?:const|let|var)\s+(\w+)\s*[:=]/,
             /(\w+)\s*[:=]/,
@@ -497,10 +553,9 @@ export class SecretDetector {
         const scanStartTime = Date.now();
 
         try {
-            const content = fs.readFileSync(filePath, 'utf8');
+            const content = await fs.readFile(filePath, 'utf8');
             const lines = content.split('\n');
 
-            // Update progress
             if (this.scanProgressCallback) {
                 const elapsed = Date.now() - startTime;
                 const avgTimePerFile = elapsed / (index + 1);
@@ -518,49 +573,26 @@ export class SecretDetector {
 
             for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
                 const line = lines[lineIndex];
+                if (line.length > 500) continue;
 
-                for (const pattern of PatternRegistry.getPatterns()) {
-                    const matches = [...line.matchAll(new RegExp(pattern.regex.source, pattern.regex.flags))];
-
-                    for (const match of matches) {
-                        const secretValue = match[0].trim();
-                        if (EntropyAnalyzer.isLikelySecret(secretValue)) {
-                            const context = ContextEvaluator.getContextLine(lines, lineIndex, match.index!);
-                            const secretScore = ContextEvaluator.calculateSecretScore(secretValue, context);
-
-                            // Extract variable name from context if possible
-                            const variableName = this.extractVariableName(context);
-
-                            const enhancedConfidence = await llmAnalyzer.analyzeSecret(secretValue, context, variableName);
-
-                            const baseSecret: DetectedSecret = {
-                                file: vscode.workspace.asRelativePath(filePath),
-                                line: lineIndex + 1,
-                                column: match.index! + 1,
-                                content: secretValue,
-                                type: pattern.type,
-                                confidence: enhancedConfidence as 'high' | 'medium' | 'low',
-                                suggestedEnvVar: '', // Will be set after processing all
-                                context: context,
-                                riskScore: secretScore.confidence,
-                                detectionMethod: secretScore.detectionMethod,
-                                reasoning: [...secretScore.reasoning, ...(enhancedConfidence !== EntropyAnalyzer.getConfidence(secretValue) ? ['ML-enhanced confidence'] : [])]
-                            };
-
-                            secrets.push(baseSecret);
-                        }
-                    }
-                }
+                const lineSecrets = await this.scanLine(line, lineIndex, lines, filePath);
+                secrets.push(...lineSecrets);
             }
 
-            // Track performance
             const scanTime = Date.now() - scanStartTime;
             CacheManager.recordScanTime(filePath, scanTime);
 
         } catch (error) {
-            console.log(`Skipping file ${filePath}: ${error}`);
+            console.log(`Skipping file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
 
         return this.assignUniqueEnvVarNames(secrets);
+    }
+
+    /**
+     * Clean up resources on disposal
+     */
+    public static dispose(): void {
+        this.stopFileWatcher();
     }
 }

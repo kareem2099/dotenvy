@@ -2,7 +2,7 @@
   "name": "dotenvy",
   "displayName": "DotEnvy – VS Code Environment Manager",
   "description": "Effortlessly manage, secure, and sync .env files directly inside VS Code with enterprise-grade encryption.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "icon": "resources/icons/icon.png",
   "publisher": "FreeRave",
   "author": "Kareem Ehab",
@@ -34,10 +34,11 @@
     "dotenvy-hook": "./out/git-hook.js"
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run compile && npm run substitute-env",
     "compile": "tsc -p ./",
+    "substitute-env": "node scripts/build-with-env.js",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
+    "pretest": "npm run compile && npm run substitute-env && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js"
   },
@@ -166,6 +167,16 @@
         "command": "dotenvy.showChangelog",
         "title": "DotEnvy: Show What's New",
         "category": "DotEnvy"
+      },
+      {
+        "command": "dotenvy.backup",
+        "title": "DotEnvy: Backup Current Environment",
+        "icon": "$(archive)"
+      },
+      {
+        "command": "dotenvy.restore",
+        "title": "DotEnvy: Restore from Backup",
+        "icon": "$(history)"
       }
     ],
     "viewsContainers": {
@@ -250,17 +261,18 @@
     "url": "https://github.com/kareem2099/dotenvy/issues"
   },
   "devDependencies": {
+    "@types/glob": "^7.2.0",
     "@types/mocha": "^9.1.1",
-    "@types/node": "16.x",
+    "@types/node": "^16.18.126",
     "@types/vscode": "^1.74.0",
     "@typescript-eslint/eslint-plugin": "^5.1.0",
     "@typescript-eslint/parser": "^5.1.0",
-    "@types/glob": "^7.2.0",
+    "@vscode/test-electron": "^2.3.0",
+    "dotenv": "^17.2.3",
     "eslint": "^8.37.0",
     "glob": "^7.2.3",
-    "mocha": "^9.2.1",
-    "typescript": "^4.8.3",
-    "@vscode/test-electron": "^2.3.0"
+    "mocha": "^11.3.0",
+    "typescript": "^4.8.3"
   },
   "dependencies": {
     "uuid": "^9.0.0"

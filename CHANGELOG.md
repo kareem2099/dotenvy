@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-01-26
+
+### **Portable Backup Encryption Enhancement** - Cross-Device Backup Revolution
+Complete implementation of password-based encryption (PBE) for backups, eliminating VSCode SecretStorage dependency and enabling truly portable encrypted backups across any device.
+
+#### **Password-Based Encryption (PBE) Architecture**
+- **OWASP 2025 Compliance**: PBKDF2 with 310,000 iterations for industry-standard password hashing
+- **Device Independence**: Backups work on any device with just user's password - no VSCode dependency
+- **Salt Management System**: Per-backup salt generation, storage in encrypted files, and extraction for consistent key derivation
+- **AES-256-GCM Encryption**: Authenticated encryption with embedded salt in backup payload format
+- **Cross-Platform Portability**: Take encrypted backups to any machine, enter password, restore successfully
+
+#### **Enhanced Backup Creation & Restoration**
+- **Backup Creation UX**: User enters password → PBKDF2 key derivation → AES-GCM encryption with salt → Portable backup created
+- **Backup Restoration UX**: User selects file → Salt extraction → Password prompt → File decryption with password-derived key
+- **Salt Extraction Utility**: Automatic salt extraction from encrypted backup files before password prompt
+- **Enhanced Encryption Format**: Base64 encoded JSON: {v, iv, ct, tag, s} with salt included for portability
+- **Backward Compatibility**: Support both old SecretStorage and new PBE methods seamlessly
+
+#### **Security & Error Handling**
+- **Brute-Force Resistance**: High iteration count PBKDF2 prevents password cracking attempts
+- **Rainbow Table Protection**: Per-file salt generation prevents precomputed attack vectors
+- **Authenticated Encryption**: AES-GCM provides integrity verification and tamper detection
+- **Clear Error Messages**: User-friendly feedback for incorrect passwords and corrupted backup files
+- **Security Model**: Password-based encryption eliminating VSCode SecretStorage dependency vulnerability
+
+#### **User Experience Enhancements**
+- **Intuitive Password Prompts**: Clear guidance for password entry with proper validation
+- **Progress Feedback**: Loading states and progress indicators for encryption/decryption operations
+- **Error Recovery**: Graceful handling of corrupted files and wrong password attempts
+- **Cross-Device Workflow**: Seamless backup transfer and restoration across different machines
+- **Professional UX**: Consistent with existing extension patterns and VS Code design principles
+
+#### **Technical Implementation**
+- **PBKDF2 Key Derivation**: 310,000 iterations with 256-bit derived keys and per-file salt generation
+- **Salt Management**: 16-byte random salt generated per backup, embedded in encrypted payload
+- **Encryption Format**: Versioned format supporting both legacy and new PBE methods
+- **File Format**: Base64 encoded JSON structure with version, IV, ciphertext, auth tag, and salt
+- **Security Standards**: Following OWASP 2025 password hashing guidelines and modern encryption practices
+
+### **Technical Enhancements**
+- **AES-256-GCM Authenticated Encryption**: Industry-standard encryption with embedded salt for portability
+- **PBKDF2 Key Derivation**: 310,000 iterations with per-backup salt generation for security
+- **Salt Storage Integration**: Salt embedded within encrypted backup format for consistent decryption
+- **Cross-Device Compatibility**: Eliminates VSCode SecretStorage dependency for true portability
+- **Error Handling**: Comprehensive validation and user-friendly error messages
+- **Backward Compatibility**: Seamless support for existing SecretStorage-based backups
+- **Security Model**: Password-based encryption following modern cryptographic best practices
+
+### **Documentation & Testing**
+- **Comprehensive Test Coverage**: Backup creation, restoration, cross-device scenarios, and error handling
+- **Security Architecture Review**: Complete analysis of PBE implementation and OWASP compliance
+- **User Experience Testing**: Cross-device backup workflows and password management scenarios
+- **Code Quality Standards**: Enhanced TypeScript compilation and security-focused code review
+
+---
+
 ## [1.3.0] - 2025-12-28
 
 ### 🛡️ **Multi-User Key Wrapping (Envelope Encryption)** - Enterprise-Grade Security
