@@ -1,0 +1,190 @@
+{
+  "version": "1.8.0",
+  "codename": "HistoryVault",
+  "theme": "Advanced Backup Management + Enhanced History Timeline",
+  "status": "pending",
+  "created": "2026-03-13",
+  "context": "v1.4.0 added PBE encrypted backups. v1.8.0 makes backups smart — scheduled, incremental, tagged, and visually diff-able. History goes from a flat list to a git-like visual timeline with search, filter, and point-in-time restore.",
+
+  "tasks": [
+    {
+      "id": "1.8-T01",
+      "title": "Rich History Timeline",
+      "description": "Replace the current flat history list with a visual timeline. Each entry shows: timestamp, action type (switch, edit, auto-switch, restore), which variables changed (added/removed/modified), git branch at the time, and the user who made the change (if multi-user setup). Render as an interactive vertical timeline with expand/collapse per entry.",
+      "project": "DotEnvy",
+      "files": [
+        "src/providers/historyWebviewProvider.ts",
+        "resources/history/history.js",
+        "resources/history/history.css"
+      ],
+      "effort": "large",
+      "priority": "P0",
+      "status": "todo",
+      "ui_components": [
+        "Vertical timeline with date grouping (Today, Yesterday, This Week)",
+        "Entry card: timestamp + action icon + summary",
+        "Expand to see full variable diff (added/removed/changed with colors)",
+        "Git branch badge per entry",
+        "Pagination or virtual scroll for 100+ entries"
+      ],
+      "acceptance_criteria": "Timeline renders 100+ entries smoothly without lag. Diff view shows exact variable changes."
+    },
+    {
+      "id": "1.8-T02",
+      "title": "Automatic Backup Scheduling",
+      "description": "Allow users to configure automatic backup triggers. Options: time-based intervals (daily at specific time, weekly), event-based (before every environment switch, before every git commit, on workspace open). Backups use existing PBE AES-256-GCM encryption from v1.4.0.",
+      "project": "DotEnvy",
+      "files": [
+        "src/utils/backupScheduler.ts",
+        "src/providers/environmentWebviewProvider.ts"
+      ],
+      "effort": "medium",
+      "priority": "P0",
+      "status": "todo",
+      "trigger_types": [
+        "interval: daily | weekly | custom_hours",
+        "event: before_switch | before_commit | on_open",
+        "manual: user-triggered (existing behavior)"
+      ],
+      "config_location": ".dotenvy.json backup.schedule section",
+      "acceptance_criteria": "Scheduled backups run at configured times without user interaction. Backup appears in history timeline."
+    },
+    {
+      "id": "1.8-T03",
+      "title": "Backup Retention Policies",
+      "description": "Add configurable retention rules to prevent backup storage bloat. Support: keep last N backups (e.g. keep last 10), keep backups from last X days (e.g. last 30 days), keep all tagged backups regardless of age. Run auto-cleanup after each new backup is created.",
+      "project": "DotEnvy",
+      "file": "src/utils/backupManager.ts",
+      "effort": "small",
+      "priority": "P0",
+      "status": "todo",
+      "config_example": {
+        "backup": {
+          "retention": {
+            "keep_last": 10,
+            "keep_days": 30,
+            "keep_tagged": true
+          }
+        }
+      },
+      "acceptance_criteria": "Old backups auto-deleted per policy. Tagged backups never auto-deleted."
+    },
+    {
+      "id": "1.8-T04",
+      "title": "History Search and Filter",
+      "description": "Add a search bar and filter controls to the history view. Search by: variable name (shows all history entries where that variable changed), date range picker, action type filter (switch / edit / restore / auto-switch). Results highlight matched variable names.",
+      "project": "DotEnvy",
+      "file": "src/providers/historyWebviewProvider.ts",
+      "effort": "medium",
+      "priority": "P1",
+      "status": "todo",
+      "acceptance_criteria": "Searching for a variable name returns all history entries where it changed. Date range filter works correctly."
+    },
+    {
+      "id": "1.8-T05",
+      "title": "Point-in-Time Restore",
+      "description": "Allow users to restore their .env file to any specific state from history. On selecting a history entry, show a preview diff of what will change (current state vs selected state). Require confirmation before applying. Auto-create a backup of the current state before restoring.",
+      "project": "DotEnvy",
+      "file": "src/commands/restoreHistory.ts",
+      "effort": "medium",
+      "priority": "P1",
+      "status": "todo",
+      "restore_flow": [
+        "User selects history entry",
+        "Preview diff shown: variables that will be added, removed, or changed",
+        "User confirms restore",
+        "Current state auto-backed up with tag 'pre-restore'",
+        "Selected state applied to .env",
+        "Toast notification with undo option (5 second window)"
+      ],
+      "acceptance_criteria": "Restore applies correct state. Pre-restore backup created. Undo works within 5 seconds."
+    },
+    {
+      "id": "1.8-T06",
+      "title": "Backup Comparison UI",
+      "description": "Add ability to select two backup points and view a side-by-side or unified diff. Show: variables added between the two points (green), variables removed (red), variables with changed values (yellow with old and new value). Available from the backups list in the panel.",
+      "project": "DotEnvy",
+      "file": "resources/panel/panel.js",
+      "effort": "medium",
+      "priority": "P1",
+      "status": "todo",
+      "acceptance_criteria": "Diff renders correctly for 50+ variable files. Color coding matches add/remove/change semantics."
+    },
+    {
+      "id": "1.8-T07",
+      "title": "Backup Tags and Notes",
+      "description": "Allow users to attach a tag (pre-release, stable, experiment, milestone) and a free-text note to any backup at creation time or retroactively. Tagged backups show a badge in the backup list and are excluded from retention auto-cleanup.",
+      "project": "DotEnvy",
+      "file": "src/providers/environmentWebviewProvider.ts",
+      "effort": "small",
+      "priority": "P1",
+      "status": "todo",
+      "predefined_tags": ["stable", "pre-release", "experiment", "milestone", "pre-restore"],
+      "acceptance_criteria": "Tags saved and displayed in backup list. Tagged backups survive retention policy cleanup."
+    },
+    {
+      "id": "1.8-T08",
+      "title": "Incremental Backups",
+      "description": "Instead of saving a full copy of .env on every backup, store only the delta (variables that changed since the last backup). Reconstruct full state on demand by replaying deltas from the last full backup. Reduces storage by 80%+ for frequent auto-backups.",
+      "project": "DotEnvy",
+      "file": "src/providers/environmentWebviewProvider.ts",
+      "effort": "medium",
+      "priority": "P2",
+      "status": "todo",
+      "storage_format": {
+        "full_backup": "every 10th backup or on manual trigger",
+        "incremental": "delta of changed variables since last backup",
+        "reconstruction": "full_backup + apply deltas in order"
+      },
+      "acceptance_criteria": "Incremental backup file size is under 1KB for typical small changes. Full restore from incremental chain produces correct result."
+    },
+    {
+      "id": "1.8-T09",
+      "title": "Export History Audit Report",
+      "description": "Generate a structured audit report of all environment changes within a date range. Output as Markdown or JSON. Include: timestamp, user, action, variables changed (names only, values redacted for security). Useful for compliance and team reviews.",
+      "project": "DotEnvy",
+      "file": "src/commands/exportHistory.ts",
+      "effort": "small",
+      "priority": "P2",
+      "status": "todo",
+      "output_formats": ["markdown", "json"],
+      "acceptance_criteria": "Report generated in under 2 seconds. Secret values are redacted. File saved to workspace root."
+    }
+  ],
+
+  "priority_guide": {
+    "P0": "Must have — core value of this release",
+    "P1": "Should have",
+    "P2": "Nice to have — include if time permits"
+  },
+
+  "task_summary": {
+    "total": 9,
+    "by_priority": { "P0": 3, "P1": 4, "P2": 2 },
+    "by_effort": { "small": 3, "medium": 5, "large": 1 },
+    "by_project": { "DotEnvy": 9 }
+  },
+
+  "recommended_order": [
+    "1.8-T01",
+    "1.8-T02",
+    "1.8-T03",
+    "1.8-T04",
+    "1.8-T05",
+    "1.8-T06",
+    "1.8-T07",
+    "1.8-T08",
+    "1.8-T09"
+  ],
+
+  "success_criteria": [
+    "Backup operations complete in under 500ms",
+    "Retention policy auto-cleans correctly without deleting tagged backups",
+    "History timeline renders 100+ entries smoothly",
+    "Point-in-time restore applies correct state without data loss",
+    "Incremental backup files are under 1KB for typical edits",
+    "Audit report exports correctly with values redacted"
+  ],
+
+  "depends_on": "v1.7.0 — AI suggestions + framework detection"
+}

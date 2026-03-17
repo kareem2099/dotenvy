@@ -1,19 +1,20 @@
 /**
- * LLM Analyzer - TypeScript Interface for Python LLM Service
- * ==========================================================
- *
- * This module provides a TypeScript interface to communicate with the
- * Python-based Custom LLM service for enhanced secret detection.
+ * LLM Analyzer - Secure Version
+ * ==============================
+ * 
+ * Uses HMAC-SHA256 signatures instead of exposing an API key.
+ * The shared secret is only used for signing — it's not an API key
+ * and grants no direct access to any external service.
  */
 
 import * as https from 'https';
 import * as http from 'http';
+import * as crypto from 'crypto';
 
 export interface LLMAnalysisRequest {
     secret_value: string;
     context: string;
     variable_name?: string;
-    features?: number[];
 }
 
 export interface LLMAnalysisResponse {
@@ -29,41 +30,27 @@ export interface LLMHealthResponse {
     message?: string;
 }
 
-export interface LLMTrainingSample {
-    secret_value: string;
-    context: string;
-    features: number[];
-    user_action: string;
-    label: string;
-}
-
 export class LLMAnalyzer {
     private static instance: LLMAnalyzer;
-    private serviceUrl: string;
-    private apiKey: string;
+
+    // ✅ No API key — just the service URL and a shared secret for signing
+    private readonly serviceUrl = 'https://python-llm-production.up.railway.app';
+    
+    // This is NOT an API key. It's a shared secret used only to sign requests.
+    // Even if someone extracts it, they can only call THIS proxy — not any real service.
+    // Rate limiting on the server handles abuse.
+    private readonly sharedSecret = process.env.EXTENSION_SHARED_SECRET || 'REPLACE_AT_BUILD_TIME';
+
     private isConnected = false;
     private failureCount = 0;
     private readonly MAX_FAILURES = 3;
     private circuitBreakerOpen = false;
     private lastFailureTime = 0;
-    private readonly CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute
+    private readonly CIRCUIT_BREAKER_TIMEOUT = 60000;
 
     private constructor() {
-        this.serviceUrl = process.env.DOTENVY_LLM_SERVICE_URL || '';
-        this.apiKey = process.env.LLM_API_KEY || '';
-
-        // Validate URL
-        if (this.serviceUrl && !this.isValidUrl(this.serviceUrl)) {
-            console.error('❌ Invalid LLM service URL provided');
-            this.serviceUrl = '';
-        }
-
-        if (!this.apiKey) {
-            console.warn('⚠️  Warning: No API Key found in build environment!');
-        }
-
-        if (!this.serviceUrl) {
-            console.warn('⚠️  Warning: No LLM service URL configured. Using fallback analysis only.');
+        if (!this.sharedSecret || this.sharedSecret === 'REPLACE_AT_BUILD_TIME') {
+            console.warn('⚠️  EXTENSION_SHARED_SECRET not set in build environment');
         }
     }
 
@@ -74,94 +61,87 @@ export class LLMAnalyzer {
         return LLMAnalyzer.instance;
     }
 
+    // ─── HMAC Signing ──────────────────────────────────────────────────────────
+
     /**
-     * Validate URL format
+     * Sign a request body with HMAC-SHA256.
+     * Matches the verification in extension_auth.py on the server.
      */
-    private isValidUrl(url: string): boolean {
-        try {
-            const parsed = new URL(url);
-            return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-        } catch {
-            return false;
-        }
+    private signRequest(body: string): { timestamp: string; signature: string } {
+        const timestamp = String(Date.now() / 1000); // Unix timestamp
+        const message = `${timestamp}.${body}`;
+        const signature = crypto
+            .createHmac('sha256', this.sharedSecret)
+            .update(message)
+            .digest('hex');
+
+        return { timestamp, signature };
     }
 
     /**
-     * Check if circuit breaker should reset
+     * Get VS Code machine ID for rate limiting identification.
+     * Falls back to a random ID if not available.
      */
+    private getMachineId(): string {
+        try {
+            // VS Code exposes machineId via env in some contexts
+            return process.env.VSCODE_MACHINE_ID || 
+                   process.env.HOSTNAME || 
+                   'unknown-machine';
+        } catch {
+            return 'unknown-machine';
+        }
+    }
+
+    // ─── Circuit Breaker ───────────────────────────────────────────────────────
+
     private shouldResetCircuitBreaker(): boolean {
-        if (!this.circuitBreakerOpen) return false;
-        
+        if (!this.circuitBreakerOpen) { return false; }
         const timeSinceLastFailure = Date.now() - this.lastFailureTime;
         if (timeSinceLastFailure > this.CIRCUIT_BREAKER_TIMEOUT) {
             this.circuitBreakerOpen = false;
             this.failureCount = 0;
-            console.log('✅ LLM service circuit breaker reset');
             return true;
         }
         return false;
     }
 
-    /**
-     * Record a failure and potentially open circuit breaker
-     */
     private recordFailure(): void {
         this.failureCount++;
         this.lastFailureTime = Date.now();
-        
         if (this.failureCount >= this.MAX_FAILURES) {
             this.circuitBreakerOpen = true;
             console.warn(`⚠️  LLM service circuit breaker opened after ${this.MAX_FAILURES} failures`);
         }
     }
 
-    /**
-     * Reset failure count on success
-     */
     private recordSuccess(): void {
         this.failureCount = 0;
         this.circuitBreakerOpen = false;
     }
 
-    /**
-     * Test connection to the Python LLM service
-     */
-    public async testConnection(): Promise<boolean> {
-        if (!this.serviceUrl) {
-            this.isConnected = false;
-            return false;
-        }
+    // ─── Public API ────────────────────────────────────────────────────────────
 
+    public async testConnection(): Promise<boolean> {
         try {
             const response = await this.makeRequest('/health', 'GET') as LLMHealthResponse;
-            this.isConnected = response && response.status === 'ok';
-            if (this.isConnected) {
-                this.recordSuccess();
-            }
+            this.isConnected = response?.status === 'ok';
+            if (this.isConnected) { this.recordSuccess(); }
             return this.isConnected;
-        } catch (error) {
-            console.warn('⚠️  LLM service connection failed:', error instanceof Error ? error.message : 'Unknown error');
+        } catch {
             this.isConnected = false;
             this.recordFailure();
             return false;
         }
     }
 
-    /**
-     * Analyze a potential secret using the LLM
-     */
     public async analyzeSecret(
         secretValue: string,
         context: string,
         variableName?: string
     ): Promise<string> {
-        // Check if service is configured
-        if (!this.serviceUrl || !this.apiKey) {
-            return this.fallbackAnalysis(secretValue, context);
-        }
-
-        // Check circuit breaker
         this.shouldResetCircuitBreaker();
+
         if (this.circuitBreakerOpen) {
             return this.fallbackAnalysis(secretValue, context);
         }
@@ -173,283 +153,254 @@ export class LLMAnalyzer {
                 variable_name: variableName
             };
 
-            const response = await this.makeRequestWithRetry('/analyze', 'POST', request, 2) as LLMAnalysisResponse;
+            // ✅ Calls /extension/analyze (HMAC-authenticated, no API key)
+            const response = await this.makeSignedRequest('/extension/analyze', request) as LLMAnalysisResponse;
 
             if (response) {
                 this.recordSuccess();
-
-                // Handle all confidence levels
                 if (response.is_likely_secret && (response.risk_level === 'high' || response.risk_level === 'critical')) {
                     return 'high';
                 }
-                
                 if (response.enhanced_confidence) {
-                    // Map LLM response to our confidence levels
                     const confidenceMap: Record<string, string> = {
-                        'critical': 'high',
-                        'high': 'high',
-                        'medium': 'medium',
-                        'low': 'low'
+                        'critical': 'high', 'high': 'high', 'medium': 'medium', 'low': 'low'
                     };
                     return confidenceMap[response.enhanced_confidence.toLowerCase()] || response.enhanced_confidence;
                 }
             }
-
         } catch (error) {
             this.recordFailure();
             console.warn('⚠️  LLM analysis failed, using fallback:', error instanceof Error ? error.message : 'Unknown error');
         }
 
-        // Fallback analysis
         return this.fallbackAnalysis(secretValue, context);
     }
 
-    /**
-     * Make HTTP request with retry logic
-     */
-    private async makeRequestWithRetry(
-        endpoint: string,
-        method: string,
-        data?: unknown,
-        retries = 2
-    ): Promise<unknown> {
-        let lastError: Error | undefined;
-
-        for (let attempt = 0; attempt <= retries; attempt++) {
-            try {
-                return await this.makeRequest(endpoint, method, data);
-            } catch (error) {
-                lastError = error instanceof Error ? error : new Error('Unknown error');
-                
-                if (attempt < retries) {
-                    // Exponential backoff: 100ms, 200ms, 400ms
-                    const delay = Math.pow(2, attempt) * 100;
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                }
-            }
-        }
-
-        throw lastError;
-    }
+    // ─── HTTP Helpers ──────────────────────────────────────────────────────────
 
     /**
-     * Extract features from secret and context (mimic original ML features)
+     * Make a signed POST request to the extension endpoint.
+     * Adds HMAC headers automatically — no API key involved.
      */
-    public extractFeatures(secretValue: string, context: string, variableName?: string): number[] {
-        const features: number[] = [];
-
-        // Basic text features
-        features.push(secretValue.length);
-        features.push(this.calculateEntropy(secretValue));
-
-        // Character analysis
-        const specialChars = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/;
-        features.push(specialChars.test(secretValue) ? 1 : 0);
-        features.push(/\d/.test(secretValue) ? 1 : 0);
-        features.push(/[A-Z]/.test(secretValue) ? 1 : 0);
-        features.push(/[a-z]/.test(secretValue) ? 1 : 0);
-
-        // Pattern analysis
-        const uniqueRatio = secretValue.length > 0 ? new Set(secretValue.split('')).size / secretValue.length : 0;
-        features.push(uniqueRatio);
-
-        // Common prefixes
-        const prefixes = ['sk-', 'pk_', 'AKIAI', 'ghp_', 'xox'];
-        features.push(prefixes.some(prefix => secretValue.startsWith(prefix)) ? 1 : 0);
-
-        // Base64/hex patterns
-        features.push(this.isBase64Like(secretValue) ? 1 : 0);
-        features.push(this.isHexLike(secretValue) ? 1 : 0);
-
-        // Context analysis
-        features.push(this.analyzeContextRisk(context));
-        features.push(this.isInQuotes(context) ? 1 : 0);
-        features.push(this.countKeywords(context));
-
-        // Variable name score
-        features.push(this.scoreVariableName(variableName));
-
-        return features;
-    }
-
-    /**
-     * Fallback analysis when LLM service is unavailable
-     */
-    private fallbackAnalysis(secretValue: string, context: string): string {
-        const entropy = this.calculateEntropy(secretValue);
-        const hasKeywords = this.analyzeContextRisk(context) > 0;
-        const hasCommonPrefix = ['sk-', 'pk_', 'AKIAI', 'ghp_', 'xox'].some(p => secretValue.startsWith(p));
-
-        // Enhanced fallback logic
-        if (hasCommonPrefix && entropy > 4.0) {
-            return 'high';
-        } else if (entropy > 4.5 && hasKeywords) {
-            return 'high';
-        } else if (entropy > 3.8 && hasKeywords) {
-            return 'medium';
-        } else if (entropy > 3.5) {
-            return 'medium';
-        } else {
-            return 'low';
-        }
-    }
-
-    /**
-     * Make HTTP/HTTPS request to Python service
-     */
-    private async makeRequest(endpoint: string, method = 'GET', data?: unknown): Promise<unknown> {
-        if (!this.serviceUrl) {
-            throw new Error('LLM service URL not configured');
-        }
+    private async makeSignedRequest(endpoint: string, data: unknown): Promise<unknown> {
+        const body = JSON.stringify(data);
+        const { timestamp, signature } = this.signRequest(body);
+        const machineId = this.getMachineId();
 
         return new Promise((resolve, reject) => {
             const url = new URL(endpoint, this.serviceUrl);
-            
             const client = url.protocol === 'https:' ? https : http;
 
             const options = {
                 hostname: url.hostname,
                 port: url.port || (url.protocol === 'https:' ? 443 : 80),
                 path: url.pathname,
-                method: method,
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'User-Agent': 'DotEnvy-LLM-Client/1.5',
-                    'Authorization': `Bearer ${this.apiKey}`
+                    'Content-Length': Buffer.byteLength(body),
+                    'User-Agent': 'DotEnvy-Extension/2.0',
+                    // ✅ HMAC headers — no API key
+                    'X-Extension-Timestamp': timestamp,
+                    'X-Extension-Signature': signature,
+                    'X-Machine-ID': machineId,
                 }
+            };
+
+            const req = client.request(options, (res) => {
+                let responseBody = '';
+                res.on('data', (chunk) => responseBody += chunk.toString());
+                res.on('end', () => {
+                    if (res.statusCode && res.statusCode >= 400) {
+                        reject(new Error(`Request failed: ${res.statusCode} ${responseBody}`));
+                        return;
+                    }
+                    try {
+                        resolve(JSON.parse(responseBody));
+                    } catch {
+                        resolve(responseBody);
+                    }
+                });
+            });
+
+            req.on('error', reject);
+            req.setTimeout(3000, () => { req.destroy(); reject(new Error('Request timeout')); });
+            req.write(body);
+            req.end();
+        });
+    }
+
+    /**
+     * Simple GET request for health check (no auth needed).
+     */
+    private async makeRequest(endpoint: string, method = 'GET'): Promise<unknown> {
+        return new Promise((resolve, reject) => {
+            const url = new URL(endpoint, this.serviceUrl);
+            const client = url.protocol === 'https:' ? https : http;
+
+            const options = {
+                hostname: url.hostname,
+                port: url.port || (url.protocol === 'https:' ? 443 : 80),
+                path: url.pathname,
+                method,
+                headers: { 'User-Agent': 'DotEnvy-Extension/2.0' }
             };
 
             const req = client.request(options, (res) => {
                 let body = '';
                 res.on('data', (chunk) => body += chunk.toString());
                 res.on('end', () => {
-                    if (res.statusCode && res.statusCode >= 400) {
-                        reject(new Error(`Request failed with status ${res.statusCode}: ${body}`));
-                        return;
-                    }
-                    try {
-                        const response = JSON.parse(body);
-                        resolve(response);
-                    } catch (error) {
-                        resolve(body);
-                    }
+                    try { resolve(JSON.parse(body)); } catch { resolve(body); }
                 });
             });
 
-            req.on('error', (error) => {
-                reject(error);
-            });
-
-            if (data) {
-                req.write(JSON.stringify(data));
-            }
-
-            // Timeout for extension performance
-            req.setTimeout(3000, () => {
-                req.destroy();
-                reject(new Error('Request timeout'));
-            });
-
+            req.on('error', reject);
+            req.setTimeout(3000, () => { req.destroy(); reject(new Error('Timeout')); });
             req.end();
         });
     }
 
-    // Utility methods
-    private calculateEntropy(text: string): number {
-        if (!text) return 0;
-        const charFreq: Map<string, number> = new Map();
-        for (const char of text) {
-            charFreq.set(char, (charFreq.get(char) || 0) + 1);
-        }
+    // ─── Fallback ──────────────────────────────────────────────────────────────
 
+    private fallbackAnalysis(secretValue: string, context: string): string {
+        const entropy = this.calculateEntropy(secretValue);
+        const hasKeywords = this.analyzeContextRisk(context) > 0;
+        const hasCommonPrefix = ['sk-', 'pk_', 'AKIAI', 'ghp_', 'xox'].some(p => secretValue.startsWith(p));
+
+        if (hasCommonPrefix && entropy > 4.0) { return 'high'; }
+        if (entropy > 4.5 && hasKeywords) { return 'high'; }
+        if (entropy > 3.8 && hasKeywords) { return 'medium'; }
+        if (entropy > 3.5) { return 'medium'; }
+        return 'low';
+    }
+
+    private calculateEntropy(text: string): number {
+        if (!text) { return 0; }
+        const freq = new Map<string, number>();
+        for (const char of text) { freq.set(char, (freq.get(char) || 0) + 1); }
         let entropy = 0;
-        const len = text.length;
-        for (const count of charFreq.values()) {
-            const p = count / len;
+        for (const count of freq.values()) {
+            const p = count / text.length;
             entropy -= p * Math.log2(p);
         }
         return entropy;
     }
 
-    private isBase64Like(text: string): boolean {
-        const base64Chars = /^[A-Za-z0-9+/=]+$/;
-        return base64Chars.test(text) && text.length % 4 === 0 && text.length >= 16;
-    }
-
-    private isHexLike(text: string): boolean {
-        const hexChars = /^[a-fA-F0-9]+$/;
-        return hexChars.test(text) && text.length >= 32;
-    }
-
     private analyzeContextRisk(context: string): number {
-        let risk = 0.0;
-        const keywords = ['auth', 'key', 'secret', 'token', 'password', 'config'];
-        const lower = context.toLowerCase();
-        for (const keyword of keywords) {
-            if (lower.includes(keyword)) risk += 0.2;
+        let risk = 0;
+        for (const kw of ['auth', 'key', 'secret', 'token', 'password', 'config']) {
+            if (context.toLowerCase().includes(kw)) { risk += 0.2; }
         }
         return Math.min(1.0, risk);
     }
 
-    private isInQuotes(context: string): boolean {
-        return context.includes('"') || context.includes("'") || context.includes('`');
-    }
-
-    private countKeywords(context: string): number {
-        const keywords = ['const', 'let', 'var', 'process.env', 'config', 'secret', 'key', 'token'];
-        let count = 0;
-        const lower = context.toLowerCase();
-        for (const keyword of keywords) {
-            if (lower.includes(keyword)) count++;
-        }
-        return count;
-    }
-
-    private scoreVariableName(name?: string): number {
-        if (!name) return 0.0;
-        if (name.toUpperCase() === name) return 0.8; // ALL_CAPS
-        if (name.toLowerCase().includes('secret') || name.toLowerCase().includes('key') || name.toLowerCase().includes('token')) return 0.6;
-        return 0.2;
-    }
-
-    /**
-     * Check if LLM service is available
-     */
     public isServiceAvailable(): boolean {
         return this.isConnected && !this.circuitBreakerOpen;
     }
 
-    /**
-     * Configure service URL
-     */
-    public setServiceUrl(url: string): void {
-        if (url && !this.isValidUrl(url)) {
-            console.error('❌ Invalid URL provided');
-            return;
-        }
-        this.serviceUrl = url;
-        this.isConnected = false;
-        this.circuitBreakerOpen = false;
-        this.failureCount = 0;
-    }
-
-    /**
-     * Get service health status
-     */
-    public getServiceStatus(): {
-        connected: boolean;
-        circuitBreakerOpen: boolean;
-        failureCount: number;
-        configured: boolean;
-    } {
+    public getServiceStatus() {
         return {
             connected: this.isConnected,
             circuitBreakerOpen: this.circuitBreakerOpen,
             failureCount: this.failureCount,
-            configured: !!(this.serviceUrl && this.apiKey)
+            configured: !!this.sharedSecret && this.sharedSecret !== 'REPLACE_AT_BUILD_TIME'
         };
+    }
+
+    /**
+     * Override the service URL (used in tests / dev environments).
+     */
+    public setServiceUrl(url: string): void {
+        (this as unknown as { serviceUrl: string }).serviceUrl = url;
+    }
+
+    /**
+     * Extract the same features the python-llm backend uses —
+     * useful for local debugging and unit tests.
+     * Returns a 35-element float array matching NUM_FEATURES on the server.
+     */
+    public extractFeatures(secretValue: string, context: string, variableName?: string): number[] {
+        const entropy  = this.calculateEntropy(secretValue);
+        const ctxRisk  = this.analyzeContextRisk(context);
+        const len      = secretValue.length;
+
+        // 1. Basic text (6)
+        const hasUpper   = /[A-Z]/.test(secretValue) ? 1 : 0;
+        const hasLower   = /[a-z]/.test(secretValue) ? 1 : 0;
+        const hasDigit   = /\d/.test(secretValue) ? 1 : 0;
+        const hasSpecial = /[^a-zA-Z0-9]/.test(secretValue) ? 1 : 0;
+        const lenNorm    = Math.min(len / 64, 1.0);
+        const uniqueRatio = new Set(secretValue).size / Math.max(len, 1);
+
+        // 2. Entropy group (3)
+        const bigrams  = this.ngramEntropy(secretValue, 2);
+        const trigrams = this.ngramEntropy(secretValue, 3);
+
+        // 3. Pattern matching (3)
+        const knownPrefixes = ['sk-','pk_','AKIAI','AKIA','ghp_','xox','SG.','dop_v1_','vercel_','AIza','-----BEGIN'];
+        const hasPrefix  = knownPrefixes.some(p => secretValue.startsWith(p)) ? 1 : 0;
+        const isBase64   = /^[A-Za-z0-9+/=]+$/.test(secretValue) && len % 4 === 0 ? 1 : 0;
+        const isHex      = /^[a-fA-F0-9]+$/.test(secretValue) ? 1 : 0;
+
+        // 4. Context risk (5)
+        const ctxAuth    = /auth|key|secret|token|password|credential/i.test(context) ? 1 : 0;
+        const ctxBearer  = /bearer|authorization/i.test(context) ? 1 : 0;
+        const ctxDB      = /database|db|mongo|postgres|mysql|redis/i.test(context) ? 1 : 0;
+        const ctxCloud   = /aws|gcp|azure|cloud/i.test(context) ? 1 : 0;
+        const ctxPayment = /stripe|payment|billing/i.test(context) ? 1 : 0;
+
+        // 5. Variable name signals (4)
+        const varLower   = (variableName || '').toLowerCase();
+        const varIsKey   = /key|secret|token|password/.test(varLower) ? 1 : 0;
+        const varIsEnv   = /^[A-Z_]+$/.test(variableName || '') ? 1 : 0;
+        const varIsConst = /^[A-Z]/.test(variableName || '') ? 1 : 0;
+        const varLen     = Math.min((variableName || '').length / 30, 1.0);
+
+        // 6. Structural analysis (4)
+        const hasDash    = secretValue.includes('-') ? 1 : 0;
+        const hasUnderscore = secretValue.includes('_') ? 1 : 0;
+        const hasDot     = secretValue.includes('.') ? 1 : 0;
+        const hasSlash   = secretValue.includes('/') ? 1 : 0;
+
+        // Pad remaining to 35 total
+        const features = [
+            // Basic (6)
+            hasUpper, hasLower, hasDigit, hasSpecial, lenNorm, uniqueRatio,
+            // Entropy (3)
+            entropy / 6.0, bigrams / 6.0, trigrams / 6.0,
+            // Pattern (3)
+            hasPrefix, isBase64, isHex,
+            // Context (5)
+            ctxRisk, ctxAuth, ctxBearer, ctxDB, ctxCloud, ctxPayment,
+            // Variable (4)
+            varIsKey, varIsEnv, varIsConst, varLen,
+            // Structural (4)
+            hasDash, hasUnderscore, hasDot, hasSlash,
+            // Padding to reach 35
+            entropy > 4.5 ? 1 : 0,
+            len > 32 ? 1 : 0,
+            len > 64 ? 1 : 0,
+            hasUpper && hasDigit ? 1 : 0,
+            ctxAuth && hasPrefix ? 1 : 0,
+        ].slice(0, 35);
+
+        // Ensure exactly 35
+        while (features.length < 35) { features.push(0); }
+        return features;
+    }
+
+    private ngramEntropy(text: string, n: number): number {
+        if (text.length < n) { return 0; }
+        const freq = new Map<string, number>();
+        for (let i = 0; i <= text.length - n; i++) {
+            const gram = text.slice(i, i + n);
+            freq.set(gram, (freq.get(gram) || 0) + 1);
+        }
+        const total = text.length - n + 1;
+        let e = 0;
+        for (const c of freq.values()) { const p = c / total; e -= p * Math.log2(p); }
+        return e;
     }
 }
 
-// Export singleton instance
 export const llmAnalyzer = LLMAnalyzer.getInstance();

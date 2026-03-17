@@ -1,0 +1,200 @@
+{
+  "version": "1.7.0",
+  "codename": "SmartSuggest",
+  "theme": "AI-Powered Environment Variable Suggestions + Framework Detection",
+  "status": "pending",
+  "created": "2026-03-13",
+  "context": "In v1.5.0 the LLM detects secrets. In v1.7.0 it starts suggesting what variables you need — before you even know you need them. This is the biggest feature leap toward v2.0.",
+
+  "tasks": [
+    {
+      "id": "1.7-T01",
+      "title": "Framework Detection Engine",
+      "description": "Auto-detect the project framework by reading package.json dependencies + scanning file structure. Return a confidence score and the detected framework name. Used as context for AI suggestions.",
+      "project": "DotEnvy",
+      "file": "src/utils/frameworkDetector.ts",
+      "effort": "medium",
+      "priority": "P0",
+      "status": "todo",
+      "supported_frameworks": [
+        "Next.js", "Vite", "Create React App", "Express", "NestJS",
+        "FastAPI", "Django", "Flask", "Laravel", "Ruby on Rails",
+        "Nuxt.js", "SvelteKit", "Remix", "Astro", "Electron"
+      ],
+      "detection_signals": [
+        "package.json dependencies",
+        "next.config.js / vite.config.ts presence",
+        "requirements.txt / pyproject.toml",
+        "composer.json / Gemfile",
+        "Dockerfile base image"
+      ],
+      "acceptance_criteria": "Correct framework detected for 10+ popular stacks with 90%+ accuracy"
+    },
+    {
+      "id": "1.7-T02",
+      "title": "Code Analysis Engine",
+      "description": "Scan all workspace files for process.env.VARIABLE_NAME usage (JS/TS), os.environ.get('VAR') (Python), env('VAR') (PHP/Laravel), ENV['VAR'] (Ruby). Compare found variables against the current .env file to identify which are missing, which are unused, and which have no value.",
+      "project": "DotEnvy",
+      "file": "src/utils/codeAnalyzer.ts",
+      "effort": "medium",
+      "priority": "P0",
+      "status": "todo",
+      "outputs": {
+        "used_in_code": "list of all env var names referenced in code",
+        "present_in_env": "list of vars in .env file",
+        "missing": "used in code but not in .env",
+        "unused": "in .env but not used in code",
+        "empty": "in .env but has no value"
+      },
+      "acceptance_criteria": "Correctly identifies missing and unused variables across JS/TS/Python projects"
+    },
+    {
+      "id": "1.7-T03",
+      "title": "Common Patterns Database",
+      "description": "Build a static database of known environment variable patterns for 30+ popular services. Each entry includes: canonical variable name, description, example value format, and which framework typically uses it.",
+      "project": "DotEnvy",
+      "file": "src/constants/envPatterns.ts",
+      "effort": "small",
+      "priority": "P0",
+      "status": "todo",
+      "services_to_cover": [
+        "Stripe (STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET)",
+        "AWS (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, S3_BUCKET)",
+        "MongoDB (MONGODB_URI, MONGODB_DB_NAME)",
+        "PostgreSQL (DATABASE_URL, POSTGRES_USER, POSTGRES_PASSWORD)",
+        "Redis (REDIS_URL, REDIS_PASSWORD)",
+        "Supabase (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY)",
+        "Firebase (FIREBASE_API_KEY, FIREBASE_PROJECT_ID, FIREBASE_APP_ID)",
+        "Auth0 (AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET)",
+        "Clerk (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY)",
+        "Twilio (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)",
+        "SendGrid (SENDGRID_API_KEY)",
+        "Resend (RESEND_API_KEY)",
+        "OpenAI (OPENAI_API_KEY, OPENAI_MODEL)",
+        "Anthropic (ANTHROPIC_API_KEY)",
+        "Vercel (VERCEL_URL, VERCEL_ENV)",
+        "Cloudinary (CLOUDINARY_URL, CLOUDINARY_CLOUD_NAME)",
+        "Sentry (SENTRY_DSN, NEXT_PUBLIC_SENTRY_DSN)",
+        "Doppler (DOPPLER_TOKEN)",
+        "GitHub OAuth (GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET)",
+        "Google OAuth (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)"
+      ],
+      "acceptance_criteria": "Database covers 30+ services with correct variable names and example values"
+    },
+    {
+      "id": "1.7-T04",
+      "title": "LLM Suggestion Endpoint — POST /suggest",
+      "description": "New Railway endpoint that receives detected framework, list of env vars used in code, list of vars already in .env, and list of missing vars. Returns AI-generated suggestions: variable name, description, example value, reason why it is needed, and confidence score.",
+      "project": "python-llm",
+      "files": [
+        "python-llm/src/routes/suggest.py",
+        "python-llm/src/models.py",
+        "src/utils/llmAnalyzer.ts"
+      ],
+      "effort": "large",
+      "priority": "P1",
+      "status": "todo",
+      "request_format": {
+        "framework": "nextjs",
+        "used_vars": ["DATABASE_URL", "STRIPE_SECRET_KEY", "NEXTAUTH_SECRET"],
+        "present_vars": ["DATABASE_URL"],
+        "missing_vars": ["STRIPE_SECRET_KEY", "NEXTAUTH_SECRET"]
+      },
+      "response_format": {
+        "suggestions": [
+          {
+            "name": "STRIPE_SECRET_KEY",
+            "description": "Stripe secret key for server-side payment processing",
+            "example": "sk_live_...",
+            "reason": "Found stripe.js import in pages/api/checkout.ts",
+            "confidence": "high",
+            "docs_url": "https://stripe.com/docs/keys"
+          }
+        ]
+      },
+      "acceptance_criteria": "Endpoint responds in under 2 seconds. Suggestions match framework context."
+    },
+    {
+      "id": "1.7-T05",
+      "title": "AI Suggestions Panel Section",
+      "description": "Add a new collapsible 'AI Suggestions' card to the environment webview panel. Shows a list of suggested missing variables with: variable name, description, example value, reason detected, confidence badge, and Add to .env button.",
+      "project": "DotEnvy",
+      "files": [
+        "src/providers/environmentWebviewProvider.ts",
+        "resources/panel/panel.js",
+        "resources/panel/panel.css"
+      ],
+      "effort": "large",
+      "priority": "P1",
+      "status": "todo",
+      "ui_components": [
+        "Suggestions card with collapse/expand toggle",
+        "Loading skeleton while LLM processes",
+        "Variable row: name + description + example + confidence badge",
+        "Add button per variable",
+        "Dismiss/ignore button per variable",
+        "Refresh suggestions button"
+      ],
+      "acceptance_criteria": "Suggestions panel renders correctly, shows loading state, and updates after adding a variable"
+    },
+    {
+      "id": "1.7-T06",
+      "title": "One-Click Variable Addition from Suggestions",
+      "description": "When user clicks Add on a suggested variable: append VARIABLE_NAME=example_value to the active .env file, trigger a file re-scan, remove the variable from the suggestions list, and show a toast notification. Support undo via VS Code edit history.",
+      "project": "DotEnvy",
+      "file": "src/providers/environmentWebviewProvider.ts",
+      "effort": "medium",
+      "priority": "P1",
+      "status": "todo",
+      "acceptance_criteria": "Variable added to .env within 500ms. Undo works. Suggestions list updates immediately."
+    },
+    {
+      "id": "1.7-T07",
+      "title": "Auto-Fix Code Actions via VS Code Quick Fix",
+      "description": "When a secret is detected in code (e.g. hardcoded Stripe key), register a VS Code diagnostic and Quick Fix code action: 'Replace with process.env.STRIPE_SECRET_KEY'. Clicking it replaces the hardcoded value in the source file AND adds the variable to .env with a placeholder value.",
+      "project": "DotEnvy",
+      "files": [
+        "src/providers/secretDiagnosticsProvider.ts",
+        "src/commands/scanSecrets.ts"
+      ],
+      "effort": "large",
+      "priority": "P2",
+      "status": "todo",
+      "acceptance_criteria": "Yellow lightbulb appears on secret detection. Quick Fix correctly replaces value in source. Variable added to .env."
+    }
+  ],
+
+  "priority_guide": {
+    "P0": "Must have — foundation for all AI features",
+    "P1": "Core value of this release",
+    "P2": "Nice to have — include if time permits"
+  },
+
+  "task_summary": {
+    "total": 7,
+    "by_priority": { "P0": 3, "P1": 3, "P2": 1 },
+    "by_effort": { "small": 1, "medium": 3, "large": 3 },
+    "by_project": { "python-llm": 1, "DotEnvy": 5, "both": 1 }
+  },
+
+  "recommended_order": [
+    "1.7-T01",
+    "1.7-T02",
+    "1.7-T03",
+    "1.7-T04",
+    "1.7-T05",
+    "1.7-T06",
+    "1.7-T07"
+  ],
+
+  "success_criteria": [
+    "Framework detected correctly for 10+ popular stacks",
+    "Missing variables identified correctly from code scan",
+    "LLM /suggest endpoint responds in under 2 seconds",
+    "Suggestions accepted by user in 70%+ of cases",
+    "One-click fix adds variable to .env and removes from suggestions",
+    "Quick Fix lightbulb appears on all detected secrets"
+  ],
+
+  "depends_on": "v1.6.0 — continuous learning + model persistence"
+}

@@ -1,0 +1,200 @@
+{
+  "version": "1.9.0",
+  "codename": "DevOpsReady",
+  "theme": "Docker & Kubernetes Integration + Environment Templates",
+  "status": "pending",
+  "created": "2026-03-13",
+  "context": "The final 1.x release before v2.0. Bridges the gap between local environment management and production DevOps workflows. Adds container integration and a template system so teams can standardize env setups across projects.",
+
+  "tasks": [
+    {
+      "id": "1.9-T01",
+      "title": "Docker Compose Integration",
+      "description": "Auto-sync changes made to .env into the environment section of docker-compose.yml. When the user switches environments or edits .env, detect which services in docker-compose.yml reference that .env file and update them. Use a file watcher to detect docker-compose.yml changes and warn the user of drift.",
+      "project": "DotEnvy",
+      "file": "src/utils/dockerIntegration.ts",
+      "effort": "large",
+      "priority": "P0",
+      "status": "todo",
+      "features": [
+        "Parse docker-compose.yml to find env_file references",
+        "Detect which services use each .env file",
+        "Warn when .env and docker-compose are out of sync",
+        "Optional: auto-update docker-compose environment section on switch"
+      ],
+      "acceptance_criteria": "Changes to .env are reflected in docker-compose.yml within 1 second. Sync warning shows correctly."
+    },
+    {
+      "id": "1.9-T02",
+      "title": "Container Environment Export",
+      "description": "Add export commands to convert the current .env file into container-ready formats. Support three output formats: Docker run -e flags (for manual docker run commands), env_file format (already standard .env), and a shell export script (export VAR=value for each line).",
+      "project": "DotEnvy",
+      "file": "src/commands/exportDocker.ts",
+      "effort": "small",
+      "priority": "P0",
+      "status": "todo",
+      "export_formats": {
+        "docker_run_flags": "docker run -e KEY1=val1 -e KEY2=val2 ...",
+        "env_file": ".env format (already supported)",
+        "shell_export": "#!/bin/bash\nexport KEY1=val1\nexport KEY2=val2"
+      },
+      "acceptance_criteria": "All three export formats generate valid output. docker run command runs successfully with exported flags."
+    },
+    {
+      "id": "1.9-T03",
+      "title": "Kubernetes ConfigMap and Secret Generation",
+      "description": "Generate Kubernetes resource files from the current .env. Non-sensitive variables go into a ConfigMap. Variables flagged as secrets (detected by the ML model or named with SECRET/KEY/TOKEN/PASSWORD) go into a Kubernetes Secret with proper base64 encoding. Output as valid YAML files.",
+      "project": "DotEnvy",
+      "file": "src/commands/exportKubernetes.ts",
+      "effort": "medium",
+      "priority": "P1",
+      "status": "todo",
+      "outputs": [
+        "configmap.yaml — non-sensitive variables as string data",
+        "secret.yaml — sensitive variables as base64-encoded data"
+      ],
+      "classification_logic": "Use ML model confidence + variable name patterns to split sensitive vs non-sensitive",
+      "acceptance_criteria": "Generated YAML applies cleanly with kubectl apply. Base64 values decode correctly."
+    },
+    {
+      "id": "1.9-T04",
+      "title": "Template Creation Command",
+      "description": "Add a 'Create Template from Current .env' command. The user is prompted to: give the template a name, mark each variable as required or optional, add a human-readable description per variable, and choose whether to include the current value or replace with a placeholder. Output saved as .env.template in workspace root.",
+      "project": "DotEnvy",
+      "file": "src/commands/createTemplate.ts",
+      "effort": "medium",
+      "priority": "P0",
+      "status": "todo",
+      "template_format": {
+        "example": "# Required: Stripe secret key for payment processing\n# Type: string\n# Example: sk_live_...\nSTRIPE_SECRET_KEY=\n\n# Optional: Enable debug logging\n# Type: boolean\n# Default: false\nDEBUG=false"
+      },
+      "acceptance_criteria": "Template file created in under 1 second. Required/optional markers and descriptions preserved."
+    },
+    {
+      "id": "1.9-T05",
+      "title": "Built-in Template Library",
+      "description": "Ship a curated library of environment templates for 20+ popular technology stacks. Each template includes all commonly needed variables with descriptions and example values. Accessible via a 'New from Template' command in the extension.",
+      "project": "DotEnvy",
+      "file": "templates/",
+      "effort": "medium",
+      "priority": "P1",
+      "status": "todo",
+      "templates_to_include": [
+        "next-js-basic (Next.js + API routes)",
+        "next-js-supabase (Next.js + Supabase + Auth)",
+        "next-js-stripe (Next.js + Stripe payments)",
+        "mern-stack (MongoDB + Express + React + Node)",
+        "express-postgres (Express + PostgreSQL)",
+        "express-mongodb (Express + MongoDB)",
+        "nestjs-postgres (NestJS + PostgreSQL + JWT)",
+        "fastapi-postgres (FastAPI + PostgreSQL)",
+        "django-postgres (Django + PostgreSQL)",
+        "flask-basic (Flask + SQLAlchemy)",
+        "nuxtjs-basic (Nuxt.js + Nitro)",
+        "sveltekit-basic (SvelteKit + Prisma)",
+        "remix-basic (Remix + SQLite/PostgreSQL)",
+        "laravel-basic (Laravel + MySQL)",
+        "rails-basic (Ruby on Rails + PostgreSQL)",
+        "electron-basic (Electron desktop app)",
+        "vite-react-basic (Vite + React SPA)",
+        "astro-basic (Astro static site)",
+        "t3-stack (Next.js + tRPC + Prisma + NextAuth)",
+        "saas-starter (Next.js + Stripe + Auth0 + Supabase)"
+      ],
+      "acceptance_criteria": "All 20+ templates load correctly. Variables have accurate descriptions and example values."
+    },
+    {
+      "id": "1.9-T06",
+      "title": "Template Import and Export",
+      "description": "Import templates from: local .env.template files, GitHub Gist URL (public), or a dotenvy.json manifest. Export current .env as a shareable template to: local file, clipboard (for pasting into GitHub Gist), or a team-shared location via Doppler.",
+      "project": "DotEnvy",
+      "files": [
+        "src/commands/importTemplate.ts",
+        "src/commands/exportTemplate.ts"
+      ],
+      "effort": "medium",
+      "priority": "P1",
+      "status": "todo",
+      "acceptance_criteria": "Import/export round-trip preserves all variable names, descriptions, and required/optional markers. GitHub Gist import works with public URLs."
+    },
+    {
+      "id": "1.9-T07",
+      "title": "Template Validation",
+      "description": "Add a 'Validate Against Template' command. Given a .env.template file, check the current .env for: missing required variables (error), missing optional variables (warning), extra variables not in the template (info), and type mismatches (e.g. PORT should be a number). Show results in a dedicated panel or Problems tab.",
+      "project": "DotEnvy",
+      "file": "src/utils/templateValidator.ts",
+      "effort": "medium",
+      "priority": "P1",
+      "status": "todo",
+      "validation_levels": {
+        "error": "Missing required variable",
+        "warning": "Missing optional variable or wrong type",
+        "info": "Extra variable not defined in template"
+      },
+      "acceptance_criteria": "Validation catches all missing required variables. Results appear in VS Code Problems panel."
+    },
+    {
+      "id": "1.9-T08",
+      "title": "Team Template Sync via Doppler",
+      "description": "Extend the existing Doppler cloud sync to support template sharing. When a team member runs pull, they also receive the latest .env.template for the project. On push, the template file is included. This ensures every team member works from the same environment specification.",
+      "project": "DotEnvy",
+      "file": "src/utils/cloudSyncManager.ts",
+      "effort": "medium",
+      "priority": "P2",
+      "status": "todo",
+      "acceptance_criteria": "Template file included in push/pull operations. New team member receives correct template on first pull."
+    },
+    {
+      "id": "1.9-T09",
+      "title": "Container Environment Detection",
+      "description": "Detect when VS Code is running inside a Dev Container or Docker container. When detected: adjust file path resolution for .env files, warn the user that direct file writes may not persist, suggest using volume mounts or environment injection instead.",
+      "project": "DotEnvy",
+      "file": "src/utils/environmentDetector.ts",
+      "effort": "small",
+      "priority": "P2",
+      "status": "todo",
+      "detection_signals": [
+        "/.dockerenv file exists",
+        "REMOTE_CONTAINERS env var set",
+        "VS Code Remote extension active"
+      ],
+      "acceptance_criteria": "Container environment detected correctly. User sees appropriate warning and guidance."
+    }
+  ],
+
+  "priority_guide": {
+    "P0": "Must have — core value of this release",
+    "P1": "Should have",
+    "P2": "Nice to have — include if time permits"
+  },
+
+  "task_summary": {
+    "total": 9,
+    "by_priority": { "P0": 3, "P1": 4, "P2": 2 },
+    "by_effort": { "small": 2, "medium": 6, "large": 1 },
+    "by_project": { "DotEnvy": 9 }
+  },
+
+  "recommended_order": [
+    "1.9-T04",
+    "1.9-T05",
+    "1.9-T06",
+    "1.9-T07",
+    "1.9-T02",
+    "1.9-T01",
+    "1.9-T03",
+    "1.9-T08",
+    "1.9-T09"
+  ],
+
+  "success_criteria": [
+    "Docker export validated successfully with docker-compose up",
+    "Kubernetes YAML applies cleanly with kubectl apply",
+    "Template library covers 20+ stacks with accurate variable definitions",
+    "Template import/export round-trip preserves all metadata",
+    "Validation catches all missing required variables",
+    "Extension package size stays under 5MB"
+  ],
+
+  "depends_on": "v1.8.0 — advanced backup + history timeline"
+}

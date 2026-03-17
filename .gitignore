@@ -126,3 +126,4 @@ RAILWAY-DEPLOYMENT.md
 # Temporary files
 *.tmp
 *.temp
+.dotenvy/history

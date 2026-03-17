@@ -1,6 +1,6 @@
 # dotenvy – VS Code Environment Manager
 
-[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
 [![Publisher](https://img.shields.io/badge/publisher-FreeRave-red.svg)](https://marketplace.visualstudio.com/publishers/FreeRave)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![VS Code Marketplace](https://img.shields.io/badge/vscode-marketplace-007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
@@ -35,18 +35,21 @@ Prevent committing sensitive data with pre-commit hooks that scan for secrets, v
 Bidirectional cloud sync with Doppler Secrets Manager for team-based environment variable management.
 
 ### 💾 **Backup & Recovery**
-Automatic backup creation before switching, with configurable backup paths and encryption options.
+Automatic backup creation before switching, with portable AES-256-GCM encrypted backups that work across any device.
 
 ### 📊 **Status Bar Integration**
 Real-time environment indicator in status bar showing current configuration, validation status, and cloud sync state.
 
-### 🔍 **Secrets Guard** 🧠
-Advanced secret detection powered by custom **Large Language Model (LLM)** for superior accuracy in identifying potential sensitive data exposure. Features:
-- **AI-Powered Analysis**: Custom transformer model trained specifically for secret patterns
-- **Confidence Scoring**: High/Medium/Low confidence classification
-- **Real-time Scanning**: Instant detection during file changes
-- **Learning Capability**: Improves accuracy from user feedback
-- **Fallback Protection**: Traditional entropy-based analysis when AI unavailable
+### 🔍 **Secrets Guard** 🧠 — v1.5.0
+Production-grade secret detection powered by a **custom ML model** deployed on Railway with HMAC-secured communication.
+
+#### What's new in v1.5.0:
+- **🔐 HMAC-SHA256 Authentication** — Extension signs every request; no API key stored or transmitted
+- **35-Feature ML Model** — Analyzes entropy, patterns, context, variable names, and structure simultaneously
+- **⚡ 18.4x Cache Speedup** — Two-tier L1 LRU + L2 Redis cache for near-instant repeated analyses
+- **📡 Progressive Streaming** — Results stream progressively: pattern → entropy → context → AI → final
+- **🔄 Smart Fallback** — Local heuristic analysis (entropy + known prefixes) when service is unreachable
+- **🎯 Confidence Scoring** — High / Medium / Low classification with reasoning attached to each finding
 
 ---
 
@@ -239,11 +242,18 @@ dotenvy supports bidirectional sync with [Doppler](https://www.doppler.com/) for
 * [x] Multi-workspace support
 * [x] Git commit hook to block secrets
 * [x] Cloud sync with Doppler
+* [x] End-to-end encrypted cloud sync (AES-256-GCM)
+* [x] Multi-user key wrapping (envelope encryption)
+* [x] Portable encrypted backups (PBE + PBKDF2)
+* [x] AI-powered secret detection (LLM v1 — 14 features)
+* [x] **HMAC-secured LLM service (v1.5.0 — 35 features, 18.4x cache, SSE streaming)**
 
+* [ ] Streaming confidence updates in the VS Code panel (SSE → UI)
+* [ ] Offline fallback mode with local heuristics only
 * [ ] Support for other cloud providers (Vault, AWS Secrets Manager)
-* [ ] Environment variable encryption at rest
 * [ ] Shareable environment templates
 * [ ] Integration with Docker environments
+* [ ] Continuous learning from user feedback (wire `/train` endpoint to panel)
 
 ---
 

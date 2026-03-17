@@ -1,62 +1,90 @@
-# 1. Ignore Development & Source Files
-.vscode/**
+# 1. Prevent source and development files (we only upload Javascript)
 src/**
-.gitignore
-.yarnrc
-yarn.lock
 tsconfig.json
 tsconfig.tsbuildinfo
 .eslintrc.json
 vsc-extension-quickstart.md
-.nyc_output
-coverage/
-node_modules/
+node_modules/**
 package-lock.json
+.yarnrc
+yarn.lock
+.vscode/**
+!.vscode/extensions.json
 
-# 2. KILL ALL ENV FILES (The most important part) 🚫
-# يمنع أي ملف يبدأ بـ .env في أي مكان في المشروع
+# 2. Prevent metadata and todo list files (internal work)
+todo_list*.json
+*.md
+!README.md
+!CHANGELOG.md
+!LICENSE
+roadmap*.json
+
+# 3. Security: prevent any environment files absolutely 🚫
 **/.env
 **/.env.*
-# استثناء ملفات الأمثلة (Example) لو عايز ترفعها
-!**/.env.example
+!.env.example
+.dotenvy.json
+.dotenvyGit.json
 
-# 3. Ignore Python Environment & Heavy Assets
-python-llm/venv/
-python-llm/service.log
-python-llm/__pycache__/
+# 4. Prevent source map files (for size and security)
+out/**/*.js.map
+test/**/*.js.map
+
+# 5. Prevent scripts and deployment tools
+scripts/**
+deploy/**
+infrastructure/**
+k8s/**
+ci-cd/**
+.github/**
+
+# 6. Prevent Python LLM project files (not the right place)
+python-llm/**
+llm-service/**
+**/__pycache__/**
 **/*.pyc
+requirements.txt
+Dockerfile
+docker-compose.yml
+railway.json
 
-# 4. Ignore Test & Build Artifacts not needed for production
-test/
-infrastructure/
-k8s/
-ci-cd/
-.github/
-
-# 5. OS & IDE Junk
+# 7. System files and IDE junk
 .DS_Store
 Thumbs.db
 *.log
-logs/
-.idea/
-*.swp
-*.swo
-.git/
+.idea/**
+.git/**
+.vscode-test/**
+coverage/**
+.nyc_output/**
 
-# 6. EXCEPTION LIST (Allow these specific files to be published) ✅
-# لازم نسمح برفع الكود المترجم (JavaScript)
+# 8. Clean up resources
+resources/icons/compressed.zip
+resources/icons/icon.orig.png
+resources/icons/compressed/**
+
+# 9. Important exceptions (these files must be uploaded for the extension to work) ✅
 !out/extension.js
-!out/extension.js.map
 !out/git-hook.js
-!out/git-hook.js.map
-!out/utils/
-!out/commands/
-!out/providers/
-
-# السماح برفع ملفات الموارد (صور، أيقونات، HTML)
+!out/utils/*.js
+!out/commands/*.js
+!out/providers/*.js
+!out/types/*.js
+!out/managers/*.js
 !resources/**
-!demo-modern-ui.html
-!readme.md
-!changelog.md
-!LICENSE.txt
-!.dotenvy.json
+
+# 10. Prevent any test files (we don't need to upload tests to the marketplace)
+test/**
+**/test/**
+
+# 11. Prevent any original or compressed icons (we only upload the final icons)
+!resources/**
+
+resources/icons/*.orig.*
+resources/icons/*.zip
+resources/icons/compressed/**
+
+# 12. Prevent any dotenvy source files (we only upload the compiled version)
+.dotenvy/**
+.gitignore
+.dotenvy/history

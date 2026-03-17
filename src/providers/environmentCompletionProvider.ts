@@ -16,7 +16,7 @@ export class EnvironmentCompletionProvider implements vscode.CompletionItemProvi
     private rootPath: string;
     // Cache variables here
     private cachedVariables: EnvVar[] = [];
-    // 🗑️ شلنا lastEnvPath لأنه كان مسبب زحمة ومش مستخدم حالياً
+    // Removed lastEnvPath because it was causing clutter and not currently used
     private watcher: vscode.FileSystemWatcher | undefined;
 
     constructor(rootPath: string) {
@@ -33,7 +33,7 @@ export class EnvironmentCompletionProvider implements vscode.CompletionItemProvi
         this.watcher.onDidDelete(() => this.refreshVariables());
     }
 
-    // ✅ التعديل الجوهري: شلنا token و context من هنا خالص
+    // Major change: removed token and context from here completely
     async provideCompletionItems(
         document: vscode.TextDocument,
         position: vscode.Position
@@ -54,7 +54,7 @@ export class EnvironmentCompletionProvider implements vscode.CompletionItemProvi
 
         const partialVariable = processEnvMatch[2] || '';
 
-        // Use Cached Variables directly (Zero Latency!) 🚀
+        // Use Cached Variables directly (Zero Latency!) - No need to read file again
         const filteredVariables = this.cachedVariables.filter(variable => 
             variable.name.toLowerCase().includes(partialVariable.toLowerCase())
         );
@@ -97,7 +97,7 @@ export class EnvironmentCompletionProvider implements vscode.CompletionItemProvi
 
             const content = await fs.promises.readFile(envFilePath, 'utf8'); // Use Async fs
             this.cachedVariables = this.parseEnvContent(content);
-            // console.log('Environment variables cached:', this.cachedVariables.length); // شيلنا الـ log عشان الـ production
+            // Removed the log for production
 
         } catch (error) {
             console.error('Error refreshing env variables:', error);

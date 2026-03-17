@@ -20,7 +20,7 @@ export class UpdateManager {
                 if (!previousVersion) {
                     this.showWelcomeMessage();
                 } else {
-                    // نمرر الـ context هنا
+                    // We pass the context here
                     this.showUpdateNotification(currentVersion, context);
                 }
             }
@@ -44,9 +44,9 @@ export class UpdateManager {
         vscode.window.showInformationMessage('Welcome to DotEnvy! 🛡️ The best way to manage your .env files.');
     }
 
-    // نستقبل الـ context عشان نجيب مسار الامتداد صح
+    // We receive the context to get the extension path correctly
     public static async showChangelog(context: vscode.ExtensionContext) {
-        // ✅ الطريقة الآمنة للوصول للملف في الروت
+        // The safe way to access the file in the root
         const changelogUri = vscode.Uri.joinPath(context.extensionUri, 'CHANGELOG.md');
 
         try {

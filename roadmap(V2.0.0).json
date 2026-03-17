@@ -1,0 +1,175 @@
+{
+  "version": "2.0.0",
+  "codename": "DotEnvy AI",
+  "title": "Full AI-Powered Environment Management",
+  "type": "major_release",
+  "status": "planned",
+  "created": "2026-03-13",
+
+  "vision": "DotEnvy 2.0 is not just an environment manager — it is an AI copilot for your entire environment lifecycle. It understands your codebase, knows what variables you need before you do, learns from every interaction, and keeps your team in sync automatically.",
+
+  "what_changes_from_1_x": {
+    "architecture": "Complete Railway API v2 with multi-tenant model serving",
+    "ui": "Full webview redesign — modern component-based UI replacing legacy panel",
+    "ml_model": "Production-grade model trained on millions of real-world secrets patterns",
+    "minimum_vscode": "1.85.0",
+    "breaking_changes": [
+      "New Railway API v2 — all endpoints versioned under /v2/",
+      "New HMAC key format — existing EXTENSION_SHARED_SECRET must be rotated",
+      "Webview panel redesigned — custom CSS will not carry over",
+      "Config schema updated — .dotenvy.json gets new required fields"
+    ]
+  },
+
+  "pillars": [
+    {
+      "id": "P1",
+      "name": "AI Environment Copilot",
+      "description": "The LLM understands the full project codebase and can set up a complete .env from scratch in under 10 seconds.",
+      "features": [
+        {
+          "title": "Full Project Scan and Auto-Generate .env",
+          "description": "Analyze every file in the workspace — source code, package.json, Dockerfile, CI config — and generate a complete .env with all required variables, descriptions, and safe placeholder values.",
+          "endpoint": "POST /v2/generate",
+          "target_time": "under 10 seconds for 1000-file projects"
+        },
+        {
+          "title": "Variable Explanation in Plain English",
+          "description": "Hover over any variable in .env to see an AI-generated explanation: what service uses it, what it controls, what happens if it is missing or wrong.",
+          "endpoint": "POST /v2/explain"
+        },
+        {
+          "title": "Conflict Detection Across Environments",
+          "description": "Detect when the same variable has inconsistent values across .env.development, .env.staging, and .env.production that could cause environment-specific bugs.",
+          "endpoint": "POST /v2/diff-environments"
+        },
+        {
+          "title": "Predictive Variable Suggestions",
+          "description": "As the developer writes code that uses a new service (e.g. adds stripe import), the extension proactively suggests adding the required Stripe variables before the developer even saves the file.",
+          "trigger": "file save event + import detection"
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "name": "Continuous Learning Model",
+      "description": "The ML model improves from every user interaction across all installations, while keeping all data anonymous.",
+      "features": [
+        {
+          "title": "Federated Learning from User Feedback",
+          "description": "When users mark secrets as confirmed or false positive across all DotEnvy installations, model improvements are aggregated centrally without sending any secret values — only gradient updates.",
+          "privacy": "Only model weight deltas are sent, never actual secret values"
+        },
+        {
+          "title": "Model Versioning with A/B Testing",
+          "description": "Run two model versions simultaneously on a percentage split of users. Compare accuracy metrics in real time. Auto-promote the better model after statistical significance is reached.",
+          "endpoint": "GET /v2/model/version, POST /v2/ab/result"
+        },
+        {
+          "title": "Per-Project Model Fine-Tuning",
+          "description": "Teams can fine-tune the model on their specific codebase patterns. A Next.js fintech team gets a model that is better at detecting their specific secret formats.",
+          "endpoint": "POST /v2/finetune"
+        },
+        {
+          "title": "Accuracy Dashboard",
+          "description": "Extension settings page showing: current model version, accuracy over time graph, number of confirmed secrets vs false positives, and comparison to baseline model.",
+          "location": "VS Code Settings > DotEnvy > Model Accuracy"
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "name": "Team Intelligence",
+      "description": "AI helps entire teams work from consistent, up-to-date environment configurations.",
+      "features": [
+        {
+          "title": "AI-Powered Onboarding",
+          "description": "New team member clones the repo. DotEnvy scans the codebase, detects the stack, generates a personalized .env setup guide with all required variables and where to get their values.",
+          "output": "Onboarding checklist shown in panel on first open"
+        },
+        {
+          "title": "Environment Drift Detection",
+          "description": "Periodically compare team members environments via Doppler. Alert when one developer is missing a variable that others have, or has a significantly different value that could cause bugs.",
+          "trigger": "Doppler pull + comparison"
+        },
+        {
+          "title": "Smart .env Merge Conflict Resolution",
+          "description": "When two developers modify .env and create a git merge conflict, the extension shows a visual merge tool specifically designed for env files — not a generic text diff.",
+          "location": "VS Code Source Control view"
+        },
+        {
+          "title": "Role-Based Variable Visibility",
+          "description": "Admins can mark certain variables as visible only to specific roles (e.g. only senior devs see production database credentials). Junior devs see a placeholder with instructions on how to request access.",
+          "depends_on": "v1.3.0 multi-user key wrapping"
+        }
+      ]
+    },
+    {
+      "id": "P4",
+      "name": "Security Intelligence",
+      "description": "Move from reactive secret detection to proactive secret prevention.",
+      "features": [
+        {
+          "title": "Real-Time Risk Scoring as User Types",
+          "description": "As the developer types a string value in code, score it in real time. If it looks like a secret (high entropy, known prefix), show a subtle inline warning before the file is even saved.",
+          "latency_target": "under 50ms — local inference only"
+        },
+        {
+          "title": "Pre-Commit Secret Prediction",
+          "description": "Enhanced git hook that not only detects known secrets but predicts likely secrets using the ML model — catching novel secret formats that pattern matching would miss.",
+          "depends_on": "v1.0.0 git hooks + v1.5.0 ML model"
+        },
+        {
+          "title": "GitHub Secret Scanning Integration",
+          "description": "If a secret is pushed to GitHub and GitHub Secret Scanning alerts, DotEnvy receives a webhook notification and immediately shows a prominent warning in VS Code with instructions to rotate the exposed secret.",
+          "endpoint": "POST /v2/webhook/github-secret-alert"
+        },
+        {
+          "title": "Compliance Reports",
+          "description": "Generate compliance-ready reports for SOC2, HIPAA, PCI DSS. Shows: all secrets managed by DotEnvy, encryption methods used, access audit trail, and evidence of secret rotation.",
+          "output_formats": ["pdf", "json", "markdown"]
+        }
+      ]
+    }
+  ],
+
+  "new_infrastructure": [
+    {
+      "component": "Railway API v2",
+      "description": "All endpoints versioned under /v2/. New endpoints: /v2/generate, /v2/explain, /v2/diff-environments, /v2/finetune, /v2/webhook/github-secret-alert. Backward compatible with v1 endpoints until v2.1."
+    },
+    {
+      "component": "Model Registry",
+      "description": "Version-controlled model storage on Railway with automatic rollback. A/B testing infrastructure. Per-project fine-tuned model storage."
+    },
+    {
+      "component": "Federated Learning Aggregator",
+      "description": "Collects anonymized gradient updates from extension installations. Aggregates weekly and releases improved model versions automatically."
+    },
+    {
+      "component": "Webview UI v2",
+      "description": "Complete redesign using a component-based architecture. Faster rendering, better accessibility, VS Code native theme support. Replaces the legacy panel.js/panel.css."
+    }
+  ],
+
+  "migration_guide": {
+    "from_1_x_to_2_0": [
+      "Run 'dotenvy: Migrate to v2.0' command — auto-updates .dotenvy.json schema",
+      "Rotate EXTENSION_SHARED_SECRET — old format not accepted by /v2/ endpoints",
+      "Re-run vsce publish after updating package.json to 2.0.0",
+      "Update Railway deployment — new service.py with v2 router"
+    ]
+  },
+
+  "success_criteria": [
+    "Auto-generate accurate .env in under 10 seconds for any project",
+    "90%+ secret detection accuracy on held-out test set",
+    "Model accuracy measurably improves after 1000 user feedback interactions",
+    "Team onboarding time reduced by 80% vs manual .env setup",
+    "Used by 10,000+ active developers",
+    "Extension package size stays under 10MB",
+    "Zero regressions from v1.x features"
+  ],
+
+  "depends_on": "v1.9.0 — Docker/K8s + templates (all 1.x features complete)"
+}

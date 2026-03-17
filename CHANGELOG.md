@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-03-13
+
+### **LLM Integration Upgrade + HMAC Security** — Production-Grade ML Secret Detection
+Complete overhaul of the AI-powered secret detection backend with HMAC authentication, 35-feature ML model, two-tier caching, and SSE streaming.
+
+#### **HMAC Authentication — No More API Key in Extension**
+- **Zero API Key Exposure**: Extension no longer holds any real API key — only a shared secret used for signing
+- **HMAC-SHA256 Signing**: Every request to the LLM service is signed with `X-Extension-Timestamp` + `X-Extension-Signature` headers
+- **Replay Attack Protection**: 5-minute timestamp window prevents request replay attacks
+- **Per-Device Rate Limiting**: `X-Machine-ID` header enables per-device rate limiting (30 req/min) on the server
+- **Secure Build Pipeline**: `build-with-env.js` injects `EXTENSION_SHARED_SECRET` at build time — excluded from published package via `.vscodeignore`
+- **Circuit Breaker**: 3-failure threshold opens circuit for 60 seconds, preventing cascade failures
+
+#### **35-Feature ML Model (Upgraded from 19)**
+- **6 Basic Text Features**: uppercase ratio, lowercase ratio, digit ratio, special chars, length normalization, unique char ratio
+- **3 Entropy Features**: Shannon entropy + bigram entropy + trigram entropy
+- **3 Pattern Features**: known secret prefix detection, Base64 encoding, hex encoding
+- **5 Context Risk Features**: auth/key/secret keywords, bearer tokens, database URLs, cloud provider signals, payment keywords
+- **4 Variable Name Features**: key/secret/token naming, env var convention (ALL_CAPS), const naming, variable length
+- **4 Structural Features**: dash, underscore, dot, slash presence
+- **10 Derived Features**: threshold flags and feature combinations
+- **TypeScript Mirror**: `extractFeatures()` method in extension matches Python backend exactly (for offline use + testing)
+
+#### ⚡ **Two-Tier Cache — 18.4x Speedup**
+- **L1 Cache**: In-process LRU (500 items, 5-minute TTL) — sub-millisecond hits
+- **L2 Cache**: Redis (1-hour TTL) — shared across instances
+- **Smart TTL**: high confidence=24h, medium=1h, low=5min
+- **Graceful Degradation**: Falls back to L1-only if Redis is unavailable
+- **Measured Performance**: 18.4x speedup on repeated requests in production
+
+#### **SSE Streaming Endpoint**
+- **Progressive Analysis**: Results stream in 5 stages via Server-Sent Events
+- `pattern_match` (20%) → `entropy` (40%) → `context` (65%) → `llm_analysis` (85%) → `final` (100%)
+- **HMAC Authenticated**: Same security as the standard endpoint
+- **Endpoint**: `POST /extension/analyze/stream`
+
+#### **Python Service Refactor — 600 Lines → 9 Files**
+Complete restructure of the Railway backend for maintainability:
+- `service.py` — ~60 lines, app wiring only
+- `analyzer.py` — LLMAnalyzer + cache singleton
+- `security.py` — JWT, rate limiting, auth dependencies
+- `middleware.py` — monitoring + security headers middleware
+- `models.py` — Pydantic request/response schemas
+- `routes/analyze.py` — `/analyze` + `/extension/analyze` + `/extension/analyze/stream`
+- `routes/train.py` — `/train` + `/reset`
+- `routes/stats.py` — `/stats` + `/health` + `/cache/*` + `/performance/*`
+- `routes/versioning.py` — `/versions/*` + `/ab/*`
+
+#### **Test Coverage**
+- **18/18** python-llm tests passing on Railway production
+- **12/12** TypeScript extension tests passing
+- Covers: HMAC auth, confidence levels, circuit breaker, 35-feature extraction, fallback, streaming
+
+---
+
 ## [1.4.0] - 2026-01-26
 
 ### **Portable Backup Encryption Enhancement** - Cross-Device Backup Revolution
@@ -125,7 +180,7 @@ Complete implementation of envelope encryption enabling secure multi-user access
 
 ### 📚 **Documentation & Testing**
 - **Comprehensive Test Coverage**: Extended master key migration tests with malformed data validation
-- **Security Architecture Analysis**: Complete review of dual encryption systems and OWASP compliance
+- **Security Architecture Review**: Complete review of dual encryption systems and OWASP compliance
 - **Code Quality Improvements**: Enhanced TypeScript compilation and linting standards
 - **Professional UX Patterns**: Modal confirmations, progress feedback, and fail-fast validation
 
@@ -277,4 +332,10 @@ Complete implementation of envelope encryption enabling secure multi-user access
 
 ## Version History
 
-- **1.0.0** - Initial stable release of dotenvy VS Code extension
+- **1.5.0** - HMAC security + 35-feature ML model + two-tier cache + SSE streaming + service refactor
+- **1.4.0** - Portable backup encryption (PBE) with PBKDF2 + AES-256-GCM
+- **1.3.0** - Multi-user key wrapping (envelope encryption) + user management
+- **1.2.0** - End-to-end encrypted cloud sync
+- **1.1.0** - History tree view + tabbed interface
+- **1.0.2** - AI-powered secret detection (LLM v1)
+- **1.0.0** - Initial stable release

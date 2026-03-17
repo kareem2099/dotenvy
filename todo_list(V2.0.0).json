@@ -1,0 +1,313 @@
+{
+  "version": "2.0.0",
+  "codename": "DotEnvy AI",
+  "theme": "Full AI-Powered Environment Management",
+  "status": "pending",
+  "created": "2026-03-13",
+  "context": "All 1.x versions feed into this release. v2.0 is a major release with breaking changes, a new Railway API v2, a redesigned webview UI, and four AI pillars: Copilot, Continuous Learning, Team Intelligence, and Security Intelligence.",
+
+  "tasks": [
+
+    {
+      "id": "2.0-T01",
+      "title": "Railway API v2 — Versioned Endpoints",
+      "description": "Create a v2 router in python-llm. All new endpoints live under /v2/. Existing /v1/ endpoints remain active until v2.1 for backward compatibility. New endpoints: /v2/generate, /v2/explain, /v2/diff-environments, /v2/finetune, /v2/webhook/github-secret-alert.",
+      "project": "python-llm",
+      "files": [
+        "python-llm/src/routes/v2/generate.py",
+        "python-llm/src/routes/v2/explain.py",
+        "python-llm/src/routes/v2/diff.py",
+        "python-llm/src/routes/v2/finetune.py",
+        "python-llm/src/routes/v2/webhooks.py",
+        "python-llm/src/service.py"
+      ],
+      "effort": "large",
+      "priority": "P0",
+      "status": "todo",
+      "acceptance_criteria": "All /v2/ endpoints return correct responses. /v1/ endpoints still work unchanged."
+    },
+    {
+      "id": "2.0-T02",
+      "title": "Auto-Generate .env from Full Project Scan",
+      "description": "New POST /v2/generate endpoint. Receives: list of all file paths and their import/require statements, package.json dependencies, detected framework. Returns a complete suggested .env with variable names, descriptions, example values, and confidence scores. Target: under 10 seconds for a 1000-file project.",
+      "project": "python-llm + DotEnvy",
+      "files": [
+        "python-llm/src/routes/v2/generate.py",
+        "src/utils/codeAnalyzer.ts",
+        "src/utils/llmAnalyzer.ts"
+      ],
+      "effort": "large",
+      "priority": "P0",
+      "status": "todo",
+      "acceptance_criteria": "Generated .env covers 90%+ of required variables for test projects. Completes in under 10 seconds."
+    },
+    {
+      "id": "2.0-T03",
+      "title": "Variable Explanation on Hover",
+      "description": "Register a VS Code HoverProvider for .env files. When user hovers over a variable name, call POST /v2/explain with the variable name and context. Show: what service uses it, what it controls, what happens if missing. Cache responses for 24 hours.",
+      "project": "DotEnvy",
+      "files": [
+        "src/providers/envHoverProvider.ts",
+        "src/utils/llmAnalyzer.ts"
+      ],
+      "effort": "medium",
+      "priority": "P0",
+      "status": "todo",
+      "acceptance_criteria": "Hover tooltip appears within 500ms (from cache) or 2 seconds (from API). Explanation is accurate and helpful."
+    },
+    {
+      "id": "2.0-T04",
+      "title": "Predictive Variable Suggestions on Import Detection",
+      "description": "Watch file save events. When a new import is added (e.g. import Stripe from 'stripe'), detect the service being imported and immediately suggest the required environment variables in the panel — before the developer even thinks about it.",
+      "project": "DotEnvy",
+      "files": [
+        "src/utils/importWatcher.ts",
+        "src/utils/frameworkDetector.ts",
+        "src/providers/environmentWebviewProvider.ts"
+      ],
+      "effort": "large",
+      "priority": "P1",
+      "status": "todo",
+      "acceptance_criteria": "New import detected within 500ms of file save. Correct variables suggested for 20+ popular libraries."
+    },
+    {
+      "id": "2.0-T05",
+      "title": "Model Registry and Versioning",
+      "description": "Build a model registry on Railway. Each trained model gets a version number, accuracy metrics, and a creation timestamp. Support: listing available versions, switching the active version, and automatic rollback if accuracy drops below a threshold.",
+      "project": "python-llm",
+      "files": [
+        "python-llm/src/routes/v2/model_registry.py",
+        "python-llm/src/analyzer.py"
+      ],
+      "effort": "large",
+      "priority": "P0",
+      "status": "todo",
+      "acceptance_criteria": "Model version switch takes effect within 30 seconds. Rollback triggers automatically if accuracy drops 5%+."
+    },
+    {
+      "id": "2.0-T06",
+      "title": "A/B Testing Infrastructure",
+      "description": "Extend the existing /ab/ routes to support real traffic splitting. Route a percentage of /extension/analyze requests to model version A and the rest to version B. Collect accuracy signals from user feedback. Auto-promote winning model after reaching statistical significance (p < 0.05).",
+      "project": "python-llm",
+      "files": [
+        "python-llm/src/routes/versioning.py",
+        "python-llm/src/routes/v2/ab.py"
+      ],
+      "effort": "large",
+      "priority": "P1",
+      "status": "todo",
+      "acceptance_criteria": "Traffic split works correctly. Winning model auto-promoted after 1000+ feedback data points."
+    },
+    {
+      "id": "2.0-T07",
+      "title": "Per-Project Model Fine-Tuning",
+      "description": "Allow teams to fine-tune the base model on their specific codebase patterns. POST /v2/finetune accepts a batch of labeled examples from the team. Stores a per-project model version that is served instead of the base model for that team's EXTENSION_SHARED_SECRET.",
+      "project": "python-llm",
+      "files": [
+        "python-llm/src/routes/v2/finetune.py",
+        "python-llm/src/model.py"
+      ],
+      "effort": "large",
+      "priority": "P1",
+      "status": "todo",
+      "acceptance_criteria": "Fine-tuned model served correctly for the team. Base model unchanged for other users."
+    },
+    {
+      "id": "2.0-T08",
+      "title": "Accuracy Dashboard in Extension Settings",
+      "description": "Add a 'Model Accuracy' page to the DotEnvy VS Code Settings webview. Shows: current model version, a line chart of accuracy over the past 30 days, number of user confirmations vs false positives this week, and a comparison bar chart vs the baseline v1.5.0 model.",
+      "project": "DotEnvy",
+      "files": [
+        "src/providers/settingsWebviewProvider.ts",
+        "resources/settings/settings.js",
+        "resources/settings/settings.css"
+      ],
+      "effort": "medium",
+      "priority": "P2",
+      "status": "todo",
+      "acceptance_criteria": "Dashboard loads in under 1 second. Charts render correctly. Data refreshes daily."
+    },
+    {
+      "id": "2.0-T09",
+      "title": "AI-Powered Team Onboarding",
+      "description": "When a developer opens a repository for the first time (no .env present), run an automatic project scan and generate a personalized onboarding checklist: all required env variables, where to get each value, which team member to ask for secrets, and a one-click setup wizard.",
+      "project": "DotEnvy",
+      "files": [
+        "src/providers/onboardingWebviewProvider.ts",
+        "src/utils/codeAnalyzer.ts"
+      ],
+      "effort": "large",
+      "priority": "P1",
+      "status": "todo",
+      "acceptance_criteria": "Onboarding wizard appears automatically on first open. Checklist covers all required variables. Setup completes in under 5 minutes for a standard project."
+    },
+    {
+      "id": "2.0-T10",
+      "title": "Environment Drift Detection",
+      "description": "After each Doppler pull, compare the local .env against the team average (variables present, approximate value patterns). Alert the developer when they are missing variables that all other team members have, or have a variable value that is significantly different from the team norm.",
+      "project": "DotEnvy",
+      "files": [
+        "src/utils/cloudSyncManager.ts",
+        "src/utils/driftDetector.ts"
+      ],
+      "effort": "medium",
+      "priority": "P1",
+      "status": "todo",
+      "privacy_note": "Only variable names and structural patterns are compared — never actual values",
+      "acceptance_criteria": "Drift detected correctly after pull. Alert shows specific missing variables. No secret values transmitted."
+    },
+    {
+      "id": "2.0-T11",
+      "title": "Real-Time Risk Scoring as User Types",
+      "description": "Register a VS Code inline hints provider. As the developer types a string literal in source code, score it locally (no network call) using the 35-feature extractor. If the score exceeds 0.7, show a subtle grey inline hint: 'Looks like a secret — consider using process.env'. No popup, no interruption.",
+      "project": "DotEnvy",
+      "files": [
+        "src/providers/inlineRiskProvider.ts",
+        "src/utils/llmAnalyzer.ts"
+      ],
+      "effort": "medium",
+      "priority": "P0",
+      "status": "todo",
+      "performance_requirement": "Local inference only — under 50ms per keystroke. No network calls during typing.",
+      "acceptance_criteria": "Inline hint appears within 50ms. No false positives on short strings. Dismissable per-session."
+    },
+    {
+      "id": "2.0-T12",
+      "title": "GitHub Secret Scanning Webhook Integration",
+      "description": "Register a Railway webhook endpoint to receive GitHub Secret Scanning alerts. When a secret is detected in a pushed commit, Railway receives the alert and sends a VS Code notification via a polling endpoint. The notification shows: which file was affected, which secret type was exposed, and a one-click 'Rotate This Secret' action.",
+      "project": "python-llm + DotEnvy",
+      "files": [
+        "python-llm/src/routes/v2/webhooks.py",
+        "src/utils/llmAnalyzer.ts",
+        "src/providers/notificationProvider.ts"
+      ],
+      "effort": "large",
+      "priority": "P2",
+      "status": "todo",
+      "acceptance_criteria": "Webhook received within 30 seconds of GitHub alert. VS Code notification appears with correct information."
+    },
+    {
+      "id": "2.0-T13",
+      "title": "Webview UI v2 — Complete Redesign",
+      "description": "Redesign the entire extension panel using a component-based architecture. New design language: cleaner typography, better dark/light theme support, faster rendering with virtual scrolling for large env files, and full keyboard navigation accessibility. Replaces legacy panel.js/panel.css completely.",
+      "project": "DotEnvy",
+      "files": [
+        "resources/panel/panel.js",
+        "resources/panel/panel.css",
+        "src/providers/environmentWebviewProvider.ts"
+      ],
+      "effort": "large",
+      "priority": "P1",
+      "status": "todo",
+      "design_goals": [
+        "Render 500+ variables without lag (virtual scroll)",
+        "Full keyboard navigation (no mouse required)",
+        "VS Code native theme colors — no hardcoded colors",
+        "WCAG 2.1 AA accessibility compliance",
+        "Mobile-friendly for VS Code on iPad"
+      ],
+      "acceptance_criteria": "Panel renders 500 variables in under 100ms. All interactive elements keyboard accessible. Passes axe accessibility audit."
+    },
+    {
+      "id": "2.0-T14",
+      "title": "New HMAC Key Rotation for v2",
+      "description": "v2.0 uses an updated HMAC message format with a version prefix to distinguish v1 and v2 requests. Provide a migration command 'dotenvy: Rotate to v2 Key' that generates a new shared secret, updates .env, and re-runs the build script. The old key continues to work for /v1/ endpoints only.",
+      "project": "DotEnvy + python-llm",
+      "files": [
+        "DotEnvy/scripts/build-with-env.js",
+        "python-llm/src/extension_auth.py",
+        "src/commands/rotateKey.ts"
+      ],
+      "effort": "medium",
+      "priority": "P0",
+      "status": "todo",
+      "acceptance_criteria": "Old key rejected by /v2/ endpoints. New key works correctly. Migration command completes without user error."
+    },
+    {
+      "id": "2.0-T15",
+      "title": "Compliance Report Generator",
+      "description": "Add a 'Generate Compliance Report' command. Produces a structured report showing: all secrets managed by DotEnvy and their encryption method, access audit trail from history, last rotation date per secret type, and a compliance checklist for SOC2 / HIPAA / PCI DSS. Output as PDF and JSON.",
+      "project": "DotEnvy",
+      "file": "src/commands/generateComplianceReport.ts",
+      "effort": "large",
+      "priority": "P2",
+      "status": "todo",
+      "output_formats": ["pdf", "json", "markdown"],
+      "acceptance_criteria": "Report generated in under 5 seconds. SOC2 checklist items mapped correctly to DotEnvy features."
+    },
+    {
+      "id": "2.0-T16",
+      "title": "Migration Tool from v1.x to v2.0",
+      "description": "Provide a 'dotenvy: Migrate to v2.0' command that automatically: updates .dotenvy.json to the new schema, rotates the HMAC key to the v2 format, backs up all existing data, and shows a migration checklist with what changed and what the user needs to do manually.",
+      "project": "DotEnvy",
+      "file": "src/commands/migrateToV2.ts",
+      "effort": "medium",
+      "priority": "P0",
+      "status": "todo",
+      "acceptance_criteria": "Migration completes without data loss. All v1.x features still work after migration. Rollback available if migration fails."
+    },
+    {
+      "id": "2.0-T17",
+      "title": "Update CHANGELOG, README, and Publish v2.0.0",
+      "description": "Document all v2.0.0 changes. Update README with new features and updated roadmap. Bump version to 2.0.0. Run vsce publish. Update Railway deployment to v2.",
+      "project": "DotEnvy + python-llm",
+      "files": [
+        "DotEnvy/CHANGELOG.md",
+        "DotEnvy/README.md",
+        "DotEnvy/package.json"
+      ],
+      "effort": "small",
+      "priority": "P3",
+      "status": "todo",
+      "acceptance_criteria": "DotEnvy v2.0.0 live on VS Code Marketplace. Railway running API v2."
+    }
+  ],
+
+  "priority_guide": {
+    "P0": "Must have — required for v2.0 release",
+    "P1": "Core value of v2.0",
+    "P2": "Nice to have — include if time permits",
+    "P3": "Release logistics"
+  },
+
+  "task_summary": {
+    "total": 17,
+    "by_priority": { "P0": 6, "P1": 7, "P2": 3, "P3": 1 },
+    "by_effort": { "small": 1, "medium": 5, "large": 11 },
+    "by_project": { "python-llm": 3, "DotEnvy": 10, "both": 4 }
+  },
+
+  "recommended_order": [
+    "2.0-T01",
+    "2.0-T14",
+    "2.0-T16",
+    "2.0-T05",
+    "2.0-T11",
+    "2.0-T02",
+    "2.0-T03",
+    "2.0-T13",
+    "2.0-T09",
+    "2.0-T04",
+    "2.0-T06",
+    "2.0-T07",
+    "2.0-T10",
+    "2.0-T08",
+    "2.0-T12",
+    "2.0-T15",
+    "2.0-T17"
+  ],
+
+  "success_criteria": [
+    "Auto-generate accurate .env in under 10 seconds for any project",
+    "90%+ secret detection accuracy on held-out test set",
+    "Model accuracy measurably improves after 1000 user feedback interactions",
+    "Team onboarding time reduced by 80% vs manual .env setup",
+    "Real-time risk scoring under 50ms per keystroke (local inference)",
+    "Panel renders 500 variables in under 100ms",
+    "Zero regressions from all v1.x features",
+    "Extension package size under 10MB",
+    "Used by 10,000+ active developers"
+  ],
+
+  "depends_on": "v1.9.0 — Docker/K8s + templates (all 1.x features complete)"
+}

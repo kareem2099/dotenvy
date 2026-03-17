@@ -2,13 +2,13 @@
   "name": "dotenvy",
   "displayName": "DotEnvy – VS Code Environment Manager",
   "description": "Effortlessly manage, secure, and sync .env files directly inside VS Code with enterprise-grade encryption.",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "icon": "resources/icons/icon.png",
   "publisher": "FreeRave",
   "author": "Kareem Ehab",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.74.0"
+    "vscode": "^1.110.0"
   },
   "categories": [
     "Programming Languages",
@@ -264,17 +264,17 @@
     "@types/glob": "^7.2.0",
     "@types/mocha": "^9.1.1",
     "@types/node": "^16.18.126",
-    "@types/vscode": "^1.74.0",
+    "@types/vscode": "^1.110.0",
     "@typescript-eslint/eslint-plugin": "^5.1.0",
     "@typescript-eslint/parser": "^5.1.0",
     "@vscode/test-electron": "^2.3.0",
-    "dotenv": "^17.2.3",
+    "dotenv": "^17.3.1",
     "eslint": "^8.37.0",
     "glob": "^7.2.3",
     "mocha": "^11.3.0",
-    "typescript": "^4.8.3"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
-    "uuid": "^9.0.0"
+    "uuid": "^13.0.0"
   }
 }

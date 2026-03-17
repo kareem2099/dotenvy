@@ -1,515 +1,347 @@
 {
   "version": "1.5.0",
-  "title": "LLM Integration Implementation",
-  "description": "Complete LLM integration with Railway server for enhanced secret detection and ML-powered analysis",
-  "created_at": "2026-01-24",
-  "planned_completion": "2026-01-25",
+  "title": "LLM Integration + Security + Refactor",
+  "description": "HMAC security, Railway deployment, python-llm refactor, 35-feature ML model, two-tier cache, SSE streaming",
+  "created_at": "2026-03-12",
+  "completed_at": "2026-03-13",
   "status": "completed",
+
   "categories": {
-    "llm_integration": {
-      "title": "LLM Integration Core",
-      "description": "Core LLM integration implementation with Railway server",
+
+    "security": {
+      "title": "HMAC Authentication (Extension ↔ Railway)",
+      "description": "Replaced raw API key exposure with HMAC-SHA256 signed requests",
       "status": "completed",
       "priority": "high",
       "tasks": [
         {
-          "id": "analyze_llm_analyzer",
-          "title": "Analyze LLM Analyzer Implementation",
-          "description": "Reviewed the LLMAnalyzer class structure and singleton pattern implementation",
+          "id": "hmac_server",
+          "title": "HMAC Validation — Server Side",
           "status": "completed",
-          "file": "src/utils/llmAnalyzer.ts",
+          "file": "python-llm/src/extension_auth.py",
           "features": [
-            "Singleton pattern implementation",
-            "HTTP/HTTPS request handling",
-            "Fallback analysis logic",
-            "Feature extraction methods"
+            "X-Extension-Signature header verification (HMAC-SHA256)",
+            "X-Extension-Timestamp replay attack protection (5min window)",
+            "X-Machine-ID per-device rate limiting (30 req/min)",
+            "EXTENSION_SHARED_SECRET env var on Railway"
           ]
         },
         {
-          "id": "examine_secret_detector_integration",
-          "title": "Examine Secret Detector Integration",
-          "description": "Analyzed how LLMAnalyzer integrates with SecretDetector for enhanced secret detection",
+          "id": "hmac_extension",
+          "title": "HMAC Signing — Extension Side",
           "status": "completed",
-          "files": [
-            "src/utils/secretDetector.ts"
-          ],
+          "file": "DotEnvy/src/utils/llmAnalyzer.ts",
           "features": [
-            "Enhanced confidence scoring",
-            "Context extraction integration",
-            "ML-enhanced analysis workflow",
-            "Fallback to traditional analysis"
+            "signRequest() — HMAC-SHA256 with Unix timestamp",
+            "makeSignedRequest() — injects X-Extension-Timestamp + X-Extension-Signature + X-Machine-ID",
+            "No API key in extension — shared secret only",
+            "Circuit breaker (3 failures → open, 60s cooldown)"
           ]
         },
         {
-          "id": "review_railway_server_config",
-          "title": "Review Railway Server Configuration",
-          "description": "Examined Railway deployment setup and service configuration",
+          "id": "hmac_build",
+          "title": "Build Script — Secret Injection",
           "status": "completed",
-          "files": [
-            "test/test-llm-service.sh",
-            "CI-CD-README.md"
-          ],
+          "file": "DotEnvy/scripts/build-with-env.js",
           "features": [
-            "Production URL configuration",
-            "API authentication setup",
-            "Service health monitoring",
-            "Deployment architecture"
-          ]
-        },
-        {
-          "id": "study_deployment_architecture",
-          "title": "Study Deployment Architecture",
-          "description": "Reviewed infrastructure as code, Kubernetes manifests, and CI/CD pipeline",
-          "status": "completed",
-          "files": [
-            "infrastructure/",
-            "k8s/",
-            ".github/workflows/"
-          ],
-          "features": [
-            "Terraform infrastructure",
-            "Kubernetes deployment",
-            "CI/CD automation",
-            "Multi-platform Docker builds"
+            "Reads EXTENSION_SHARED_SECRET from .env at build time",
+            "Injects into compiled JS (replaces REPLACE_AT_BUILD_TIME)",
+            ".env excluded from published package via .vscodeignore"
           ]
         }
       ]
     },
-    "api_endpoints": {
-      "title": "API Endpoints and Authentication",
-      "description": "Document and implement API endpoints with proper authentication",
+
+    "python_llm_refactor": {
+      "title": "Service Refactor — 600 lines → 9 files",
+      "description": "Monolithic service.py split into focused modules",
       "status": "completed",
       "priority": "high",
       "tasks": [
         {
-          "id": "document_api_endpoints",
-          "title": "Document API Endpoints",
-          "description": "Documented REST API endpoints and authentication mechanisms",
+          "id": "refactor_service",
+          "title": "service.py — App Wiring Only",
           "status": "completed",
-          "files": [
-            "LLM_INTEGRATION_GUIDE.md"
+          "file": "python-llm/src/service.py",
+          "features": ["~60 lines", "FastAPI app init", "Middleware + router registration"]
+        },
+        {
+          "id": "refactor_analyzer",
+          "title": "analyzer.py — LLMAnalyzer + Cache Singleton",
+          "status": "completed",
+          "file": "python-llm/src/analyzer.py",
+          "features": ["LLMAnalyzer class", "EnhancedCacheManager singleton", "Model load/init"]
+        },
+        {
+          "id": "refactor_security",
+          "title": "security.py — Auth + Rate Limiting",
+          "status": "completed",
+          "file": "python-llm/src/security.py",
+          "features": ["SecurityManager", "JWT verification", "Rate limiting", "get_api_key FastAPI dependency"]
+        },
+        {
+          "id": "refactor_middleware",
+          "title": "middleware.py — Monitoring + Security Headers",
+          "status": "completed",
+          "file": "python-llm/src/middleware.py",
+          "features": [
+            "MonitoringMiddleware — request timing + logging",
+            "SecurityHeadersMiddleware — removes Server header (MutableHeaders fix)",
+            "CORS headers"
+          ]
+        },
+        {
+          "id": "refactor_models",
+          "title": "models.py — Pydantic Schemas",
+          "status": "completed",
+          "file": "python-llm/src/models.py",
+          "features": ["AnalyzeRequest", "AnalyzeResponse", "TrainRequest", "StatsResponse"]
+        },
+        {
+          "id": "refactor_routes",
+          "title": "routes/ — 4 Router Files",
+          "status": "completed",
+          "files": {
+            "routes/analyze.py": "/analyze + /extension/analyze + /extension/analyze/stream",
+            "routes/train.py": "/train + /reset",
+            "routes/stats.py": "/stats + /health + /readiness + /liveness + /cache/* + /database/* + /performance/*",
+            "routes/versioning.py": "/versions/* + /ab/*"
+          }
+        }
+      ]
+    },
+
+    "ml_model": {
+      "title": "35-Feature ML Model",
+      "description": "Upgraded from 19-feature to 35-feature extraction + model retrained",
+      "status": "completed",
+      "priority": "high",
+      "tasks": [
+        {
+          "id": "feature_extractor_35",
+          "title": "feature_extractor.py — 35 Features",
+          "status": "completed",
+          "file": "python-llm/src/feature_extractor.py",
+          "features": [
+            "Basic text (6): upper, lower, digit, special, length_norm, unique_ratio",
+            "Entropy (3): Shannon + bigram + trigram",
+            "Pattern matching (3): known_prefix, is_base64, is_hex",
+            "Context risk (5): auth, bearer, db, cloud, payment keywords",
+            "Variable name (4): is_key, is_env, is_const, var_len",
+            "Structural (4): dash, underscore, dot, slash",
+            "Derived (10): combinations and threshold flags"
           ],
+          "constant": "NUM_FEATURES = 35"
+        },
+        {
+          "id": "model_update",
+          "title": "model.py — Updated for 35 Features",
+          "status": "completed",
+          "file": "python-llm/src/model.py",
           "features": [
-            "Health check endpoint",
-            "Secret analysis endpoint",
-            "Service statistics endpoint",
-            "Authentication requirements"
+            "feature_embedding resized to (NUM_FEATURES, hidden_dim)",
+            "load_model() detects dimension mismatch and re-initializes",
+            "train() validation updated"
           ]
         },
         {
-          "id": "implement_api_authentication",
-          "title": "Implement API Authentication",
-          "description": "Added Bearer token authentication to HTTP headers",
+          "id": "model_training",
+          "title": "train_model.py — Pre-Training Script",
           "status": "completed",
-          "file": "src/utils/llmAnalyzer.ts",
+          "file": "train_model.py",
           "features": [
-            "API key environment variable",
-            "Bearer token in headers",
-            "Authentication error handling",
-            "Secure credential storage"
+            "30 labeled samples: 16 high + 4 medium + 10 false_positive",
+            "15 epochs",
+            "Built-in verification after training",
+            "Covers: Stripe, GitHub, AWS, Slack, SendGrid, JWT, DB URLs, private keys"
           ]
         },
         {
-          "id": "configure_service_url",
-          "title": "Configure Service URL",
-          "description": "Updated service URL configuration for Railway deployment",
+          "id": "feature_extraction_ts",
+          "title": "extractFeatures() — TypeScript Mirror",
           "status": "completed",
-          "file": "src/utils/llmAnalyzer.ts",
+          "file": "DotEnvy/src/utils/llmAnalyzer.ts",
           "features": [
-            "Environment variable support",
-            "Production URL default",
-            "Local development fallback",
-            "URL validation"
+            "35-feature extraction matching python backend",
+            "ngramEntropy() helper",
+            "Used in test/llm-test.ts for offline validation"
           ]
         }
       ]
     },
-    "feature_extraction": {
-      "title": "Feature Extraction Logic",
-      "description": "Implement comprehensive feature extraction for ML analysis",
+
+    "cache_and_performance": {
+      "title": "Two-Tier Cache + Streaming",
+      "description": "L1 LRU + L2 Redis cache and SSE streaming endpoint",
       "status": "completed",
       "priority": "medium",
       "tasks": [
         {
-          "id": "understand_feature_extraction",
-          "title": "Understand Feature Extraction Logic",
-          "description": "Analyzed the 15+ features extracted for ML analysis",
+          "id": "two_tier_cache",
+          "title": "cache_manager.py — Two-Tier Cache",
           "status": "completed",
-          "file": "src/utils/llmAnalyzer.ts",
+          "file": "python-llm/src/cache_manager.py",
           "features": [
-            "Basic text features (length, entropy)",
-            "Character analysis (special chars, digits, case)",
-            "Pattern analysis (Base64, hex, prefixes)",
-            "Context analysis (keywords, quotes)",
-            "Variable name scoring"
+            "L1: in-process LRU (500 items, 5min TTL)",
+            "L2: Redis (1hr TTL)",
+            "Graceful fallback to L1-only if Redis unavailable",
+            "Smart TTL: high=24h, medium=1h, low=5min",
+            "Measured speedup: 18.4x on cache hits (production)"
           ]
         },
         {
-          "id": "enhance_response_processing",
-          "title": "Enhance Response Processing",
-          "description": "Improved response processing with ML insights",
+          "id": "sse_streaming",
+          "title": "streaming.py — SSE Streaming Endpoint",
           "status": "completed",
-          "file": "src/utils/llmAnalyzer.ts",
+          "file": "python-llm/src/streaming.py",
           "features": [
-            "Enhanced confidence levels",
-            "Risk level assessment",
-            "Secret likelihood detection",
-            "Fallback confidence handling"
+            "POST /extension/analyze/stream",
+            "5 progressive stages via Server-Sent Events",
+            "pattern_match(20%) → entropy(40%) → context(65%) → llm_analysis(85%) → final(100%)",
+            "HMAC authenticated"
           ]
         }
       ]
     },
-    "error_handling": {
-      "title": "Error Handling and Fallback Mechanisms",
-      "description": "Implement robust error handling and fallback mechanisms",
+
+    "extension_updates": {
+      "title": "DotEnvy Extension — v1.5.0",
+      "description": "Extension published to VS Code Marketplace",
       "status": "completed",
       "priority": "high",
       "tasks": [
         {
-          "id": "analyze_fallback_mechanisms",
-          "title": "Analyze Fallback Mechanisms",
-          "description": "Reviewed fallback logic when LLM service is unavailable",
+          "id": "version_bump",
+          "title": "Version bumped 1.4.0 → 1.5.0",
           "status": "completed",
-          "file": "src/utils/llmAnalyzer.ts",
+          "file": "DotEnvy/package.json"
+        },
+        {
+          "id": "vscodeignore",
+          "title": ".vscodeignore Hardened",
+          "status": "completed",
+          "file": "DotEnvy/.vscodeignore",
           "features": [
-            "Service availability checking",
-            "Traditional analysis fallback",
-            "Graceful degradation",
-            "Error logging"
+            "All .env files excluded",
+            "python-llm/ excluded",
+            "Source maps excluded",
+            "Only out/, resources/, README, CHANGELOG published"
           ]
         },
         {
-          "id": "improve_error_handling",
-          "title": "Improve Error Handling",
-          "description": "Enhanced error handling with status code checking and timeout management",
+          "id": "deps_updated",
+          "title": "Dependencies Updated",
           "status": "completed",
-          "file": "src/utils/llmAnalyzer.ts",
           "features": [
-            "Status code validation",
-            "Timeout protection",
-            "Error propagation",
-            "Silent fallback handling"
+            "uuid → latest",
+            "typescript → latest",
+            "@types/vscode → latest",
+            "dotenv → latest",
+            "3 remaining vulns are devDependencies only (mocha/diff)"
           ]
         },
         {
-          "id": "fix_https_protocol",
-          "title": "Fix HTTPS Protocol Issue",
-          "description": "Changed from http to https module for Railway SSL support",
+          "id": "published",
+          "title": "vsce publish — Published to Marketplace",
+          "status": "completed"
+        },
+        {
+          "id": "setServiceUrl_method",
+          "title": "setServiceUrl() added to LLMAnalyzer",
           "status": "completed",
-          "file": "src/utils/llmAnalyzer.ts",
-          "features": [
-            "Protocol selection logic",
-            "SSL/TLS support",
-            "Port configuration",
-            "Client selection"
-          ]
+          "file": "DotEnvy/src/utils/llmAnalyzer.ts",
+          "features": ["Allows URL override in tests and dev environments"]
         }
       ]
     },
-    "performance_optimization": {
-      "title": "Performance Optimization",
-      "description": "Optimize performance for extension responsiveness",
-      "status": "completed",
-      "priority": "medium",
-      "tasks": [
-        {
-          "id": "review_cicd_pipeline",
-          "title": "Review CI/CD Pipeline",
-          "description": "Examined GitHub Actions workflow and deployment automation",
-          "status": "completed",
-          "files": [
-            ".github/workflows/ci-cd.yml"
-          ],
-          "features": [
-            "Security scanning",
-            "Code quality checks",
-            "Multi-platform builds",
-            "Automated deployment"
-          ]
-        },
-        {
-          "id": "optimize_timeout_settings",
-          "title": "Optimize Timeout Settings",
-          "description": "Reduced timeout for better extension performance",
-          "status": "completed",
-          "file": "src/utils/llmAnalyzer.ts",
-          "features": [
-            "3-second timeout",
-            "Request abortion",
-            "Performance monitoring",
-            "User experience optimization"
-          ]
-        },
-        {
-          "id": "validate_deployment_readiness",
-          "title": "Validate Deployment Readiness",
-          "description": "Confirmed all components are ready for production deployment",
-          "status": "completed",
-          "files": [
-            "LLM_ARCHITECTURE_SUMMARY.md"
-          ],
-          "features": [
-            "Infrastructure validation",
-            "Security review",
-            "Performance testing",
-            "Documentation completeness"
-          ]
-        }
-      ]
-    },
-    "documentation": {
-      "title": "Documentation and Testing",
-      "description": "Create comprehensive documentation and testing procedures",
-      "status": "completed",
-      "priority": "medium",
-      "tasks": [
-        {
-          "id": "create_comprehensive_documentation",
-          "title": "Create Comprehensive Documentation",
-          "description": "Created LLM_INTEGRATION_GUIDE.md without exposing sensitive data",
-          "status": "completed",
-          "file": "LLM_INTEGRATION_GUIDE.md",
-          "features": [
-            "Architecture overview",
-            "Component documentation",
-            "Deployment guide",
-            "Security considerations"
-          ]
-        },
-        {
-          "id": "create_architecture_summary",
-          "title": "Create Architecture Summary",
-          "description": "Created LLM_ARCHITECTURE_SUMMARY.md with key components overview",
-          "status": "completed",
-          "file": "LLM_ARCHITECTURE_SUMMARY.md",
-          "features": [
-            "Quick overview",
-            "Key components",
-            "Connection flow",
-            "Performance features"
-          ]
-        },
-        {
-          "id": "create_fixes_summary",
-          "title": "Create Fixes Summary",
-          "description": "Created comprehensive summary of all fixes applied",
-          "status": "completed",
-          "file": "LLM_FIXES_SUMMARY.md",
-          "features": [
-            "Issue identification",
-            "Solution implementation",
-            "Testing procedures",
-            "Release readiness"
-          ]
-        }
-      ]
-    },
-    "testing_verification": {
-      "title": "Testing and Verification",
-      "description": "Comprehensive testing of LLM service connection and functionality",
+
+    "testing": {
+      "title": "Test Suites",
+      "description": "Local + production test coverage",
       "status": "completed",
       "priority": "high",
       "tasks": [
         {
-          "id": "code_review_llm_analyzer",
-          "title": "Code Review - LLM Analyzer",
-          "description": "Performed comprehensive code review of llmAnalyzer.ts for errors",
+          "id": "test_local_py",
+          "title": "test_local.py — python-llm Test Suite",
           "status": "completed",
-          "file": "src/utils/llmAnalyzer.ts",
-          "date_completed": "2026-01-24",
-          "features": [
-            "TypeScript compilation check - passed",
-            "ESLint validation - no errors found",
-            "Code structure review - well-organized",
-            "Best practices verification - all checks passed"
-          ],
+          "file": "python-llm/test_local.py",
           "results": {
-            "typescript_errors": 0,
-            "eslint_errors": 0,
-            "code_quality": "excellent",
-            "patterns": [
-              "Singleton pattern correctly implemented",
-              "Circuit breaker pattern for resilience",
-              "Retry logic with exponential backoff",
-              "Comprehensive error handling"
+            "local": "17/18 passed",
+            "production_railway": "18/18 passed 🎉",
+            "cache_speedup": "18.4x",
+            "note": "/stats test assertion fixed"
+          }
+        },
+        {
+          "id": "test_llm_connection_ts",
+          "title": "test/test-llm-connection.ts — Extension Test Suite",
+          "status": "completed",
+          "file": "DotEnvy/test/test-llm-connection.ts",
+          "results": {
+            "total": "12/12 passed 🎉",
+            "covers": [
+              "HMAC config check",
+              "Railway health check",
+              "Stripe / GitHub / AWS high-confidence",
+              "Non-secrets (low/medium)",
+              "Circuit breaker state",
+              "extractFeatures() 35 features offline",
+              "setServiceUrl() + fallback analysis"
             ]
           }
-        },
+        }
+      ]
+    },
+
+    "deployment": {
+      "title": "Railway Deployment",
+      "description": "Production deployment verified",
+      "status": "completed",
+      "priority": "high",
+      "tasks": [
         {
-          "id": "railway_service_connection_test",
-          "title": "Railway Service Connection Test",
-          "description": "Tested direct connection to Railway-deployed LLM service using curl",
+          "id": "railway_env_vars",
+          "title": "Railway Environment Variables Set",
           "status": "completed",
-          "date_completed": "2026-01-24",
-          "features": [
-            "Health endpoint test - successful",
-            "Authentication test - working",
-            "Analysis endpoint test - functional",
-            "Response validation - correct format"
-          ],
-          "results": {
-            "health_check": {
-              "status": "ok",
-              "llm_ready": true,
-              "version": "1.0.0"
-            },
-            "analysis_test": {
-              "method": "llm_hybrid",
-              "confidence": "high",
-              "response_time": "~2s"
-            }
-          }
-        },
-        {
-          "id": "install_test_dependencies",
-          "title": "Install Testing Dependencies",
-          "description": "Installed required dependencies for TypeScript testing",
-          "status": "completed",
-          "date_completed": "2026-01-24",
-          "packages": [
-            "dotenv - for environment variable management",
-            "@types/node - for Node.js types"
+          "vars": [
+            "API_KEY",
+            "DATABASE_URL",
+            "ENVIRONMENT=production",
+            "EXTENSION_SHARED_SECRET",
+            "jwt_secret",
+            "LOG_LEVEL",
+            "RATE_LIMIT_REQUESTS_PER_MINUTE",
+            "REDIS_URL"
           ]
         },
         {
-          "id": "create_comprehensive_test_suite",
-          "title": "Create Comprehensive Test Suite",
-          "description": "Created TypeScript test suite for LLM service connection",
+          "id": "railway_health",
+          "title": "Production Health Verified",
           "status": "completed",
-          "file": "test/test-llm-connection.ts",
-          "date_completed": "2026-01-24",
-          "features": [
-            "Environment variable loading",
-            "Service status checking",
-            "Health check verification",
-            "Secret analysis testing (multiple types)",
-            "Feature extraction validation",
-            "Circuit breaker verification",
-            "Performance monitoring"
-          ],
-          "test_cases": [
-            "Service Status Check",
-            "Health Check",
-            "Stripe API Key Analysis",
-            "GitHub Token Analysis",
-            "AWS Access Key Analysis",
-            "Non-Secret Value Analysis",
-            "Feature Extraction",
-            "Service Availability Check"
-          ]
-        },
-        {
-          "id": "fix_environment_loading",
-          "title": "Fix Environment Variable Loading",
-          "description": "Fixed singleton initialization issue with environment variables",
-          "status": "completed",
-          "file": "test/test-llm-connection.ts",
-          "date_completed": "2026-01-24",
-          "features": [
-            "Load env vars before importing llmAnalyzer",
-            "Manual service URL configuration",
-            "Proper initialization order",
-            "Environment validation"
-          ]
-        },
-        {
-          "id": "run_comprehensive_tests",
-          "title": "Run Comprehensive Test Suite",
-          "description": "Executed all 8 test cases and verified Railway service functionality",
-          "status": "completed",
-          "date_completed": "2026-01-24",
-          "results": {
-            "total_tests": 8,
-            "passed": 8,
-            "failed": 0,
-            "success_rate": "100%",
-            "service_status": {
-              "connected": true,
-              "configured": true,
-              "circuit_breaker_open": false,
-              "failure_count": 0
-            },
-            "performance_metrics": {
-              "health_check": "~150ms",
-              "stripe_key_analysis": "240ms",
-              "github_token_analysis": "504ms",
-              "aws_key_analysis": "476ms",
-              "non_secret_analysis": "461ms",
-              "average_response_time": "~450ms"
-            },
-            "accuracy": {
-              "stripe_key": "high confidence (correct)",
-              "github_token": "high confidence (correct)",
-              "aws_key": "high confidence (correct)",
-              "non_secret": "low confidence (correct)"
-            }
-          }
-        },
-        {
-          "id": "create_test_walkthrough",
-          "title": "Create Test Results Walkthrough",
-          "description": "Documented comprehensive test results and verification",
-          "status": "completed",
-          "file": "walkthrough.md",
-          "date_completed": "2026-01-24",
-          "features": [
-            "Test results summary",
-            "Performance metrics table",
-            "Service status documentation",
-            "Key findings and strengths",
-            "Verification methods"
-          ]
+          "url": "https://python-llm-production.up.railway.app",
+          "result": "{\"status\":\"ok\",\"llm_ready\":true,\"version\":\"1.0.0\"}"
         }
       ]
     }
   },
+
   "estimated_effort": {
-    "total_tasks": 26,
-    "high_priority": 15,
+    "total_tasks": 28,
+    "high_priority": 18,
     "medium_priority": 8,
-    "low_priority": 3,
-    "estimated_completion_days": 1
+    "low_priority": 2,
+    "actual_completion_days": 2
   },
-  "benefits_expected": [
-    "Enhanced secret detection accuracy with ML",
-    "Improved performance with caching",
-    "Robust error handling and fallbacks",
-    "Enterprise-grade security practices",
-    "Scalable architecture with Railway deployment",
-    "Comprehensive monitoring and logging"
-  ],
-  "technical_requirements": [
-    "TypeScript for LLM integration",
-    "HTTPS protocol support",
-    "Bearer token authentication",
-    "Environment variable management",
-    "Fallback analysis logic",
-    "Performance optimization techniques"
-  ],
+
   "success_criteria": [
-    "All high-priority features implemented and tested",
-    "LLM service connection working with Railway",
-    "Fallback mechanisms functioning correctly",
-    "Performance optimized for extension responsiveness",
-    "Security best practices implemented",
-    "Comprehensive documentation created",
-    "Code review completed with zero errors",
-    "All 8 test cases passed (100% success rate)",
-    "Railway service verified operational",
-    "Test suite created and documented"
-  ],
-  "risks_mitigations": [
-    {
-      "risk": "Service unavailability affecting extension functionality",
-      "mitigation": "Robust fallback mechanisms to traditional analysis"
-    },
-    {
-      "risk": "API authentication failures",
-      "mitigation": "Environment variable management and error handling"
-    },
-    {
-      "risk": "Performance impact from network requests",
-      "mitigation": "Caching, timeout optimization, and async processing"
-    }
+    "18/18 python-llm tests passing on Railway production ✅",
+    "12/12 extension LLM tests passing ✅",
+    "HMAC auth — no API key in extension ✅",
+    "35-feature extraction matching python backend ✅",
+    "Two-tier cache 18.4x speedup ✅",
+    "SSE streaming 3+ events ✅",
+    "Service refactored into 9 focused files ✅",
+    "DotEnvy v1.5.0 published to Marketplace ✅"
   ]
 }

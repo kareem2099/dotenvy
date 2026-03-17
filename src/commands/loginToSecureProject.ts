@@ -62,11 +62,11 @@ export class LoginToSecureProjectCommand implements vscode.Disposable {
                     password: password
                 };
 
-                // هنا السحر بيحصل: بنستخدم UserManager عشان يفك التشفير
+                // Here's the magic: we use UserManager to decrypt
                 const result = await UserManager.accessProjectKey(credentials);
 
                 if (result.success && result.projectKey) {
-                    // نجحنا! احفظ المفتاح في الرامات
+                    // Store session information securely in memory
                     session.setSession(selectedUser, result.projectKey);
                     vscode.window.showInformationMessage(`🔓 Welcome back, ${selectedUser}! Environment unlocked.`);
                 } else {
