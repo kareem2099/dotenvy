@@ -127,3 +127,5 @@ RAILWAY-DEPLOYMENT.md
 *.tmp
 *.temp
 .dotenvy/history
+
+test/**
