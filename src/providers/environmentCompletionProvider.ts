@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { EnvironmentProvider } from './environmentProvider';
 import { EncryptedVarsManager } from '../utils/encryptedVars';
+import { logger } from '../utils/logger';
 
 interface EnvVar {
     name: string;
@@ -100,7 +101,7 @@ export class EnvironmentCompletionProvider implements vscode.CompletionItemProvi
             // Removed the log for production
 
         } catch (error) {
-            console.error('Error refreshing env variables:', error);
+            logger.error('Error refreshing env variables:', error, 'EnvironmentCompletionProvider');
         }
     }
 

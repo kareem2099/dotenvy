@@ -9,6 +9,7 @@ import { EnvironmentDiffer, EnvDiff } from '../utils/environmentDiffer';
 import { ConfigUtils } from '../utils/configUtils';
 import { WorkspaceManager } from '../providers/workspaceManager';
 import { HistoryManager } from '../utils/historyManager';
+import { logger } from '../utils/logger';
 
 export class SwitchEnvironmentCommand implements vscode.Disposable {
 	private disposables: vscode.Disposable[] = [];
@@ -152,7 +153,7 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 						}
 					} catch (error) {
 						// If diff fails, continue with switch
-						console.log('Failed to generate diff preview:', error);
+						logger.error('Failed to generate diff preview:', error, 'SwitchEnvironment');
 					}
 				}
 
@@ -198,7 +199,7 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 							}
 						}
 					} catch (error) {
-						console.warn('Failed to read current .env for history:', error);
+						logger.error('Failed to read current .env for history:', error, 'SwitchEnvironment');
 					}
 				}
 
@@ -209,7 +210,7 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 					const content = await vscode.workspace.fs.readFile(newEnvUri);
 					newContent = content.toString();
 				} catch (error) {
-					console.warn('Failed to read new environment file:', error);
+					logger.error('Failed to read new environment file:', error, 'SwitchEnvironment');
 				}
 
 				// Calculate diff if we have both contents
@@ -218,7 +219,7 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 					try {
 						diff = EnvironmentDiffer.compareFiles(currentEnvPath, selected.env.filePath);
 					} catch (error) {
-						console.warn('Failed to calculate diff for history:', error);
+						logger.error('Failed to calculate diff for history:', error, 'SwitchEnvironment');
 					}
 				}
 
@@ -240,7 +241,7 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 						}
 					);
 				} catch (error) {
-					console.warn('Failed to record history entry:', error);
+					logger.error('Failed to record history entry:', error, 'SwitchEnvironment');
 				}
 
 				// Warn if secrets detected in selected file

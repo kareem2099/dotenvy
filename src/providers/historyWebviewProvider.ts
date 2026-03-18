@@ -7,6 +7,7 @@ import { HistoryAnalytics } from '../utils/historyAnalytics';
 import { HistoryFilterOptions } from '../utils/historyFilters';
 import * as fs from 'fs';
 import * as os from 'os';
+import { logger } from '../utils/logger';
 
 interface CachedHistoryData {
     history: HistoryEntry[];
@@ -36,7 +37,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
 
         // Handle cancellation token
         token.onCancellationRequested(() => {
-            console.log('History webview resolution cancelled');
+            logger.info('History webview resolution cancelled', 'HistoryWebviewProvider');
         });
 
         webviewView.webview.options = {
@@ -138,7 +139,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
                 });
             }
         } catch (error) {
-            console.error('Failed to load history:', error);
+            logger.error('Failed to load history:', error, 'HistoryWebviewProvider');
             if (this._view) {
                 this._view.webview.postMessage({
                     type: 'error',
@@ -181,7 +182,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
                 });
             }
         } catch (error) {
-            console.error('Failed to load analytics:', error);
+            logger.error('Failed to load analytics:', error, 'HistoryWebviewProvider');
             if (this._view) {
                 this._view.webview.postMessage({
                     type: 'error',
@@ -206,7 +207,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
                 });
             }
         } catch (error) {
-            console.error('Failed to load entry:', error);
+            logger.error('Failed to load entry:', error, 'HistoryWebviewProvider');
             if (this._view) {
                 this._view.webview.postMessage({
                     type: 'error',
@@ -239,7 +240,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
                 }
             }
         } catch (error) {
-            console.error('Failed to rollback:', error);
+            logger.error('Failed to rollback:', error, 'HistoryWebviewProvider');
             if (this._view) {
                 this._view.webview.postMessage({
                     type: 'error',
@@ -276,7 +277,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
                 });
             }
         } catch (error) {
-            console.error('Failed to generate diff:', error);
+            logger.error('Failed to generate diff:', error, 'HistoryWebviewProvider');
             if (this._view) {
                 this._view.webview.postMessage({
                     type: 'error',
@@ -309,7 +310,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
                 });
             }
         } catch (error) {
-            console.error('Failed to apply filters:', error);
+            logger.error('Failed to apply filters:', error, 'HistoryWebviewProvider');
             if (this._view) {
                 this._view.webview.postMessage({
                     type: 'error',
@@ -331,7 +332,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
                 });
             }
         } catch (error) {
-            console.error('Failed to get filter options:', error);
+            logger.error('Failed to get filter options:', error, 'HistoryWebviewProvider');
             if (this._view) {
                 this._view.webview.postMessage({
                     type: 'error',
@@ -354,7 +355,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
                 });
             }
         } catch (error) {
-            console.error('Failed to get variable history:', error);
+            logger.error('Failed to get variable history:', error, 'HistoryWebviewProvider');
             if (this._view) {
                 this._view.webview.postMessage({
                     type: 'error',
@@ -385,7 +386,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
                 vscode.window.showInformationMessage('Environment content copied to clipboard');
             }
         } catch (error) {
-            console.error('Failed to copy content:', error);
+            logger.error('Failed to copy content:', error, 'HistoryWebviewProvider');
             vscode.window.showErrorMessage('Failed to copy environment content to clipboard');
         }
     }
@@ -413,7 +414,7 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
                 await this.rollbackToEntry(entryId, workspacePath, reason);
             }
         } catch (error) {
-            console.error('Failed to confirm rollback:', error);
+            logger.error('Failed to confirm rollback:', error, 'HistoryWebviewProvider');
             vscode.window.showErrorMessage('Failed to process rollback confirmation');
         }
     }

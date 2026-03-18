@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { EXTENSION_VERSION_KEY } from '../constants';
+import { logger } from '../utils/logger';
 
 export class UpdateManager {
     private static readonly VERSION_KEY = EXTENSION_VERSION_KEY;
@@ -25,7 +26,7 @@ export class UpdateManager {
                 }
             }
         } catch (error) {
-            console.error('Failed to check for updates:', error);
+            logger.error('Failed to check for updates:', error, 'UpdateManager');
         }
     }
 

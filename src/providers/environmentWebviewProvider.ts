@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import * as os from 'os';
+import { logger } from '../utils/logger';
 
 // Dashboard data interfaces
 interface EnvironmentData {
@@ -56,6 +57,13 @@ interface ValidationStatus {
     errors?: number;
     warnings?: number;
     lastValidated?: Date;
+}
+interface BackupPackage {
+    v: number;
+    iv: string;
+    ct: string;
+    tag: string;
+    s?: string; // optional salt for version 2 (password-based)
 }
 
 interface BackupSettings {
@@ -130,7 +138,7 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         // Use context state for view-specific restoration
         const viewState = context.state;
         if (viewState) {
-            console.log('Restoring webview state:', viewState);
+            logger.info(`Restoring webview state:', ${viewState}`, 'environmentWebviewProvider');
         }
 
         // Store last resolution timestamp for diagnostics
@@ -139,13 +147,13 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         // Handle cancellation for long-running operations
         let isCancelled = false;
         token.onCancellationRequested(() => {
-            console.log('Environment webview resolution cancelled');
+            logger.info('Environment webview resolution cancelled', 'environmentWebviewProvider');
             isCancelled = true;
         });
 
         // Check for cancellation before starting expensive operations
         if (isCancelled) {
-            console.log('Cancelling webview initialization due to token cancellation');
+            logger.info('Cancelling webview initialization due to token cancellation', 'environmentWebviewProvider');
             return;
         }
 
@@ -216,7 +224,7 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
                     line.trim() && !line.startsWith('#') && line.includes('=')
                 ).length;
             } catch (e) {
-                console.log(`Error reading ${env.fileName}:`, e);
+                logger.error(`Error reading ${env.fileName}:`, e, 'environmentWebviewProvider');
             }
 
             return {
@@ -238,7 +246,7 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
                 try {
                     masterKey = await EncryptedVarsManager.ensureMasterKey(this.context);
                 } catch (error) {
-                    console.log('No master key available for decryption:', error);
+                    logger.error('No master key available for decryption:', error, 'environmentWebviewProvider');
                 }
 
                 // Parse environment file with possible decryption
@@ -270,7 +278,7 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
                     variables: variablesList // Send to frontend for lock icons
                 };
             } catch (error) {
-                console.log('Error reading current .env file:', error);
+                logger.error('Error reading current .env file:', error, 'environmentWebviewProvider');
             }
         }
 
@@ -457,7 +465,7 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
 
         // Version 2: Password-based with salt
         // Version 1: Legacy SecretStorage-based
-        const pack: any = {
+        const pack: BackupPackage = {
             v: salt ? 2 : EnvironmentWebviewProvider.FORMAT_VERSION,
             iv: iv.toString('base64'),
             ct: ciphertext.toString('base64'),
@@ -788,7 +796,7 @@ DEBUG=false
                     }
 
                 } catch (error) {
-                    console.error('Failed to create backup:', error);
+                    logger.error('Failed to create backup:', error, 'environmentWebviewProvider');
                     vscode.window.showErrorMessage(`Failed to create backup: ${(error as Error).message}`);
                     return;
                 }

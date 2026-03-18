@@ -1,172 +1,214 @@
 {
-  "version": "1.6.0",
-  "codename": "SolidBase",
-  "theme": "Fix + Wire up what is already built",
-  "status": "pending",
-  "created": "2026-03-13",
-  "context": "All infrastructure from v1.5.0 is in place — HMAC auth, 35-feature ML, Railway deployed, /train endpoint exists. This release wires it all to the UI and hardens the foundation.",
+  "versions": {
+    "v1.6.0": {
+      "codename": "SolidBase",
+      "status": "completed",
+      "released": "2026-03-17",
+      "summary": "Security hardening, ML feature alignment, centralized logging, secrets panel UI, feedback loop, and .dotenvyignore support",
 
-  "tasks": [
-    {
-      "id": "1.6-T01",
-      "title": "Fix /stats test assertion",
-      "description": "GET /stats returns HTTP 200 but the test checks for wrong response keys, causing a false failure. Update the assertion in test_local.py to match the actual response structure.",
-      "project": "python-llm",
-      "file": "python-llm/test_local.py",
-      "effort": "small",
-      "priority": "P0",
-      "status": "todo",
-      "acceptance_criteria": "test_local.py reports 18/18 passing"
-    },
-    {
-      "id": "1.6-T02",
-      "title": "SSE Streaming in VS Code Panel",
-      "description": "Wire the existing /extension/analyze/stream endpoint (Server-Sent Events) to the panel UI. Replace the current blocking call to /extension/analyze with a streaming connection that shows progressive confidence updates: pattern_match (20%) → entropy (40%) → context (65%) → llm_analysis (85%) → final (100%).",
-      "project": "DotEnvy",
-      "files": [
-        "src/utils/llmAnalyzer.ts",
-        "resources/panel/panel.js",
-        "resources/panel/panel.css"
+      "completed_tasks": [
+        {
+          "id": "1.6-T01",
+          "title": "Fix engines.vscode version mismatch",
+          "description": "Bumped engines.vscode from ^1.74.0 to ^1.110.0 to match @types/vscode.",
+          "status": "done"
+        },
+        {
+          "id": "1.6-T02",
+          "title": "Add .vscodeignore to clean package",
+          "description": "Excludes roadmap*.json, .vscode/**, resources/icons/icon.svg from published .vsix.",
+          "status": "done"
+        },
+        {
+          "id": "1.6-T03",
+          "title": "Rewrite llmAnalyzer.ts — SecretStorage + variableName",
+          "description": "Replaced hardcoded EXTENSION_SHARED_SECRET with vscode.SecretStorage. Fixed machineId, timestamp, and variableName passthrough.",
+          "status": "done"
+        },
+        {
+          "id": "1.6-T04",
+          "title": "Build featureExtractor.ts — carbon copy of Python",
+          "description": "Fixed feature count 31→35, entropy /6.0→/8.0, added 4 missing feature functions.",
+          "status": "done"
+        },
+        {
+          "id": "1.6-T05",
+          "title": "Centralized Logger",
+          "description": "Replaced 94 console calls across 21 files with logger.ts (OutputChannel, timestamps, context tags, log levels).",
+          "status": "done"
+        },
+        {
+          "id": "1.6-T06",
+          "title": "Secrets Panel UI (SecretsPanel.ts)",
+          "description": "Full WebviewPanel with filter/search, View/Move/.env/Not-a-Secret buttons, color-coded confidence.",
+          "status": "done"
+        },
+        {
+          "id": "1.6-T07",
+          "title": "FeedbackManager — collect training data",
+          "description": "Collects confirmed/false-positive labels with 35-feature vectors, stores locally, sends to Railway /extension/feedback.",
+          "status": "done"
+        },
+        {
+          "id": "1.6-T08",
+          "title": ".dotenvyignore support",
+          "description": "Full gitignore-syntax glob matching integrated into SecretDetector. Init command + right-click add to ignore.",
+          "status": "done"
+        },
+        {
+          "id": "1.6-T09",
+          "title": "Delete secretScanner.ts (legacy monolith)",
+          "description": "Confirmed SecretDetector covers all functionality. Updated scanSecrets.ts. Zero compile errors.",
+          "status": "done"
+        },
+        {
+          "id": "1.6-T10",
+          "title": "Reconstruct 5 missing .ts source files",
+          "description": "Reverse-engineered from compiled .js: setupFlutterEnvironment, scanFlutterEnvironment, toggleRealtimeScanning, mlLearner, flutterEnvironmentScanner.",
+          "status": "done"
+        },
+        {
+          "id": "1.6-T11",
+          "title": "Security audit — gitleaks",
+          "description": "Ran gitleaks on full git history. 25 findings — all confirmed placeholder values. No real secrets exposed.",
+          "status": "done"
+        }
       ],
-      "effort": "medium",
-      "priority": "P1",
-      "status": "todo",
-      "acceptance_criteria": "Panel shows animated progress bar while analysis streams in 5 stages"
+
+      "metrics": {
+        "files_changed": 42,
+        "console_calls_replaced": 94,
+        "features_fixed": "31 → 35",
+        "entropy_normalization_fixed": "÷6.0 → ÷8.0",
+        "compile_errors_at_start": 6,
+        "compile_errors_at_end": 0
+      }
     },
-    {
-      "id": "1.6-T03",
-      "title": "Wire User Feedback to /train Endpoint",
-      "description": "The /train endpoint already exists on Railway. Add 'Confirm Secret' and 'Mark as False Positive' buttons to the panel secrets list. On click, POST to /train with the secret value, context, variable name, label, and user_action. This enables continuous learning from real usage.",
-      "project": "DotEnvy + python-llm",
-      "files": [
-        "src/utils/llmAnalyzer.ts",
-        "src/providers/environmentWebviewProvider.ts",
-        "resources/panel/panel.js"
+
+    "v1.7.0": {
+      "codename": "TrainLoop",
+      "theme": "Close the feedback loop — make the model actually learn",
+      "status": "pending",
+      "created": "2026-03-17",
+      "context": "v1.6.0 built the full pipeline: FeedbackManager collects data + sends to Railway. Now wire the server side, persist the model, and improve training quality.",
+
+      "tasks": [
+        {
+          "id": "1.7-T01",
+          "title": "Fix /stats test assertion",
+          "description": "GET /stats returns HTTP 200 but test checks wrong response keys. Update assertion in test_local.py.",
+          "project": "python-llm",
+          "file": "python-llm/test_local.py",
+          "effort": "small",
+          "priority": "P0",
+          "status": "todo",
+          "acceptance_criteria": "test_local.py reports 18/18 passing"
+        },
+        {
+          "id": "1.7-T02",
+          "title": "Wire /extension/feedback endpoint on Railway",
+          "description": "FeedbackManager already sends data. Railway needs /extension/feedback to accept batches and call model.train().",
+          "project": "python-llm",
+          "effort": "small",
+          "priority": "P0",
+          "status": "todo",
+          "acceptance_criteria": "POST /extension/feedback returns 200, model loss decreases after 10+ samples"
+        },
+        {
+          "id": "1.7-T03",
+          "title": "Fix .dotenvy/** false positives",
+          "description": "History JSON files still appear in scan results. Verify glob pattern works and add analytics-cache.json explicitly.",
+          "project": "DotEnvy",
+          "effort": "small",
+          "priority": "P0",
+          "status": "todo",
+          "acceptance_criteria": "Scan returns 0 results from .dotenvy/** files"
+        },
+        {
+          "id": "1.7-T04",
+          "title": "Persist Trained Model Across Railway Deploys",
+          "description": "ML model weights lost on every redeploy. Mount Railway persistent volume at /data/.",
+          "project": "python-llm",
+          "effort": "medium",
+          "priority": "P1",
+          "status": "todo",
+          "implementation_options": [
+            "Railway volume mount at /data/llm_model.json (recommended)",
+            "Save model as BYTEA in PostgreSQL"
+          ],
+          "acceptance_criteria": "Model trained before deploy survives a Railway redeploy"
+        },
+        {
+          "id": "1.7-T05",
+          "title": "SSE Streaming in VS Code Panel",
+          "description": "Wire /extension/analyze/stream to panel UI with animated progress bar.",
+          "project": "DotEnvy",
+          "effort": "medium",
+          "priority": "P1",
+          "status": "todo",
+          "acceptance_criteria": "Panel shows 5-stage animated progress during analysis"
+        },
+        {
+          "id": "1.7-T06",
+          "title": "Implement Proper Backpropagation",
+          "description": "_simple_gradient_update() only updates classifier layer. Implement real backprop through all layers + Adam optimizer.",
+          "project": "python-llm",
+          "effort": "large",
+          "priority": "P2",
+          "status": "todo",
+          "acceptance_criteria": "Training loss decreases consistently across 10+ epochs"
+        },
+        {
+          "id": "1.7-T07",
+          "title": "Expand Training Dataset to 150+ Samples",
+          "description": "Current: 30 samples. Add Azure, GCP, Twilio, npm, Docker Hub, PyPI, Cloudflare, Datadog, HuggingFace tokens.",
+          "project": "python-llm",
+          "effort": "medium",
+          "priority": "P2",
+          "status": "todo",
+          "current_samples": 30,
+          "target_samples": 150
+        },
+        {
+          "id": "1.7-T08",
+          "title": "Upgrade Major Dependencies",
+          "description": "typescript 4→5, eslint 8→10, @typescript-eslint 5→8, uuid 9→13.",
+          "project": "DotEnvy",
+          "effort": "medium",
+          "priority": "P2",
+          "status": "todo",
+          "acceptance_criteria": "npm run compile passes, npm audit shows 0 vulnerabilities"
+        },
+        {
+          "id": "1.7-T09",
+          "title": "Update CHANGELOG and Publish v1.7.0",
+          "description": "Document changes, bump version, vsce publish.",
+          "effort": "small",
+          "priority": "P3",
+          "status": "todo"
+        }
       ],
-      "effort": "medium",
-      "priority": "P1",
-      "status": "todo",
-      "acceptance_criteria": "Clicking 'Confirm Secret' sends a POST /train request with correct payload and the model loss decreases over time"
-    },
-    {
-      "id": "1.6-T04",
-      "title": "Persist Trained Model Across Railway Deploys",
-      "description": "Currently the ML model weights (llm_model.json) are lost on every Railway redeploy because the container filesystem is ephemeral. Mount a Railway persistent volume at /data/ and save/load the model file from there. Fallback to re-initializing if volume is empty.",
-      "project": "python-llm",
-      "file": "python-llm/src/analyzer.py",
-      "effort": "medium",
-      "priority": "P1",
-      "status": "todo",
-      "implementation_options": [
-        "Railway volume mount at /data/llm_model.json (recommended)",
-        "Save model as BYTEA in PostgreSQL",
-        "Commit model file to git (not recommended — binary bloat)"
+
+      "recommended_order": [
+        "1.7-T01",
+        "1.7-T02",
+        "1.7-T03",
+        "1.7-T04",
+        "1.7-T05",
+        "1.7-T07",
+        "1.7-T06",
+        "1.7-T08",
+        "1.7-T09"
       ],
-      "acceptance_criteria": "Model trained before deploy survives a Railway redeploy and test results remain the same"
-    },
-    {
-      "id": "1.6-T05",
-      "title": "Upgrade Major Dependencies",
-      "description": "Upgrade all major dependencies that were held back in v1.5.0 due to breaking change risk. Test thoroughly after each upgrade.",
-      "project": "DotEnvy",
-      "file": "DotEnvy/package.json",
-      "effort": "medium",
-      "priority": "P2",
-      "status": "todo",
-      "upgrades": [
-        { "package": "typescript", "from": "4.x", "to": "5.x", "risk": "tsconfig strict mode changes" },
-        { "package": "eslint", "from": "8.x", "to": "10.x", "risk": "must migrate .eslintrc.json to eslint.config.js flat config" },
-        { "package": "@typescript-eslint", "from": "5.x", "to": "8.x", "risk": "must upgrade in sync with eslint" },
-        { "package": "uuid", "from": "9.x", "to": "13.x", "risk": "import syntax changed" }
-      ],
-      "acceptance_criteria": "npm run compile passes with 0 errors, npm audit shows 0 vulnerabilities"
-    },
-    {
-      "id": "1.6-T06",
-      "title": "Implement Proper Backpropagation in ML Model",
-      "description": "The current _simple_gradient_update() only updates the final classifier layer bias and weights. The attention mechanism and FFN layers never learn. Implement real backpropagation through all layers using chain rule. Add Adam optimizer with learning rate scheduling.",
-      "project": "python-llm",
-      "file": "python-llm/src/model.py",
-      "effort": "large",
-      "priority": "P2",
-      "status": "todo",
-      "technical_notes": "Consider using PyTorch autograd instead of manual backprop to avoid numerical instability",
-      "acceptance_criteria": "Training loss decreases consistently across 10+ epochs. Non-secret strings correctly classified as low confidence after 50+ training samples."
-    },
-    {
-      "id": "1.6-T07",
-      "title": "Expand Training Dataset to 150+ Samples",
-      "description": "Current training set has 30 samples (16 high, 4 medium, 10 false positive). Expand to 150+ with better class balance. Add new secret types not currently covered.",
-      "project": "python-llm",
-      "file": "python-llm/train_model.py",
-      "effort": "medium",
-      "priority": "P2",
-      "status": "todo",
-      "current_samples": 30,
-      "target_samples": 150,
-      "new_types_to_add": [
-        "Azure connection strings",
-        "GCP service account JSON keys",
-        "Twilio Auth Token",
-        "npm publish tokens",
-        "Docker Hub access tokens",
-        "PyPI API tokens",
-        "Webhook secrets (generic)",
-        "Cloudflare API tokens",
-        "Datadog API keys",
-        "HuggingFace tokens"
-      ],
-      "acceptance_criteria": "All 3 previously failing test cases (Stripe, GitHub, plain string) pass with correct confidence"
-    },
-    {
-      "id": "1.6-T08",
-      "title": "Update CHANGELOG and Publish v1.6.0",
-      "description": "Document all v1.6.0 changes in CHANGELOG.md, bump version in package.json to 1.6.0, run vsce publish.",
-      "project": "DotEnvy",
-      "files": [
-        "DotEnvy/CHANGELOG.md",
-        "DotEnvy/package.json"
-      ],
-      "effort": "small",
-      "priority": "P3",
-      "status": "todo",
-      "acceptance_criteria": "Extension v1.6.0 visible on VS Code Marketplace"
+
+      "success_criteria": [
+        "18/18 python-llm tests passing",
+        "POST /extension/feedback accepted and model loss decreases",
+        "Model persists across Railway deploys",
+        ".dotenvy/** files never appear in scan results",
+        "Panel shows live streaming confidence updates",
+        "0 npm vulnerabilities"
+      ]
     }
-  ],
-
-  "priority_guide": {
-    "P0": "Must have — blocks release",
-    "P1": "Should have — core value of this release",
-    "P2": "Nice to have — include if time permits",
-    "P3": "Release logistics"
-  },
-
-  "task_summary": {
-    "total": 8,
-    "by_priority": { "P0": 1, "P1": 3, "P2": 3, "P3": 1 },
-    "by_effort": { "small": 2, "medium": 4, "large": 2 },
-    "by_project": { "python-llm": 4, "DotEnvy": 3, "both": 1 }
-  },
-
-  "recommended_order": [
-    "1.6-T01",
-    "1.6-T04",
-    "1.6-T02",
-    "1.6-T03",
-    "1.6-T07",
-    "1.6-T06",
-    "1.6-T05",
-    "1.6-T08"
-  ],
-
-  "success_criteria": [
-    "18/18 python-llm tests passing",
-    "Panel shows live streaming confidence updates",
-    "User feedback reaches /train endpoint and model loss decreases",
-    "Model persists across Railway deploys",
-    "0 npm vulnerabilities remaining",
-    "Training loss decreases consistently across epochs"
-  ],
-
-  "depends_on": "v1.5.0 — HMAC auth + 35-feature ML + Railway deployment"
+  }
 }

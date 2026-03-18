@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { Environment } from '../types/environment';
 import { ConfigUtils } from '../utils/configUtils';
+import { logger } from '../utils/logger';
 
 export class EnvironmentProvider {
 	private rootPath: string;
@@ -58,7 +59,7 @@ export class EnvironmentProvider {
 					})
 					.filter(env => env.name.length > 0 && ![ 'backup', 'example', 'template' ].includes(env.name.toLowerCase()));
 			} catch (error) {
-				console.error('Error reading directory for environments:', error);
+				logger.error('Error reading directory for environments:', error, 'EnvironmentProvider');
 				return [];
 			}
 		}

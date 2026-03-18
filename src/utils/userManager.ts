@@ -17,6 +17,7 @@ import {
   UserManagementResult,
   ProjectKeyAccessResult
 } from '../types/user';
+import { logger } from './logger';
 
 export class UserManager {
 
@@ -64,7 +65,7 @@ export class UserManager {
 
       return envelope;
     } catch (error) {
-      console.error('Failed to load envelope:', error);
+      logger.error('Failed to load envelope:', error, 'UserManager');
       return null;
     }
   }

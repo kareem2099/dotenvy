@@ -16,6 +16,7 @@ import {
 	ValidationStatus,
 	StatusBarSegment
 } from '../types/environment';
+import { logger } from '../utils/logger';
 
 export class StatusBarProvider implements vscode.Disposable {
 	private statusBarItems: Map<string, vscode.StatusBarItem> = new Map();
@@ -114,7 +115,7 @@ export class StatusBarProvider implements vscode.Disposable {
 			this.updateValidationStatus(status.validationStatus);
 			this.updateEnvironmentStatus(status.environment || 'None');
 		} catch (error) {
-			console.error('Error updating status bar:', error);
+			logger.error('Error updating status bar:', error, 'StatusBarProvider');
 		}
 	}
 

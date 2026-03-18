@@ -2,7 +2,7 @@
   "name": "dotenvy",
   "displayName": "DotEnvy – VS Code Environment Manager",
   "description": "Effortlessly manage, secure, and sync .env files directly inside VS Code with enterprise-grade encryption.",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "icon": "resources/icons/icon.png",
   "publisher": "FreeRave",
   "author": "Kareem Ehab",
@@ -43,6 +43,18 @@
     "test": "node ./out/test/runTest.js"
   },
   "contributes": {
+    "languages": [
+      {
+        "id": "dotenvyignore",
+        "filenames": [
+          ".dotenvyignore"
+        ],
+        "icon": {
+          "light": "./resources/icons/dotenvyignoreIcon.svg",
+          "dark": "./resources/icons/dotenvyignoreIcon.svg"
+        }
+      }
+    ],
     "configuration": {
       "title": "DotEnvy",
       "properties": {
@@ -108,8 +120,23 @@
         "title": "DotEnvy: Switch Environment"
       },
       {
+        "command": "dotenvy.initDotenvyIgnore",
+        "title": "DotEnvy: Init .dotenvyignore",
+        "icon": "$(exclude)"
+      }, 
+      {
+        "command": "dotenvy.addToIgnore",
+        "title": "DotEnvy: Ignore this path",
+        "icon": "$(eye-closed)"
+      },
+      {
         "command": "dotenvy.openEnvironmentPanel",
         "title": "DotEnvy: Open Environment Panel"
+      },
+      {
+        "command": "dotenvy.setupLLMSecret",
+        "title": "DotEnvy: Setup LLM Secret",
+        "icon": "$(key)"
       },
       {
         "command": "dotenvy.validateEnvironment",
@@ -248,6 +275,12 @@
           "command": "dotenvy.removeGitHook",
           "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
           "group": "7_modification"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "dotenvy.addToIgnore",
+          "group": "navigation@2"
         }
       ]
     }

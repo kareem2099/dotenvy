@@ -5,6 +5,7 @@ import { EnvironmentProvider } from './environmentProvider';
 import { StatusBarProvider } from './statusBarProvider';
 import { FileUtils } from '../utils/fileUtils';
 import { SecretsGuard } from '../utils/secretsGuard';
+import { logger } from '../utils/logger';
 
 export class GitBranchWatcher implements vscode.Disposable {
 	private workspaceRoot: string;
@@ -63,7 +64,7 @@ export class GitBranchWatcher implements vscode.Disposable {
 				await this.autoSwitchEnvironment(branch);
 			}
 		} catch (error) {
-			console.log('Failed to check git branch:', error);
+			logger.error('Failed to check git branch:', error, 'GitBranchWatcher');
 		}
 	}
 

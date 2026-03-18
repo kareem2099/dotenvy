@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { EncryptedVarsManager } from './encryptedVars';
 import { FileUtils } from './fileUtils';
+import { logger } from './logger';
 
   export interface ExportOptions {
   format?: 'json' | 'csv' | 'env' | 'encrypted-json';
@@ -116,7 +117,7 @@ export class EnvironmentExporter {
    */
   private static async parseEnvironmentContent(content: string, envPath: string): Promise<Map<string, { value: string; encrypted: boolean; comment?: string }>> {
     // Log the file being parsed using the envPath parameter
-    console.log(`Parsing environment file: ${path.basename(envPath)}`);
+    logger.info(`Parsing environment file: ${path.basename(envPath)}`, 'EnvironmentExporter');
     const variables = new Map<string, { value: string; encrypted: boolean; comment?: string }>();
     const lines = content.split('\n');
 
@@ -232,7 +233,7 @@ export class EnvironmentExporter {
           fs.unlinkSync(tempFilePath);
         } catch (error) {
           // Ignore errors in masking, continue with original value
-          console.warn(`Error masking secrets for ${key}:`, error);
+          logger.error(`Error masking secrets for ${key}:`, error, 'EnvironmentExporter');
         }
       }
 
@@ -354,7 +355,7 @@ export class EnvironmentExporter {
         }
       }
     } catch (error) {
-      console.warn('Error scanning workspace for environment files:', error);
+      logger.error('Error scanning workspace for environment files:', error, 'EnvironmentExporter');
     }
 
     return envFiles.map(filePath => ({

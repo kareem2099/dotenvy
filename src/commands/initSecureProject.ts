@@ -3,6 +3,7 @@ import * as path from 'path';
 import { UserManager } from '../utils/userManager';
 import { UserCredentials } from '../types/user';
 import { MIN_PASSWORD_LENGTH } from '../constants';
+import { logger } from '../utils/logger';
 
 export class InitSecureProjectCommand implements vscode.Disposable {
 
@@ -27,7 +28,7 @@ export class InitSecureProjectCommand implements vscode.Disposable {
                     try {
                         await vscode.workspace.fs.delete(vscode.Uri.file(lockFilePath));
                     } catch (e) {
-                        console.warn('Could not delete old lock file', e);
+                        logger.error('Could not delete old lock file', e, 'InitSecureProject');
                     }
                 }
             }

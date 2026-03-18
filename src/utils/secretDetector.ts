@@ -6,7 +6,9 @@ import { PatternRegistry } from './patternRegistry';
 import { EntropyAnalyzer } from './entropyAnalyzer';
 import { ContextEvaluator } from './contextEvaluator';
 import { CacheManager } from './cacheManager';
-import { llmAnalyzer } from './llmAnalyzer';
+import { LLMAnalyzer } from './llmAnalyzer';
+import { DotenvyIgnore } from './dotenvyIgnore';
+import { logger } from './logger';
 
 export class SecretDetector {
     private static scanProgressCallback?: (progress: ScanProgress) => void;
@@ -74,11 +76,11 @@ export class SecretDetector {
             this.clearDebounceTimer(filePath);
             this.activeScanPromises.delete(filePath);
 
-            console.log(`🗑️  File deleted - ${path.basename(filePath)}`);
+            logger.info(`🗑️  File deleted - ${path.basename(filePath)}`, 'SecretDetector');
         });
 
         this.isFileWatcherActive = true;
-        console.log('🔍 Real-time secret monitoring started');
+        logger.info('🔍 Real-time secret monitoring started', 'SecretDetector');
     }
 
     /**
@@ -96,9 +98,9 @@ export class SecretDetector {
             this.activeScanPromises.clear();
 
             this.isFileWatcherActive = false;
-            console.log('🛑 Real-time secret monitoring stopped');
+            logger.info('🛑 Real-time secret monitoring stopped', 'SecretDetector');
         } catch (error) {
-            console.error('Error stopping file watcher:', error);
+            logger.error('Error stopping file watcher:', error, 'SecretDetector');
             this.fileWatcher = undefined;
             this.debounceTimers.clear();
             this.activeScanPromises.clear();
@@ -138,7 +140,7 @@ export class SecretDetector {
                 this.activeScanPromises.delete(filePath);
 
             } catch (error) {
-                console.error(`Error scanning file ${filePath}:`, error);
+                logger.error(`Error scanning file ${filePath}:`, error, 'SecretDetector');
                 this.activeScanPromises.delete(filePath);
             }
         }, this.DEBOUNCE_DELAY);
@@ -153,14 +155,14 @@ export class SecretDetector {
         filePath: string,
         onSecretsFound?: (secrets: DetectedSecret[]) => void
     ): Promise<void> {
-        console.log(`🔍 Scanning changed file: ${path.basename(filePath)}`);
+        logger.info(`🔍 Scanning changed file: ${path.basename(filePath)}`, 'SecretDetector');
 
         CacheManager.invalidateFileCache(filePath);
 
         const secrets = await this.scanFile(filePath);
 
         if (secrets.length > 0) {
-            console.log(`⚠️  Found ${secrets.length} potential secret(s) in ${path.basename(filePath)}`);
+            logger.info(`⚠️  Found ${secrets.length} potential secret(s) in ${path.basename(filePath)}`, 'SecretDetector');
 
             if (onSecretsFound) {
                 onSecretsFound(secrets);
@@ -170,7 +172,7 @@ export class SecretDetector {
                     'Review Secrets'
                 ).then(selection => {
                     if (selection === 'Review Secrets') {
-                        console.log('Secrets found:', secrets);
+                        logger.info('Secrets found:', 'SecretDetector');
                     }
                 });
             }
@@ -215,12 +217,14 @@ export class SecretDetector {
                 const filePath = fileUri.fsPath;
                 if (!PatternRegistry.shouldScanFile(filePath, rootPath)) continue;
 
+                if (DotenvyIgnore.shouldIgnore(filePath, rootPath)) continue;
+
                 const fileSecrets = await this.scanFile(filePath);
                 secrets.push(...fileSecrets);
             }
 
         } catch (error) {
-            console.error('Error scanning workspace:', error);
+            logger.error('Error scanning workspace:', error, 'SecretDetector');
         }
 
         return this.deduplicateSecrets(secrets);
@@ -245,7 +249,7 @@ export class SecretDetector {
             }
 
         } catch (error) {
-            console.log(`Skipping file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            logger.info(`Skipping file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`, 'SecretDetector');
         }
 
         return this.assignUniqueEnvVarNames(secrets);
@@ -283,7 +287,7 @@ export class SecretDetector {
                     // Try LLM analysis
                     if (secretScore.confidence > 0.4) {
                         try {
-                            const llmConfidence = await llmAnalyzer.analyzeSecret(secretValue, context, variableName);
+                            const llmConfidence = await LLMAnalyzer.getInstance().analyzeSecret(secretValue, context, variableName);
                             
                             if (llmConfidence === 'high' || llmConfidence === 'critical') {
                                 finalConfidence = 'high';
@@ -482,6 +486,8 @@ export class SecretDetector {
                 const filePath = fileUri.fsPath;
                 if (!PatternRegistry.shouldScanFile(filePath, rootPath)) continue;
 
+                if (DotenvyIgnore.shouldIgnore(filePath, rootPath)) continue;
+
                 if (CacheManager.shouldRescanFile(filePath)) {
                     filesToScan.push(filePath);
                 } else {
@@ -519,7 +525,7 @@ export class SecretDetector {
             }
 
         } catch (error) {
-            console.error('Error in enhanced workspace scan:', error);
+            logger.error('Error in enhanced workspace scan:', error, 'SecretDetector');
         }
 
         return this.deduplicateSecrets(secrets);
@@ -583,7 +589,7 @@ export class SecretDetector {
             CacheManager.recordScanTime(filePath, scanTime);
 
         } catch (error) {
-            console.log(`Skipping file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            logger.info(`Skipping file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`, 'SecretDetector');
         }
 
         return this.assignUniqueEnvVarNames(secrets);

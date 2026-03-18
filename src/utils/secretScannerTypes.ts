@@ -71,3 +71,29 @@ export interface SecurityAssessment {
     detectionMethod: string;
     reasoning: string[];
 }
+
+export interface StringContext {
+    variableName?: string;
+    isInConfig: boolean;
+    isInAuth: boolean;
+    isInComment: boolean;
+    isInString: boolean;
+    lineContent: string;
+    surroundingCode: string;
+}
+
+export interface SecretScore {
+    isLikelySecret: boolean;
+    confidence: number;
+    category: string;
+    riskLevel: 'critical' | 'high' | 'medium' | 'low';
+    reasoning: string[];
+    detectionMethod: 'statistical' | 'contextual' | 'pattern' | 'hybrid';
+}
+
+export interface ScanCache {
+    filePath: string;
+    lastModified: number;
+    scanResults: DetectedSecret[];
+    fileHash: string;
+}

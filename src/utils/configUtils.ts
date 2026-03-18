@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { QuickEnvConfig, EnvironmentValidationRules } from '../types/environment';
 import { extensionContext } from '../extension';
+import { logger } from './logger';
 
 export class ConfigUtils {
 	private static readonly CONFIG_KEY = 'dotenvyConfig';
@@ -26,7 +27,7 @@ export class ConfigUtils {
 					return config;
 				}
 			} catch (error) {
-				console.warn('Failed to read config from .dotenvy.json:', error);
+				logger.warn(`Failed to read config from .dotenvy.json:', ${error}`, 'ConfigUtils');
 			}
 		}
 
@@ -54,7 +55,7 @@ export class ConfigUtils {
 					'utf8'
 				);
 			} catch (error) {
-				console.warn('Failed to save config to .dotenvy.json:', error);
+				logger.warn(`Failed to save config to .dotenvy.json:', ${error}`, 'ConfigUtils');
 			}
 		}
 	}

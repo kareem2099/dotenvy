@@ -3,6 +3,7 @@ import { EnvironmentProvider } from './environmentProvider';
 import { StatusBarProvider } from './statusBarProvider';
 import { GitBranchWatcher } from './gitBranchWatcher';
 import { EnvironmentTreeProvider } from './environmentTreeProvider';
+import { logger } from '../utils/logger';
 
 export interface WorkspaceContext {
 	workspace: vscode.WorkspaceFolder;
@@ -79,7 +80,7 @@ export class WorkspaceManager {
 
 		} catch (error) {
 			// Git watcher failed to initialize, continue without it
-			console.log(`Git branch watcher not available for workspace ${workspaceName}`);
+			logger.info(`Git branch watcher not available for workspace ${workspaceName}`, 'WorkspaceManager');
 		}
 
 		const context: WorkspaceContext = {
@@ -120,7 +121,7 @@ export class WorkspaceManager {
 	clearWorkspaces(): void {
 		for (const [workspacePath, context] of this.workspaces) {
 			// Log workspace cleanup for debugging
-			console.log(`Clearing workspace: ${workspacePath}`);
+			logger.info(`Clearing workspace: ${workspacePath}`, 'WorkspaceManager');
 
 			// Dispose all workspace-specific resources
 			context.workspaceDisposables?.forEach(disposable => disposable.dispose());

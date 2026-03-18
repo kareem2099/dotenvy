@@ -1,6 +1,6 @@
 # dotenvy – VS Code Environment Manager
 
-[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
 [![Publisher](https://img.shields.io/badge/publisher-FreeRave-red.svg)](https://marketplace.visualstudio.com/publishers/FreeRave)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![VS Code Marketplace](https://img.shields.io/badge/vscode-marketplace-007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
@@ -40,72 +40,82 @@ Automatic backup creation before switching, with portable AES-256-GCM encrypted 
 ### 📊 **Status Bar Integration**
 Real-time environment indicator in status bar showing current configuration, validation status, and cloud sync state.
 
-### 🔍 **Secrets Guard** 🧠 — v1.5.0
-Production-grade secret detection powered by a **custom ML model** deployed on Railway with HMAC-secured communication.
+### 🔍 **Secrets Guard** 🧠 — v1.6.0
 
-#### What's new in v1.5.0:
-- **🔐 HMAC-SHA256 Authentication** — Extension signs every request; no API key stored or transmitted
-- **35-Feature ML Model** — Analyzes entropy, patterns, context, variable names, and structure simultaneously
-- **⚡ 18.4x Cache Speedup** — Two-tier L1 LRU + L2 Redis cache for near-instant repeated analyses
-- **📡 Progressive Streaming** — Results stream progressively: pattern → entropy → context → AI → final
-- **🔄 Smart Fallback** — Local heuristic analysis (entropy + known prefixes) when service is unreachable
-- **🎯 Confidence Scoring** — High / Medium / Low classification with reasoning attached to each finding
+Production-grade secret detection powered by a **custom ML model** with HMAC-secured communication and an interactive Secrets Panel.
+
+#### What's new in v1.6.0:
+- **🔐 OS-Encrypted Secret Storage** — Shared secret stored in VS Code SecretStorage (Keychain / libsecret / Credential Manager), never in the compiled bundle
+- **35-Feature ML Model (fixed)** — Feature count corrected from 31 → 35, entropy normalization fixed to match Python backend exactly
+- **📋 Secrets Panel** — Full WebviewPanel shows all detected secrets (no more 5-item cap) with filter by confidence, search, View / Move to .env / Not a Secret buttons
+- **🧠 AI Training Feedback** — "Not a Secret" and "Move to .env" send labeled training samples to the Railway model — it learns from your corrections
+- **🚫 .dotenvyignore** — New file (same syntax as `.gitignore`) lets you exclude files and folders from secret scanning
+- **📝 Centralized Logging** — All extension logs visible in VS Code Output panel → DotEnvy
+- **🔄 Smart Fallback** — Local fallback analysis uses all 35 features including variable name signals (e.g. `DB_PASS` increases risk even with low entropy)
 
 ---
 
 ## 📋 Commands
 
-dotenvy provides a comprehensive set of commands to manage your environment files. All commands are accessible via the Command Palette (`Ctrl+Shift+P` / `⌘+Shift+P`).
+All commands are accessible via the Command Palette (`Ctrl+Shift+P` / `⌘+Shift+P`).
 
 ### 🔄 Environment Manager
-Core commands for managing and switching between environment files:
-
-- **`dotenvy: Switch Environment`** - Switch between different `.env` files (development, staging, production, etc.)
-- **`dotenvy: Open Environment Panel`** - Open the interactive environment management panel
-- **`dotenvy: Validate Environment Files`** - Validate .env files for syntax errors and required variables
-- **`dotenvy: Diff Environment Files`** - Compare environment files side-by-side before switching
+- **`DotEnvy: Switch Environment`** — Switch between `.env` files
+- **`DotEnvy: Open Environment Panel`** — Open the interactive management panel
+- **`DotEnvy: Validate Environment Files`** — Validate for syntax errors and required variables
+- **`DotEnvy: Diff Environment Files`** — Compare environment files side-by-side
 
 ### 📊 Environment History
-Track and manage environment file changes over time:
-
-- **`dotenvy: View Environment History`** - View historical changes to environment files with timestamps and git integration
+- **`DotEnvy: View Environment History`** — View historical changes with timestamps
 
 ### 🛡️ Git Integration
-Secure your commits with pre-commit hooks:
-
-- **`dotenvy: Install Git Commit Hook`** - Install pre-commit hook to prevent committing secrets and validation errors
-- **`dotenvy: Remove Git Commit Hook`** - Remove the installed git commit hook
+- **`DotEnvy: Install Git Commit Hook`** — Block commits containing secrets
+- **`DotEnvy: Remove Git Commit Hook`** — Remove the installed hook
 
 ### ☁️ Cloud Sync
-Bidirectional synchronization with cloud secret managers:
-
-- **`dotenvy: Pull Environment from Cloud`** - Pull environment variables from Doppler (or other cloud providers)
-- **`dotenvy: Push Environment to Cloud`** - Push local environment variables to Doppler
+- **`DotEnvy: Pull Environment from Cloud`** — Pull from Doppler
+- **`DotEnvy: Push Environment to Cloud`** — Push to Doppler
 
 ### 🔍 Security
-Advanced security scanning for sensitive data:
+- **`DotEnvy: Scan for Secrets`** — Scan workspace with AI-powered detection; opens Secrets Panel with all findings
+- **`DotEnvy: Init .dotenvyignore`** — Create a pre-populated `.dotenvyignore` file
+- **`DotEnvy: Setup LLM Secret`** — Store the HMAC shared secret securely in OS vault
 
-- **`dotenvy: Scan for Secrets`** - Scan workspace for potential secrets using AI-powered analysis
+### 🖱️ Right-Click (Explorer)
+- **`DotEnvy: Ignore this path`** — Right-click any file or folder → add to `.dotenvyignore` instantly
 
 ### 💬 Support
-Get help and provide feedback:
+- **`DotEnvy: Feedback & Support`** — Access feedback and support resources
+- **`DotEnvy: Show What's New`** — View changelog for current version
 
-- **`dotenvy: Feedback & Support`** - Access feedback form and support resources
+---
 
-### ⌨️ Keyboard Shortcuts
-To improve productivity, consider setting up keyboard shortcuts for frequently used commands:
+## 🚫 .dotenvyignore
 
-1. Open Keyboard Shortcuts (`Ctrl+K Ctrl+S` / `⌘+K ⌘+S`)
-2. Search for "dotenvy"
-3. Assign shortcuts to your most-used commands (e.g., `Ctrl+Alt+E` for Switch Environment)
+Control which files DotEnvy skips when scanning for secrets — same syntax as `.gitignore`:
 
-### 🎮 List Commands Feature
-For easy command discovery and execution, use **`dotenvy: List Commands`** which provides:
+```gitignore
+# .dotenvyignore
 
-- **Interactive Quick Pick Menu**: Browse all commands organized by category
-- **Command Descriptions**: Detailed explanations of what each command does
-- **Direct Execution**: Click to run any command immediately
-- **Keyboard Shortcuts Setup**: Built-in assistance for setting up shortcuts
+# DotEnvy's own data (always recommended)
+.dotenvy/**
+.dotenvy-backups/**
+
+# Test files (often contain example secrets)
+**/*.test.ts
+**/*.spec.ts
+tests/**
+
+# Docs with example secrets
+docs/**
+README.md
+SECURITY.md
+
+# Specific files
+k8s/secrets.yaml
+```
+
+Run **`DotEnvy: Init .dotenvyignore`** to create a default file, or right-click any file/folder in the Explorer and choose **"DotEnvy: Ignore this path"**.
 
 ---
 
@@ -122,18 +132,7 @@ For easy command discovery and execution, use **`dotenvy: List Commands`** which
 - **Manual**: Download `.vsix` file and install via VS Code
 
 ### Requirements
-- VS Code 1.74.0 or later
-- Node.js (for cloud sync features)
-
-## 🏗️ Supported Environments
-
-Default environment files are automatically detected:
-- `.env.development`
-- `.env.staging`
-- `.env.production`
-- `.env.test`
-
-**Custom environments** can be configured in `.dotenvy.json`.
+- VS Code **1.110.0** or later
 
 ---
 
@@ -147,25 +146,17 @@ Default environment files are automatically detected:
    .env.production
    ```
 
-2. Open the **Command Palette** (`Ctrl+Shift+P` / `⌘+Shift+P`).
+2. Open the **Command Palette** (`Ctrl+Shift+P`).
 
-3. Search for:
+3. Run `DotEnvy: Switch Environment` and pick your environment.
 
-   ```
-   dotenvy: Switch Environment
-   ```
+4. The selected file is copied to `.env` automatically.
 
-4. Pick the environment you want to activate.
-
-5. The selected file will be copied into `.env` automatically.
-
-✅ The status bar will update to show the active environment.
+✅ The status bar updates to show the active environment.
 
 ---
 
 ## ⚙️ Configuration
-
-You can add a config file to define custom environments, git branch auto-switching, and validation rules:
 
 ```jsonc
 // .dotenvy.json
@@ -178,7 +169,6 @@ You can add a config file to define custom environments, git branch auto-switchi
   "gitBranchMapping": {
     "develop": "development",
     "staging": "staging",
-    "master": "production",
     "main": "production"
   },
   "autoSwitchOnBranchChange": true,
@@ -188,32 +178,19 @@ You can add a config file to define custom environments, git branch auto-switchi
       "PORT": "number",
       "DEBUG": "boolean",
       "API_URL": "url"
-    },
-    "customValidators": {
-      "EMAIL": "^[^@]+@[^@]+\\.[^@]+$"
     }
   },
   "gitCommitHook": {
     "blockEnvFiles": true,
     "blockSecrets": true,
-    "blockValidationErrors": true,
-    "customMessage": "Commit blocked due to security concerns"
+    "blockValidationErrors": true
   }
 }
 ```
 
 ---
 
-## ☁️ Cloud Sync Setup
-
-### Doppler Integration
-
-dotenvy supports bidirectional sync with [Doppler](https://www.doppler.com/) for team-based environment variable management.
-
-#### Setup Steps:
-1. **Create Doppler Account** and project at [doppler.com](https://www.doppler.com/)
-2. **Generate Service Token** from Doppler dashboard
-3. **Add to .dotenvy.json**:
+## ☁️ Cloud Sync Setup (Doppler)
 
 ```jsonc
 {
@@ -226,34 +203,27 @@ dotenvy supports bidirectional sync with [Doppler](https://www.doppler.com/) for
 }
 ```
 
-#### Available Commands:
-- **Pull from Cloud**: `dotenvy: Pull Environment from Cloud`
-- **Push to Cloud**: `dotenvy: Push Environment to Cloud`
-
-**Note**: Doppler tokens are stored securely using VS Code secrets storage.
-
 ---
 
 ## 🗺️ Roadmap
 
 * [x] Auto-switch env based on Git branch
-* [x] Environment validation
-* [x] Diff view
-* [x] Multi-workspace support
+* [x] Environment validation + diff view
 * [x] Git commit hook to block secrets
-* [x] Cloud sync with Doppler
-* [x] End-to-end encrypted cloud sync (AES-256-GCM)
+* [x] Cloud sync with Doppler (E2E encrypted)
 * [x] Multi-user key wrapping (envelope encryption)
 * [x] Portable encrypted backups (PBE + PBKDF2)
 * [x] AI-powered secret detection (LLM v1 — 14 features)
-* [x] **HMAC-secured LLM service (v1.5.0 — 35 features, 18.4x cache, SSE streaming)**
+* [x] HMAC-secured LLM service (v1.5.0 — 35 features, 18.4x cache, SSE streaming)
+* [x] **OS-encrypted secret storage + Secrets Panel + .dotenvyignore + AI feedback loop (v1.6.0)**
 
-* [ ] Streaming confidence updates in the VS Code panel (SSE → UI)
-* [ ] Offline fallback mode with local heuristics only
-* [ ] Support for other cloud providers (Vault, AWS Secrets Manager)
+* [ ] Wire `/extension/feedback` on Railway — model learns from user corrections
+* [ ] Persist trained model across Railway deploys (persistent volume)
+* [ ] Streaming confidence updates in VS Code panel (SSE → UI)
+* [ ] Proper backpropagation + Adam optimizer for ML model
+* [ ] Expand training dataset to 150+ samples
+* [ ] Support for Vault, AWS Secrets Manager
 * [ ] Shareable environment templates
-* [ ] Integration with Docker environments
-* [ ] Continuous learning from user feedback (wire `/train` endpoint to panel)
 
 ---
 
@@ -265,15 +235,14 @@ PRs are welcome! If you have ideas for features, open an issue.
 
 ## 📜 License
 
-MIT © 2025 Kareem Ehab
+MIT © 2026 FreeRave (Kareem)
 
 ---
 
 ## Development
 
-This extension is built with TypeScript. To get started:
-
-1. Clone the repository
-2. Run `npm install`
-3. Open in VS Code
-4. Press F5 to start debugging
+```bash
+git clone https://github.com/kareem2099/dotenvy
+npm install
+# Open in VS Code and press F5 to start debugging
+```

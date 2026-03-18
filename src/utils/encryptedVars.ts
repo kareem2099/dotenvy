@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { SessionManager } from './sessionManager';
+import { logger } from './logger';
 
 export class EncryptedVarsManager {
     public static readonly SECRET_STORAGE_KEY_PREFIX = 'dotenvy.master.key.';
@@ -511,7 +512,7 @@ export class EncryptedEnvironmentFile {
                     isEncrypted = true;
                 } catch (error) {
                     // Keep encrypted if decryption fails
-                    console.warn(`Failed to decrypt ${key}:`, error);
+                    logger.error(`Failed to decrypt ${key}:`, error, 'EncryptedEnvironmentFile');
                     finalValue = value;
                 }
             } else if (EncryptedVarsManager.isEncrypted(value)) {

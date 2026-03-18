@@ -5,6 +5,83 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-03-17
+
+### **SolidBase** — Security Hardening + ML Feature Alignment + Secrets Panel UI
+
+Complete overhaul of secret detection accuracy, security architecture, developer tooling, and user experience. This release wires together all infrastructure built in v1.5.0.
+
+#### **Security — HMAC Secret Storage**
+- **Removed hardcoded secrets**: `EXTENSION_SHARED_SECRET` no longer embedded in compiled bundle at build time
+- **VS Code SecretStorage**: Shared secret now stored in OS-encrypted vault (Keychain / libsecret / Windows Credential Manager) — never touches the filesystem as plaintext
+- **Setup command**: `DotEnvy: Setup LLM Secret` opens a password-style input box and stores the secret securely
+- **Machine ID fix**: Replaced unreliable `process.env.VSCODE_MACHINE_ID` with `vscode.env.machineId`
+- **Timestamp fix**: Changed `Date.now() / 1000` (float) to `Math.floor(Date.now() / 1000)` (clean integer) for HMAC signatures
+
+#### **ML Feature Extractor — Carbon Copy of Python Backend**
+- **Feature count fixed**: 31 → **35 features** (was silently padding with zeros)
+- **Entropy normalization fixed**: `/ 6.0` → `/ 8.0` (matches `feature_extractor.py`)
+- **Missing features added**: `compressionRatio`, `localEntropyVariance`, `alternatingAlphaDigitScore`, `separatorStructureScore`, `characterClassBalance`
+- **Pattern scores fixed**: returns float (0.6–1.0) instead of binary 0/1
+- **Input sanitization**: mirrors Pydantic validator (`\x00`, `\r`, `\n` stripping)
+- **`featureExtractor.ts`**: extracted as standalone file, used by both `llmAnalyzer.ts` and `feedbackManager.ts`
+- **`variableName` wired**: `fallbackAnalysis()` now passes `variableName` to `FeatureExtractor`, enabling Group 5 (variable name signals) to affect local confidence — e.g. `DB_PASS` now increases detection risk even with low entropy
+
+#### **Centralized Logger**
+- Replaced **94 `console.log/warn/error` calls** across 21 files with a centralized `Logger` class
+- VS Code **Output Channel** (`DotEnvy`) — visible in View → Output → DotEnvy
+- Log levels: `DEBUG` / `INFO` / `WARN` / `ERROR` / `NONE`
+- Timestamps on every line: `2026-03-17 20:28:06.768 INFO [Extension] DotEnvy is now active!`
+- Context tags per file: `[HistoryManager]`, `[LLMAnalyzer]`, `[SecretsPanel]`, etc.
+- `LogLevel.DEBUG` in development, `LogLevel.WARN` in production (auto-detected via `extensionMode`)
+- CLI scripts (`git-hook.ts`, `build-with-env.js`) intentionally kept using `console` — correct for CLI context
+
+#### **Secrets Panel UI**
+- **Full WebviewPanel** replaces the old notification-based flow that capped at 5 results
+- Displays **all detected secrets** with filter + search
+- Filter tabs: All / ⚠️ High / ⚡ Medium / ℹ️ Low with live counts
+- Search box: filter by file, type, or suggested variable name
+- Per-secret actions: **📍 View** (jump to code location), **📥 Move to .env**, **👁️ Not a Secret**
+- Confidence color-coding: red border (HIGH), orange (MED), blue (LOW)
+- Detection method badge: `🤖 AI + Pattern` / `🔎 Pattern` / `📊 Statistical`
+- Training hint banner: "Click Not a Secret on false positives — your feedback trains the AI"
+
+#### **User Feedback → Model Training**
+- **`FeedbackManager`**: collects user actions (confirmed secret / false positive) as training samples
+- Each sample includes the 35-feature vector, context, variable name, label, and timestamp
+- Stored locally in `globalState` (up to 500 entries)
+- Sent to Railway `/extension/feedback` in batches of 20 via HMAC-signed requests
+- `Move to .env` → records `confirmed_secret` label
+- `Not a Secret` → records `false_positive` label
+- Milestone messages every 5 false positives: "Thanks! Helping train the AI"
+
+#### **.dotenvyignore**
+- New file format (same syntax as `.gitignore`) controls which files DotEnvy skips during scanning
+- Full glob support: `*`, `**`, `?`, `[abc]`, `{a,b}`, negation `!`, directory trailing `/`
+- File-change cache: patterns reload only when `.dotenvyignore` is modified on disk
+- **`DotEnvy: Init .dotenvyignore`** command creates a pre-populated default file
+- **Right-click → DotEnvy: Ignore this path** in Explorer adds file/folder instantly
+- Default exclusions: `.dotenvy/**`, `out/**`, `dist/**`, test files, docs, CI config, lock files
+- File icon registered in `package.json` for `.dotenvyignore`
+
+#### **Code Quality & Architecture**
+- **Deleted `secretScanner.ts`** (700+ line monolith) — replaced by modular `SecretDetector` + helper classes
+- **`SecretScanner` → `SecretDetector`**: updated all imports
+- **`DetectedSecret`, `ScanProgress`** moved to `secretScannerTypes.ts` as single source of truth
+- Missing interfaces added: `SecretScore`, `ScanCache`, `StringContext`
+- **`BackupPackage` interface**: replaced `any` type in `environmentWebviewProvider.ts`
+- **ESLint fixes**: `no-control-regex` (`\x00` → `\u0000`), `no-empty-function`, `no-explicit-any`
+- **Circular import fixed**: `SecretsPanel.ts` was importing itself
+- **Reconstructed 5 missing `.ts` source files** from compiled `.js`: `setupFlutterEnvironment.ts`, `scanFlutterEnvironment.ts`, `toggleRealtimeScanning.ts`, `mlLearner.ts`, `flutterEnvironmentScanner.ts`
+- **`engines.vscode`**: bumped from `^1.74.0` to `^1.110.0` to match `@types/vscode`
+- **`.vscodeignore`**: excludes `roadmap*.json`, `.vscode/**`, `resources/icons/icon.svg` from published `.vsix`
+- **Zero compile errors**: `npm run compile` clean
+
+#### **Security Audit**
+- Ran `gitleaks detect` on full git history — 25 findings, all confirmed as example/placeholder values — no real secrets exposed
+
+---
+
 ## [1.5.0] - 2026-03-13
 
 ### **LLM Integration Upgrade + HMAC Security** — Production-Grade ML Secret Detection
@@ -332,10 +409,13 @@ Complete implementation of envelope encryption enabling secure multi-user access
 
 ## Version History
 
-- **1.5.0** - HMAC security + 35-feature ML model + two-tier cache + SSE streaming + service refactor
-- **1.4.0** - Portable backup encryption (PBE) with PBKDF2 + AES-256-GCM
-- **1.3.0** - Multi-user key wrapping (envelope encryption) + user management
-- **1.2.0** - End-to-end encrypted cloud sync
-- **1.1.0** - History tree view + tabbed interface
-- **1.0.2** - AI-powered secret detection (LLM v1)
-- **1.0.0** - Initial stable release
+| Version | Date | Codename | Highlights |
+|---------|------|----------|------------|
+| **1.6.0** | 2026-03-17 | SolidBase | SecretStorage, 35-feature ML fix, Logger, Secrets Panel, FeedbackManager, .dotenvyignore |
+| **1.5.0** | 2026-03-13 | — | HMAC auth, 35-feature ML, two-tier cache, SSE streaming, service refactor |
+| **1.4.0** | 2026-01-26 | — | Portable backup encryption (PBE + PBKDF2) |
+| **1.3.0** | 2025-12-28 | — | Multi-user envelope encryption |
+| **1.2.0** | 2025-11-16 | — | End-to-end encrypted cloud sync |
+| **1.1.0** | 2025-11-08 | — | History tree view + tabbed UI |
+| **1.0.2** | 2025-10-12 | — | AI-powered secret detection (LLM v1) |
+| **1.0.0** | 2025-09-29 | — | Initial stable release |

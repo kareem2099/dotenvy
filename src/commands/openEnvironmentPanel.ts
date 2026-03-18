@@ -9,6 +9,7 @@ import { EnvironmentValidator } from '../utils/environmentValidator';
 import { QuickEnvConfig } from '../types/environment';
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from '../utils/logger';
 
 interface WebviewMessage {
     type: string;
@@ -87,7 +88,7 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
                     line.trim() && !line.startsWith('#') && line.includes('=')
                 ).length;
             } catch (e) {
-                console.log(`Error reading ${env.fileName}:`, e);
+                logger.error(`Error reading ${env.fileName}`, e, 'OpenEnvPanel');
             }
 
             return {
@@ -113,7 +114,7 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
                     ).length
                 };
             } catch (error) {
-                console.log('Error reading current .env file:', error);
+                logger.error('Error reading current .env file:', error, 'OpenEnvPanel');
             }
         }
 

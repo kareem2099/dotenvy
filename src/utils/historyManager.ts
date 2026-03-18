@@ -16,6 +16,7 @@ import { HistoryAnalytics, AnalyticsSummary } from './historyAnalytics';
 import { HistoryFilters, HistoryFilterOptions, FilterResult } from './historyFilters';
 import { EnvDiff, EnvironmentDiffer } from './environmentDiffer';
 import { execSync } from 'child_process';
+import { logger } from './logger';
 
 export class HistoryManager {
     private static readonly HISTORY_DIR = '.dotenvy';
@@ -150,7 +151,7 @@ export class HistoryManager {
 
             return entry;
         } catch (error) {
-            console.error('Failed to record history entry:', error);
+            logger.error('Failed to record history entry:', error, 'HistoryManager');
             return null;
         }
     }
@@ -248,7 +249,7 @@ export class HistoryManager {
                 // Stop if we have enough entries
                 if (limit && entries.length >= limit) break;
             } catch (error) {
-                console.warn(`Failed to load history file ${file}:`, error);
+                logger.error(`Failed to load history file ${file}:`, error, 'HistoryManager');
             }
         }
 
@@ -305,7 +306,7 @@ export class HistoryManager {
 
             return true;
         } catch (error) {
-            console.error('Failed to rollback:', error);
+            logger.error('Failed to rollback:', error, 'HistoryManager');
             return false;
         }
     }
@@ -388,7 +389,7 @@ export class HistoryManager {
                     removedCount += (entries.length - filteredEntries.length);
                 }
             } catch (error) {
-                console.warn(`Failed to cleanup history file ${file}:`, error);
+                logger.error(`Failed to cleanup history file ${file}:`, error, 'HistoryManager');
             }
         }
 
@@ -474,7 +475,7 @@ export class HistoryManager {
                 }
             }
         } catch (error) {
-            console.warn('Failed to calculate diff with blame:', error);
+            logger.error('Failed to calculate diff with blame:', error, 'HistoryManager');
             return null;
         }
     }
@@ -517,7 +518,7 @@ export class HistoryManager {
 
             return importedCount;
         } catch (error) {
-            console.error('Failed to import history:', error);
+            logger.error('Failed to import history:', error, 'HistoryManager');
             return 0;
         }
     }
@@ -530,7 +531,7 @@ export class HistoryManager {
             const entries = await this.getHistory(rootPath);
             return await HistoryAnalytics.generateAnalytics(entries);
         } catch (error) {
-            console.error('Failed to generate analytics:', error);
+            logger.error('Failed to generate analytics:', error, 'HistoryManager');
             return HistoryAnalytics.generateAnalytics([]); // Return empty analytics
         }
     }
@@ -579,7 +580,7 @@ export class HistoryManager {
                 }
             } catch (error) {
                 // Cache is corrupted, generate fresh analytics
-                console.warn('Analytics cache corrupted, regenerating:', error);
+                logger.error('Analytics cache corrupted, regenerating:', error, 'HistoryManager');
             }
         }
 
@@ -592,7 +593,7 @@ export class HistoryManager {
             const cacheData = JSON.stringify(analytics, null, 2);
             fs.writeFileSync(cacheFile, cacheData, 'utf8');
         } catch (error) {
-            console.warn('Failed to cache analytics:', error);
+            logger.error('Failed to cache analytics:', error, 'HistoryManager');
             // Continue without caching
         }
 
@@ -609,7 +610,7 @@ export class HistoryManager {
                 fs.unlinkSync(cacheFile);
             }
         } catch (error) {
-            console.warn('Failed to clear analytics cache:', error);
+            logger.error('Failed to clear analytics cache:', error, 'HistoryManager');
         }
     }
 
