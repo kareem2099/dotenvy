@@ -4,7 +4,6 @@ const vscode = acquireVsCodeApi();
 // 1. STATE & ANIMATIONS
 // ============================
 
-// CSS Injection for Animations
 const addAnimationStyles = () => {
     if (!document.getElementById('modern-animations')) {
         const style = document.createElement('style');
@@ -18,6 +17,39 @@ const addAnimationStyles = () => {
             .variable-lock-btn { transition: transform 0.2s; }
             .variable-lock-btn:hover { transform: scale(1.1); }
             .variable-lock-btn:active { transform: scale(0.95); }
+
+            /* ── Analytics styles ── */
+            .analytics-panel-section { padding: var(--space-xl); background: rgba(255,255,255,0.01); border-top: 1px solid var(--glass-border); }
+            .analytics-dashboard { display: flex; flex-direction: column; gap: 1.25rem; }
+            .analytics-section h3 { margin: 0 0 0.75rem; font-size: 1rem; font-weight: 700; color: var(--vscode-foreground); }
+            .analytics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem; }
+            .analytics-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 12px; padding: 0.875rem; }
+            .analytics-card h4 { margin: 0 0 0.5rem; font-size: 0.8rem; font-weight: 600; color: var(--vscode-descriptionForeground); text-transform: uppercase; letter-spacing: 0.5px; }
+            .analytics-card.full-width { grid-column: 1 / -1; }
+            .top-list, .stability-list, .variable-list { display: flex; flex-direction: column; gap: 0.35rem; }
+            .list-item { display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0.5rem; background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 0.8rem; }
+            .list-item .count { font-weight: 700; color: var(--vscode-foreground); }
+            .stability-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
+            .stability-item span:first-child { min-width: 70px; }
+            .stability-bar { flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+            .stability-fill { height: 100%; background: var(--primary-gradient); border-radius: 3px; transition: width 0.5s ease; }
+            .stability-item .score { min-width: 36px; text-align: right; font-weight: 700; }
+            .variable-item { display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: rgba(255,255,255,0.04); border-radius: 6px; font-size: 0.8rem; gap: 0.5rem; }
+            .variable-info { display: flex; flex-direction: column; gap: 0.1rem; flex: 1; }
+            .variable-name { font-weight: 600; color: var(--vscode-foreground); }
+            .variable-value { color: var(--vscode-descriptionForeground); font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+            .variable-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 0.1rem; }
+            .changes { font-weight: 700; color: var(--vscode-foreground); }
+            .velocity { color: var(--vscode-descriptionForeground); font-size: 0.75rem; }
+            .heatmap-container { display: flex; flex-direction: column; gap: 0.5rem; }
+            .heatmap-grid { display: flex; flex-wrap: wrap; gap: 3px; }
+            .heatmap-cell { width: 14px; height: 14px; border-radius: 2px; cursor: default; }
+            .heatmap-legend { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--vscode-descriptionForeground); }
+            .legend-colors { display: flex; gap: 3px; }
+            .legend-color { width: 12px; height: 12px; border-radius: 2px; }
+            .analytics-meta { font-size: 0.75rem; color: var(--vscode-descriptionForeground); margin: 0; }
+            .analytics-footer { padding-top: 0.5rem; border-top: 1px solid var(--glass-border); }
+            .empty-state { text-align: center; padding: 2rem; color: var(--vscode-descriptionForeground); font-size: 0.9rem; }
         `;
         document.head.appendChild(style);
     }
@@ -45,7 +77,6 @@ const buttonEffects = {
 function updateDashboard(data) {
     console.log('📊 Updating dashboard...', data);
 
-    updateStatusCard(data);
     updateCloudCard(data);
     updateGitHookCard(data);
     updateValidationCard(data);
@@ -60,12 +91,6 @@ function updateDashboard(data) {
             card.classList.add('animate-fade-in');
         });
     }, 50);
-}
-
-function updateStatusCard(data) {
-    const envCount = ((data.environments && data.environments.length) || 0) + (data.currentFile ? 1 : 0);
-    setText('env-count', envCount);
-    setText('current-env', data.currentEnvironment || 'None');
 }
 
 function updateCloudCard(data) {
@@ -193,7 +218,6 @@ function renderVariablesWithLocks(variables, container) {
 
             vscode.postMessage({ type: 'toggleVarEncryption', key: variable.key });
 
-            // Restore state after timeout or success/error message
             setTimeout(() => {
                 lockBtn.innerHTML = originalIcon;
                 lockBtn.disabled = false;
@@ -217,7 +241,25 @@ function renderVariablesWithLocks(variables, container) {
             valSpan.textContent = variable.value;
         }
 
+        // ✏️ Edit Button
+        const editBtn = document.createElement('button');
+        editBtn.className = 'variable-lock-btn';
+        editBtn.innerHTML = '✏️';
+        editBtn.title = 'Edit Value';
+        editBtn.style.cssText = `width:32px; height:32px; border:none; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.1); color:white;`;
+        editBtn.onclick = () => vscode.postMessage({ type: 'updateVariable', key: variable.key });
+
+        // 🗑️ Delete Button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'variable-lock-btn';
+        deleteBtn.innerHTML = '🗑️';
+        deleteBtn.title = 'Delete Variable';
+        deleteBtn.style.cssText = `width:32px; height:32px; border:none; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; background:rgba(239,68,68,0.2); color:#ef4444;`;
+        deleteBtn.onclick = () => vscode.postMessage({ type: 'deleteVariable', key: variable.key });
+
         row.appendChild(lockBtn);
+        row.appendChild(editBtn);
+        row.appendChild(deleteBtn);
         row.appendChild(keySpan);
         row.appendChild(document.createTextNode('='));
         row.appendChild(valSpan);
@@ -227,7 +269,7 @@ function renderVariablesWithLocks(variables, container) {
 }
 
 // ============================
-// 5. GLOBAL ACTIONS
+// 6. GLOBAL ACTIONS
 // ============================
 
 const actions = {
@@ -247,7 +289,10 @@ const actions = {
     scanSecrets: () => vscode.postMessage({ type: 'scanSecrets' }),
     chooseBackupLocation: () => vscode.postMessage({ type: 'chooseBackupLocation' }),
     restoreFromBackup: () => vscode.postMessage({ type: 'restoreFromBackup' }),
-    openWorkspace: () => vscode.postMessage({ type: 'openWorkspace' })
+    openWorkspace: () => vscode.postMessage({ type: 'openWorkspace' }),
+    openHistoryPanel: () => vscode.postMessage({ type: 'openHistoryPanel' }),
+    openAnalyticsPanel: () => vscode.postMessage({ type: 'openAnalyticsPanel' }),
+    openTrashBin: () => vscode.postMessage({ type: 'openTrashBin' }),
 };
 
 // Expose to window
@@ -277,19 +322,25 @@ const showNotification = (msg, type = 'info') => {
 };
 
 // ============================
-// 6. SINGLE INITIALIZATION
+// 7. INITIALIZATION
 // ============================
 
 window.addEventListener('message', event => {
     const message = event.data;
     switch (message.type) {
-        case 'refresh': updateDashboard(message); break;
-        case 'scanComplete': showNotification('Secret scan completed!', 'success'); break;
-        case 'showNotification': showNotification(message.message, message.notificationType); break;
+        case 'refresh':
+            updateDashboard(message);
+            break;
+        case 'scanComplete':
+            showNotification('Secret scan completed!', 'success');
+            break;
+        case 'showNotification':
+            showNotification(message.message, message.notificationType);
+            break;
         case 'updateStatus':
-             if (message.cloudStatus) updateCloudCard(message);
-             if (message.gitHookStatus) updateGitHookCard(message);
-             break;
+            if (message.cloudStatus) updateCloudCard(message);
+            if (message.gitHookStatus) updateGitHookCard(message);
+            break;
     }
 });
 
@@ -297,12 +348,11 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 DotEnvy UI Initialized');
     addAnimationStyles();
 
-    // Add Ripple Effects
     document.querySelectorAll('.btn').forEach(btn => {
         btn.addEventListener('click', buttonEffects.addRipple);
     });
 
-    // Request Data
+    // Request dashboard data
     setTimeout(() => {
         vscode.postMessage({ type: 'refresh' });
     }, 100);

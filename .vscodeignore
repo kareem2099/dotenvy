@@ -88,3 +88,5 @@ resources/icons/compressed/**
 .dotenvy/**
 .gitignore
 .dotenvy/history
+
+.vscode/**

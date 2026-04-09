@@ -8,7 +8,7 @@
   "author": "Kareem Ehab",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.110.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "Programming Languages",
@@ -123,7 +123,7 @@
         "command": "dotenvy.initDotenvyIgnore",
         "title": "DotEnvy: Init .dotenvyignore",
         "icon": "$(exclude)"
-      }, 
+      },
       {
         "command": "dotenvy.addToIgnore",
         "title": "DotEnvy: Ignore this path",
@@ -171,6 +171,21 @@
         "title": "DotEnvy: View Environment History"
       },
       {
+        "command": "dotenvy.openHistoryPanel",
+        "title": "DotEnvy: Open History Panel",
+        "icon": "$(history)"
+      },
+      {
+        "command": "dotenvy.openAnalyticsPanel",
+        "title": "DotEnvy: Open Analytics Panel",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "dotenvy.openTimelinePanel",
+        "title": "DotEnvy: Open Timeline Panel",
+        "icon": "$(history)"
+      },
+      {
         "command": "dotenvy.initSecureProject",
         "title": "DotEnvy: Init Secure Project",
         "icon": "$(shield-lock)"
@@ -204,6 +219,11 @@
         "command": "dotenvy.restore",
         "title": "DotEnvy: Restore from Backup",
         "icon": "$(history)"
+      },
+      {
+        "command": "dotenvy.openTrashBin",
+        "title": "DotEnvy: Open Session Trash Bin",
+        "icon": "$(trash)"
       }
     ],
     "viewsContainers": {
@@ -224,12 +244,6 @@
           "icon": "$(settings-gear)"
         },
         {
-          "id": "dotenvy.historyViewer",
-          "name": "Environment History",
-          "type": "webview",
-          "icon": "$(history)"
-        },
-        {
           "id": "dotenvy.commands",
           "name": "Secure Commands",
           "type": "tree",
@@ -247,34 +261,14 @@
     "menus": {
       "view/title": [
         {
-          "command": "dotenvy.switchEnvironment",
+          "command": "dotenvy.openHistoryPanel",
           "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
-          "command": "dotenvy.openEnvironmentPanel",
+          "command": "dotenvy.openAnalyticsPanel",
           "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
-          "group": "navigation"
-        },
-        {
-          "command": "dotenvy.validateEnvironment",
-          "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
-          "group": "navigation"
-        },
-        {
-          "command": "dotenvy.diffEnvironment",
-          "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
-          "group": "navigation"
-        },
-        {
-          "command": "dotenvy.installGitHook",
-          "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
-          "group": "7_modification"
-        },
-        {
-          "command": "dotenvy.removeGitHook",
-          "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
-          "group": "7_modification"
+          "group": "navigation@2"
         }
       ],
       "explorer/context": [
@@ -297,7 +291,7 @@
     "@types/glob": "^7.2.0",
     "@types/mocha": "^9.1.1",
     "@types/node": "^16.18.126",
-    "@types/vscode": "^1.110.0",
+    "@types/vscode": "^1.90.0",
     "@typescript-eslint/eslint-plugin": "^5.1.0",
     "@typescript-eslint/parser": "^5.1.0",
     "@vscode/test-electron": "^2.3.0",

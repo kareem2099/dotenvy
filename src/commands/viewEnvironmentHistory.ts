@@ -3,6 +3,7 @@ import { HistoryManager } from '../utils/historyManager';
 import { HistoryEntry } from '../types/environment';
 import { EnvironmentDiffer } from '../utils/environmentDiffer';
 import { WorkspaceManager } from '../providers/workspaceManager';
+import { HistoryWebviewProvider } from '../providers/historyWebviewProvider';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -17,7 +18,8 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 
 	private registerCommand(): vscode.Disposable {
 		this.commandDisposable = vscode.commands.registerCommand('dotenvy.viewEnvironmentHistory', () => {
-			this.execute();
+			// Open the full History WebviewPanel instead of the old QuickPick flow
+			HistoryWebviewProvider.openOrReveal();
 		});
 
 		// Store for proper disposal

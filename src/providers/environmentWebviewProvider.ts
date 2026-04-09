@@ -14,6 +14,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import * as os from 'os';
 import { logger } from '../utils/logger';
+import { TrashBinManager } from '../utils/trashBinManager';
 
 // Dashboard data interfaces
 interface EnvironmentData {
@@ -116,7 +117,12 @@ interface ToggleVarEncryptionMessage extends BaseWebviewMessage {
     key: string;
 }
 
-type WebviewMessage = BaseWebviewMessage | SwitchEnvironmentMessage | EditFileMessage | DiffEnvironmentMessage | CreateEnvironmentMessage | BackupMessage | ToggleVarEncryptionMessage;
+interface VariableActionMessage extends BaseWebviewMessage {
+    type: 'updateVariable' | 'deleteVariable' | 'toggleVarEncryption';
+    key: string;
+}
+
+type WebviewMessage = BaseWebviewMessage | SwitchEnvironmentMessage | EditFileMessage | DiffEnvironmentMessage | CreateEnvironmentMessage | BackupMessage | ToggleVarEncryptionMessage | VariableActionMessage;
 
 export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
@@ -524,6 +530,19 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
                 await this.refreshEnvironments();
                 break;
 
+            case 'openHistoryPanel':
+                vscode.commands.executeCommand('dotenvy.openHistoryPanel');
+                break;
+
+            case 'openAnalyticsPanel':
+                vscode.commands.executeCommand('dotenvy.openAnalyticsPanel');
+                break;
+
+            case 'openTrashBin':
+                vscode.commands.executeCommand('dotenvy.openTrashBin');
+                break;
+
+
             case 'switchEnvironment':
                 const switchMsg = message as SwitchEnvironmentMessage;
                 const selectedEnv = (await this.environmentProvider.getEnvironments())
@@ -836,7 +855,7 @@ DEBUG=false
 
             case 'toggleVarEncryption': {
                 // Handle individual variable encryption toggle
-                const toggleMsg = message as ToggleVarEncryptionMessage;
+                const toggleMsg = message as VariableActionMessage;
                 const targetKey = toggleMsg.key;
 
                 if (!targetKey) {
@@ -878,6 +897,87 @@ DEBUG=false
 
                 } catch (error) {
                     vscode.window.showErrorMessage(`Failed to toggle encryption for '${targetKey}': ${(error as Error).message}`);
+                }
+                break;
+            }
+
+            case 'updateVariable': {
+                const updateMsg = message as VariableActionMessage;
+                const targetKey = updateMsg.key;
+                const envFilePath = path.join(rootPath, '.env');
+
+                try {
+                    const cryptoKey  = await EncryptedVarsManager.ensureMasterKey(this.context);
+                    const currentVars = await EncryptedEnvironmentFile.parseEnvFile(envFilePath, this.context, cryptoKey);
+                    
+                    const varData = currentVars.get(targetKey);
+                    if (!varData) {
+                        vscode.window.showErrorMessage(`Variable '${targetKey}' not found.`);
+                        return;
+                    }
+
+                    const newValue = await vscode.window.showInputBox({
+                        prompt: `Enter new value for ${targetKey}`,
+                        value: varData.value,
+                        ignoreFocusOut: true
+                    });
+
+                    if (newValue !== undefined && newValue !== varData.value) {
+                        // Push to Trash Bin BEFORE updating
+                        TrashBinManager.getInstance().push({
+                            key: targetKey,
+                            oldValue: varData.value,
+                            newValue: newValue,
+                            environmentFile: '.env',
+                            workspacePath: rootPath,
+                            type: 'modified'
+                        });
+
+                        varData.value = newValue;
+                        currentVars.set(targetKey, varData);
+                        await EncryptedEnvironmentFile.writeEnvFile(envFilePath, currentVars, this.context, cryptoKey);
+                        await this.refreshEnvironments();
+                        vscode.window.showInformationMessage(`✅ Updated ${targetKey}`);
+                    }
+                } catch (error) {
+                    vscode.window.showErrorMessage(`Update failed: ${(error as Error).message}`);
+                }
+                break;
+            }
+
+            case 'deleteVariable': {
+                const deleteMsg = message as VariableActionMessage;
+                const targetKey = deleteMsg.key;
+                const envFilePath = path.join(rootPath, '.env');
+
+                try {
+                    const cryptoKey  = await EncryptedVarsManager.ensureMasterKey(this.context);
+                    const currentVars = await EncryptedEnvironmentFile.parseEnvFile(envFilePath, this.context, cryptoKey);
+                    
+                    const varData = currentVars.get(targetKey);
+                    if (!varData) return;
+
+                    const confirm = await vscode.window.showWarningMessage(
+                        `Delete variable '${targetKey}'?`, { modal: true }, 'Delete'
+                    );
+
+                    if (confirm === 'Delete') {
+                        // Push to Trash Bin
+                        TrashBinManager.getInstance().push({
+                            key: targetKey,
+                            oldValue: varData.value,
+                            environmentFile: '.env',
+                            workspacePath: rootPath,
+                            type: 'deleted'
+                        });
+
+                        currentVars.delete(targetKey);
+                        await EncryptedEnvironmentFile.writeEnvFile(envFilePath, currentVars, this.context, cryptoKey);
+                        await this.refreshEnvironments();
+                        vscode.window.showInformationMessage(`🗑️ Deleted ${targetKey}`);
+                    }
+                } catch (error) {
+                    vscode.window.showErrorMessage(`Delete failed: ${(error as Error).message}`);
                 }
                 break;
             }
@@ -1017,3 +1117,4 @@ DEBUG=false
         }
     }
 }
+

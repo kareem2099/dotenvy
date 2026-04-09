@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>dotenvy - Environment Manager</title>
     <link rel="stylesheet" href="{{panelCssUri}}">
 </head>
+
 <body>
     <div class="header animate-fade-in">
         <h2>
@@ -13,7 +15,18 @@
             dotenvy Environment Manager
         </h2>
         <div class="header-actions">
-            <button class="btn btn-danger btn-sm" onclick="scanSecrets()" title="Scan codebase for API keys and secrets">
+            <button class="btn btn-secondary btn-sm" onclick="openHistoryPanel()"
+                title="Open full Environment History viewer">
+                <span>🕐</span> History
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="openAnalyticsPanel()" title="Open Environment Analytics">
+                <span>📈</span> Analytics
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="openTrashBin()" title="Open Session Trash Bin">
+                <span>🗑️</span> Trash Bin
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="scanSecrets()"
+                title="Scan codebase for API keys and secrets">
                 <span class="scan-icon">🔍</span> Scan Secrets
             </button>
             <button class="btn btn-primary btn-sm" onclick="pullFromCloud()">
@@ -31,26 +44,9 @@
         </div>
     </div>
 
+    <!-- Dashboard cards: Cloud Sync, Git Hook, Validation (Status removed) -->
     <div class="dashboard" id="dashboard">
-        <!-- Dashboard cards are static now -->
         <div class="dashboard-grid">
-            <div class="dashboard-card status-card">
-                <div class="card-header">
-                    <span class="card-icon">📊</span>
-                    <span class="card-title">Status</span>
-                </div>
-                <div class="card-content">
-                    <div class="status-item">
-                        <span class="status-label">Environments:</span>
-                        <span class="status-value" id="env-count">1</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">Current:</span>
-                        <span class="status-value" id="current-env">local</span>
-                    </div>
-                </div>
-            </div>
-
             <div class="dashboard-card cloud-card">
                 <div class="card-header">
                     <span class="card-icon">☁️</span>
@@ -139,7 +135,7 @@
             </div>
         </div>
     </div>
-
     <script src="{{panelJsUri}}"></script>
 </body>
+
 </html>

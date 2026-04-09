@@ -1,384 +1,306 @@
 import * as vscode from 'vscode';
 import { HistoryManager } from '../utils/historyManager';
-import { HistoryEntry, HistoryStats } from '../types/environment';
-import { EnvironmentDiffer } from '../utils/environmentDiffer';
 import { WorkspaceManager } from './workspaceManager';
 import { HistoryAnalytics } from '../utils/historyAnalytics';
 import { HistoryFilterOptions } from '../utils/historyFilters';
 import * as fs from 'fs';
 import * as os from 'os';
+import * as path from 'path';
 import { logger } from '../utils/logger';
 
-interface CachedHistoryData {
-    history: HistoryEntry[];
-    stats: HistoryStats;
-}
-
-export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
+export class HistoryWebviewProvider {
     public static readonly viewType = 'dotenvy.historyViewer';
-    private _view?: vscode.WebviewView;
-    private cachedHistory: HistoryEntry[] | null = null;
-    private cachedStats: import('../types/environment').HistoryStats | null = null;
-    private cachedWorkspacePath: string | null = null;
+    private static _panel?: vscode.WebviewPanel;
+    private static _context?: vscode.ExtensionContext;
+    private static _extensionUri?: vscode.Uri;
 
-    constructor(private readonly _extensionUri: vscode.Uri, private readonly _context: vscode.ExtensionContext) {}
+    /** Call once on activate to store context & uri */
+    public static init(extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
+        HistoryWebviewProvider._extensionUri = extensionUri;
+        HistoryWebviewProvider._context = context;
+    }
 
-    public resolveWebviewView(
-        webviewView: vscode.WebviewView,
-        context: vscode.WebviewViewResolveContext,
-        token: vscode.CancellationToken,
-    ) {
-        this._view = webviewView;
+    /** Open (or reveal) the History webview panel */
+    public static async openOrReveal(): Promise<void> {
+        const context = HistoryWebviewProvider._context!;
+        const extensionUri = HistoryWebviewProvider._extensionUri!;
 
-        // Store context for state persistence
-        this._context.globalState.update('history-webview-context', {
-            lastResolveTime: Date.now()
-        });
+        if (HistoryWebviewProvider._panel) {
+            HistoryWebviewProvider._panel.reveal(vscode.ViewColumn.One);
+            return;
+        }
 
-        // Handle cancellation token
-        token.onCancellationRequested(() => {
-            logger.info('History webview resolution cancelled', 'HistoryWebviewProvider');
-        });
+        const panel = vscode.window.createWebviewPanel(
+            HistoryWebviewProvider.viewType,
+            'Environment History',
+            vscode.ViewColumn.One,
+            {
+                enableScripts: true,
+                localResourceRoots: [extensionUri],
+                retainContextWhenHidden: true,
+            }
+        );
 
-        webviewView.webview.options = {
-            enableScripts: true,
-            localResourceRoots: [this._extensionUri]
-        };
-
-        webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+        HistoryWebviewProvider._panel = panel;
+        panel.webview.html = HistoryWebviewProvider._getHtml(panel.webview, extensionUri);
 
         // Handle messages from the webview
-        const messageDisposable = webviewView.webview.onDidReceiveMessage(async (message) => {
-            switch (message.type) {
-                case 'refresh':
-                    const workspaceFolders = vscode.workspace.workspaceFolders;
-                    if (workspaceFolders && workspaceFolders.length > 0) {
-                        await this.loadHistory(workspaceFolders[0].uri.fsPath);
-                        await this.loadAnalytics(workspaceFolders[0].uri.fsPath);
-                    }
-                    break;
-                case 'loadHistory':
-                    await this.loadHistory(message.workspacePath);
-                    break;
-                case 'loadAnalytics':
-                    await this.loadAnalytics(message.workspacePath);
-                    break;
-                case 'viewEntry':
-                    await this.viewEntry(message.entryId, message.workspacePath);
-                    break;
-                case 'rollback':
-                    await this.rollbackToEntry(message.entryId, message.workspacePath, message.reason);
-                    break;
-                case 'diff':
-                    await this.showDiff(message.entryId, message.workspacePath);
-                    break;
-                case 'applyFilters':
-                    await this.applyFilters(message.workspacePath, message.filters);
-                    break;
-                case 'getFilterOptions':
-                    await this.getFilterOptions(message.workspacePath);
-                    break;
-                case 'getVariableHistory':
-                    await this.getVariableHistory(message.workspacePath, message.variableName);
-                    break;
-                case 'validateRegex':
-                    this.validateRegex(message.pattern);
-                    break;
-                case 'copyContent':
-                    await this.copyContent(message.entryId, message.workspacePath);
-                    break;
-                case 'confirmRollback':
-                    await this.confirmRollback(message.entryId, message.workspacePath, message.timestamp, message.environmentName);
-                    break;
-            }
-        });
+        panel.webview.onDidReceiveMessage(async (message) => {
+            await HistoryWebviewProvider._handleMessage(message);
+        }, undefined, context.subscriptions);
 
-        // Handle visibility changes
-        const visibilityDisposable = webviewView.onDidChangeVisibility(() => {
-            if (webviewView.visible) {
-                const workspaceFolders = vscode.workspace.workspaceFolders;
-                if (workspaceFolders && workspaceFolders.length > 0) {
-                    this.loadHistory(workspaceFolders[0].uri.fsPath);
-                }
-            }
-        });
+        // When the panel is closed, clean up
+        panel.onDidDispose(() => {
+            HistoryWebviewProvider._panel = undefined;
+        }, null, context.subscriptions);
 
-        this._context.subscriptions.push(messageDisposable, visibilityDisposable);
-
-        // Load initial history if workspace is available
+        // Load initial history
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (workspaceFolders && workspaceFolders.length > 0) {
-            const workspacePath = workspaceFolders[0].uri.fsPath;
-
-            // Try to load from persistent cache first
-            const cacheKey = `history-cache-${workspacePath}`;
-            const cachedData = this._context.globalState.get(cacheKey) as CachedHistoryData;
-
-            if (cachedData && cachedData.history && cachedData.stats) {
-                this.cachedHistory = cachedData.history;
-                this.cachedStats = cachedData.stats;
-                this.cachedWorkspacePath = workspacePath;
-                this.displayCachedHistory();
-            } else {
-                this.loadHistory(workspacePath);
-            }
+            await HistoryWebviewProvider.loadHistory(workspaceFolders[0].uri.fsPath);
         }
     }
 
-    public async loadHistory(workspacePath: string): Promise<void> {
+    // ─── Public data methods ────────────────────────────────────────────────────
+
+    public static async loadHistory(workspacePath: string): Promise<void> {
         try {
             const history = await HistoryManager.getHistory(workspacePath, 100);
             const stats = await HistoryManager.getStats(workspacePath);
 
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'historyLoaded',
-                    history: history,
-                    stats: stats,
-                    workspacePath: workspacePath
-                });
-            }
+            HistoryWebviewProvider._post({
+                type: 'historyLoaded',
+                history,
+                stats,
+                workspacePath
+            });
         } catch (error) {
             logger.error('Failed to load history:', error, 'HistoryWebviewProvider');
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'error',
-                    message: `Failed to load history: ${(error as Error).message}`
-                });
-            }
+            HistoryWebviewProvider._post({
+                type: 'error',
+                message: `Failed to load history: ${(error as Error).message}`
+            });
         }
     }
 
-    public async loadAnalytics(workspacePath: string): Promise<void> {
+    public static async loadAnalytics(workspacePath: string): Promise<void> {
         try {
-            // Get history data for comprehensive analytics
-            const historyData = await HistoryManager.getHistory(workspacePath, 1000); // Get more data for detailed analysis
-
-            // Use HistoryAnalytics for comprehensive analytics
+            const historyData = await HistoryManager.getHistory(workspacePath, 1000);
             const analytics = await HistoryAnalytics.generateAnalytics(historyData);
 
-            // Get top insights for quick display
             const topEnvironments = HistoryAnalytics.getTopEnvironments(analytics, 5);
             const peakHours = HistoryAnalytics.getPeakHours(analytics);
             const mostChangedVariables = HistoryAnalytics.getMostChangedVariables(analytics, 10);
 
-            // Enhanced analytics with quick insights
             const enhancedAnalytics = {
                 ...analytics,
                 quickInsights: {
                     topEnvironments,
-                    peakHours: peakHours.slice(0, 3), // Top 3 peak hours
-                    mostChangedVariables: mostChangedVariables.slice(0, 5), // Top 5 most changed variables
+                    peakHours: peakHours.slice(0, 3),
+                    mostChangedVariables: mostChangedVariables.slice(0, 5),
                     totalUniqueVariables: Object.keys(analytics.variableAnalytics.changeFrequency).length,
-                    activityScore: this.calculateActivityScore(analytics)
+                    activityScore: HistoryWebviewProvider._calcActivityScore(analytics)
                 }
             };
 
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'analyticsLoaded',
-                    analytics: enhancedAnalytics,
-                    workspacePath: workspacePath
-                });
-            }
+            HistoryWebviewProvider._post({
+                type: 'analyticsLoaded',
+                analytics: enhancedAnalytics,
+                workspacePath
+            });
         } catch (error) {
             logger.error('Failed to load analytics:', error, 'HistoryWebviewProvider');
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'error',
-                    message: `Failed to load analytics: ${(error as Error).message}`
-                });
-            }
+            HistoryWebviewProvider._post({
+                type: 'error',
+                message: `Failed to load analytics: ${(error as Error).message}`
+            });
         }
     }
 
-    private async viewEntry(entryId: string, workspacePath: string): Promise<void> {
+    public static async applyFilters(workspacePath: string, filters: HistoryFilterOptions): Promise<void> {
+        try {
+            const result = await HistoryManager.applyFilters(workspacePath, filters);
+            HistoryWebviewProvider._post({ type: 'filtersApplied', result, workspacePath });
+        } catch (error) {
+            logger.error('Failed to apply filters:', error, 'HistoryWebviewProvider');
+            HistoryWebviewProvider._post({ type: 'error', message: `Failed to apply filters: ${(error as Error).message}` });
+        }
+    }
+
+    public static async getFilterOptions(workspacePath: string): Promise<void> {
+        try {
+            const options = await HistoryManager.getFilterOptions(workspacePath);
+            HistoryWebviewProvider._post({ type: 'filterOptionsLoaded', options, workspacePath });
+        } catch (error) {
+            logger.error('Failed to get filter options:', error, 'HistoryWebviewProvider');
+            HistoryWebviewProvider._post({ type: 'error', message: `Failed to get filter options: ${(error as Error).message}` });
+        }
+    }
+
+    public static async getVariableHistory(workspacePath: string, variableName: string): Promise<void> {
+        try {
+            const history = await HistoryManager.getVariableHistory(workspacePath, variableName);
+            HistoryWebviewProvider._post({ type: 'variableHistoryLoaded', variableName, history, workspacePath });
+        } catch (error) {
+            logger.error('Failed to get variable history:', error, 'HistoryWebviewProvider');
+            HistoryWebviewProvider._post({ type: 'error', message: `Failed to get variable history: ${(error as Error).message}` });
+        }
+    }
+
+    public static validateRegex(pattern: string): void {
+        const result = HistoryManager.validateRegex(pattern);
+        HistoryWebviewProvider._post({ type: 'regexValidated', pattern, valid: result.valid, error: result.error });
+    }
+
+    // ─── Private helpers ────────────────────────────────────────────────────────
+
+    private static _post(message: object): void {
+        HistoryWebviewProvider._panel?.webview.postMessage(message);
+    }
+
+    private static async _handleMessage(message: { type: string;[key: string]: any }): Promise<void> {
+        switch (message.type) {
+            case 'refresh': {
+                const workspaceFolders = vscode.workspace.workspaceFolders;
+                if (workspaceFolders && workspaceFolders.length > 0) {
+                    await HistoryWebviewProvider.loadHistory(workspaceFolders[0].uri.fsPath);
+                    await HistoryWebviewProvider.loadAnalytics(workspaceFolders[0].uri.fsPath);
+                }
+                break;
+            }
+            case 'loadHistory':
+                await HistoryWebviewProvider.loadHistory(message.workspacePath);
+                break;
+            case 'loadAnalytics':
+                await HistoryWebviewProvider.loadAnalytics(message.workspacePath);
+                break;
+            case 'viewEntry':
+                await HistoryWebviewProvider._viewEntry(message.entryId, message.workspacePath);
+                break;
+            case 'rollback':
+                await HistoryWebviewProvider._rollbackToEntry(message.entryId, message.workspacePath, message.reason);
+                break;
+            case 'diff':
+                await HistoryWebviewProvider._showDiff(message.entryId, message.workspacePath);
+                break;
+            case 'applyFilters':
+                await HistoryWebviewProvider.applyFilters(message.workspacePath, message.filters);
+                break;
+            case 'getFilterOptions':
+                await HistoryWebviewProvider.getFilterOptions(message.workspacePath);
+                break;
+            case 'getVariableHistory':
+                await HistoryWebviewProvider.getVariableHistory(message.workspacePath, message.variableName);
+                break;
+            case 'validateRegex':
+                HistoryWebviewProvider.validateRegex(message.pattern);
+                break;
+            case 'openTimeline':
+                await vscode.commands.executeCommand('dotenvy.openTimelinePanel');
+                break;
+            case 'copyContent':
+                await HistoryWebviewProvider._copyContent(message.entryId, message.workspacePath);
+                break;
+            case 'confirmRollback':
+                await HistoryWebviewProvider._confirmRollback(
+                    message.entryId, message.workspacePath, message.timestamp, message.environmentName
+                );
+                break;
+        }
+    }
+
+    private static async _viewEntry(entryId: string, workspacePath: string): Promise<void> {
         try {
             const entry = await HistoryManager.getEntry(workspacePath, entryId);
-            if (entry && this._view) {
-                this._view.webview.postMessage({
-                    type: 'entryContent',
-                    entry: entry
-                });
-            } else if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'error',
-                    message: 'Entry not found'
-                });
+            if (entry) {
+                HistoryWebviewProvider._post({ type: 'entryContent', entry });
+            } else {
+                HistoryWebviewProvider._post({ type: 'error', message: 'Entry not found' });
             }
         } catch (error) {
             logger.error('Failed to load entry:', error, 'HistoryWebviewProvider');
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'error',
-                    message: `Failed to load entry: ${(error as Error).message}`
-                });
-            }
+            HistoryWebviewProvider._post({ type: 'error', message: `Failed to load entry: ${(error as Error).message}` });
         }
     }
 
-    private async rollbackToEntry(entryId: string, workspacePath: string, reason?: string): Promise<void> {
+    private static async _rollbackToEntry(entryId: string, workspacePath: string, reason?: string): Promise<void> {
         try {
             const success = await HistoryManager.rollbackToEntry(workspacePath, entryId, reason);
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'rollbackResult',
-                    success: success,
-                    entryId: entryId
-                });
+            HistoryWebviewProvider._post({ type: 'rollbackResult', success, entryId });
 
-                // Refresh history after rollback
-                await this.loadHistory(workspacePath);
+            await HistoryWebviewProvider.loadHistory(workspacePath);
 
-                // Refresh status bar
-                const workspaceManager = WorkspaceManager.getInstance();
-                const workspaceData = workspaceManager.getAllWorkspaces().find(
-                    ws => ws.workspace.uri.fsPath === workspacePath
-                );
-                if (workspaceData?.statusBarProvider) {
-                    workspaceData.statusBarProvider.forceRefresh();
-                }
+            const workspaceManager = WorkspaceManager.getInstance();
+            const workspaceData = workspaceManager.getAllWorkspaces().find(
+                ws => ws.workspace.uri.fsPath === workspacePath
+            );
+            if (workspaceData?.statusBarProvider) {
+                workspaceData.statusBarProvider.forceRefresh();
             }
         } catch (error) {
             logger.error('Failed to rollback:', error, 'HistoryWebviewProvider');
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'error',
-                    message: `Rollback failed: ${(error as Error).message}`
-                });
-            }
+            HistoryWebviewProvider._post({ type: 'error', message: `Rollback failed: ${(error as Error).message}` });
         }
     }
 
-    private async showDiff(entryId: string, workspacePath: string): Promise<void> {
+    private static async _showDiff(entryId: string, workspacePath: string): Promise<void> {
         try {
-            const entry = await HistoryManager.getEntry(workspacePath, entryId);
-            if (!entry) return;
+            const allEntries = await HistoryManager.getHistory(workspacePath);
+            const entryIndex = allEntries.findIndex(e => e.id === entryId);
+            if (entryIndex === -1) { return; }
 
-            const currentEnvPath = `${workspacePath}/.env`;
+            const entry = allEntries[entryIndex];
 
-            // Create temporary file for historical content
+            // Find the version before this one for the same environment
+            const envEntries = allEntries.filter(e => e.environmentName === entry.environmentName);
+            const envIndex = envEntries.findIndex(e => e.id === entryId);
+            const previousEntry = envEntries[envIndex + 1]; // Next in list is older
+
             const tempDir = os.tmpdir();
-            const tempFile = `${tempDir}/dotenvy-history-${entry.id}.env`;
-            fs.writeFileSync(tempFile, entry.fileContent);
+            let leftFile: string;
+            let rightFile: string;
+            let label: string;
 
-            // Generate diff
-            const diff = EnvironmentDiffer.compareFiles(tempFile, currentEnvPath);
-            const diffText = EnvironmentDiffer.formatDiffForDisplay(diff, entry.environmentName, 'Current');
+            if (previousEntry) {
+                // Scenario: View changes made IN this history entry
+                const leftPath = path.join(tempDir, `dotenvy-prev-${entry.id}.env`);
+                const rightPath = path.join(tempDir, `dotenvy-curr-${entry.id}.env`);
 
-            // Clean up temp file
-            fs.unlinkSync(tempFile);
+                fs.writeFileSync(leftPath, previousEntry.fileContent, 'utf8');
+                fs.writeFileSync(rightPath, entry.fileContent, 'utf8');
 
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'diffContent',
-                    diff: diffText,
-                    entry: entry
-                });
+                leftFile = leftPath;
+                rightFile = rightPath;
+                label = `History: ${entry.environmentName} (Changes at ${new Date(entry.timestamp).toLocaleString()})`;
+            } else {
+                // Fallback: Scenario: View changes between this entry and Current file
+                const leftPath = path.join(tempDir, `dotenvy-snap-${entry.id}.env`);
+                fs.writeFileSync(leftPath, entry.fileContent, 'utf8');
+
+                const envFileName = entry.fileName || (entry.environmentName === 'local' ? '.env' : `.env.${entry.environmentName}`);
+                const currentEnvPath = path.join(workspacePath, envFileName);
+
+                leftFile = leftPath;
+                rightFile = currentEnvPath;
+                label = `History: ${entry.environmentName} (${new Date(entry.timestamp).toLocaleString()}) ↔ Current`;
             }
-        } catch (error) {
-            logger.error('Failed to generate diff:', error, 'HistoryWebviewProvider');
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'error',
-                    message: `Failed to generate diff: ${(error as Error).message}`
-                });
-            }
-        }
-    }
 
-    private displayCachedHistory(): void {
-        if (this._view && this.cachedHistory && this.cachedStats && this.cachedWorkspacePath) {
-            this._view.webview.postMessage({
-                type: 'historyLoaded',
-                history: this.cachedHistory,
-                stats: this.cachedStats,
-                workspacePath: this.cachedWorkspacePath
+            await vscode.commands.executeCommand('vscode.diff', vscode.Uri.file(leftFile), vscode.Uri.file(rightFile), label, {
+                preview: true,
             });
-        }
-    }
 
-    public async applyFilters(workspacePath: string, filters: HistoryFilterOptions): Promise<void> {
-        try {
-            const result = await HistoryManager.applyFilters(workspacePath, filters);
-
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'filtersApplied',
-                    result: result,
-                    workspacePath: workspacePath
-                });
-            }
+            // Clean up temp files after a short delay (diff editor may still be reading it)
+            setTimeout(() => {
+                try { if (leftFile.startsWith(tempDir)) fs.unlinkSync(leftFile); } catch { /* ignore */ }
+                try { if (rightFile.startsWith(tempDir)) fs.unlinkSync(rightFile); } catch { /* ignore */ }
+            }, 60_000);
         } catch (error) {
-            logger.error('Failed to apply filters:', error, 'HistoryWebviewProvider');
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'error',
-                    message: `Failed to apply filters: ${(error as Error).message}`
-                });
-            }
+            logger.error('Failed to open diff:', error, 'HistoryWebviewProvider');
+            vscode.window.showErrorMessage(`Failed to open diff: ${(error as Error).message}`);
         }
     }
 
-    public async getFilterOptions(workspacePath: string): Promise<void> {
-        try {
-            const options = await HistoryManager.getFilterOptions(workspacePath);
-
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'filterOptionsLoaded',
-                    options: options,
-                    workspacePath: workspacePath
-                });
-            }
-        } catch (error) {
-            logger.error('Failed to get filter options:', error, 'HistoryWebviewProvider');
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'error',
-                    message: `Failed to get filter options: ${(error as Error).message}`
-                });
-            }
-        }
-    }
-
-    public async getVariableHistory(workspacePath: string, variableName: string): Promise<void> {
-        try {
-            const history = await HistoryManager.getVariableHistory(workspacePath, variableName);
-
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'variableHistoryLoaded',
-                    variableName: variableName,
-                    history: history,
-                    workspacePath: workspacePath
-                });
-            }
-        } catch (error) {
-            logger.error('Failed to get variable history:', error, 'HistoryWebviewProvider');
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'error',
-                    message: `Failed to get variable history: ${(error as Error).message}`
-                });
-            }
-        }
-    }
-
-    public validateRegex(pattern: string): void {
-        const result = HistoryManager.validateRegex(pattern);
-
-        if (this._view) {
-            this._view.webview.postMessage({
-                type: 'regexValidated',
-                pattern: pattern,
-                valid: result.valid,
-                error: result.error
-            });
-        }
-    }
-
-    private async copyContent(entryId: string, workspacePath: string): Promise<void> {
+    private static async _copyContent(entryId: string, workspacePath: string): Promise<void> {
         try {
             const entry = await HistoryManager.getEntry(workspacePath, entryId);
             if (entry) {
@@ -391,27 +313,23 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private async confirmRollback(entryId: string, workspacePath: string, timestamp: string, environmentName: string): Promise<void> {
+    private static async _confirmRollback(
+        entryId: string, workspacePath: string, timestamp: string, environmentName: string
+    ): Promise<void> {
         try {
             const timestampDate = new Date(timestamp);
             const message = `Are you sure you want to rollback to the environment state from ${timestampDate.toLocaleString()}?\n\nThis will replace your current .env file with the historical version for environment "${environmentName}".`;
 
             const result = await vscode.window.showWarningMessage(
-                message,
-                { modal: true },
-                'Rollback',
-                'Cancel'
+                message, { modal: true }, 'Rollback', 'Cancel'
             );
 
             if (result === 'Rollback') {
-                // Ask for optional reason
                 const reason = await vscode.window.showInputBox({
                     prompt: 'Optional: Enter a reason for this rollback',
                     placeHolder: 'e.g., Reverting to stable configuration'
                 });
-
-                // Proceed with rollback
-                await this.rollbackToEntry(entryId, workspacePath, reason);
+                await HistoryWebviewProvider._rollbackToEntry(entryId, workspacePath, reason);
             }
         } catch (error) {
             logger.error('Failed to confirm rollback:', error, 'HistoryWebviewProvider');
@@ -419,30 +337,21 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private calculateActivityScore(analytics: import('../utils/historyAnalytics').AnalyticsSummary): number {
-        // Calculate a simple activity score based on:
-        // - Number of entries
-        // - Stability scores
-        // - Variable change frequency
-
-        const entryScore = Math.min(analytics.dataRange.totalEntries / 10, 100); // Up to 100 points for entries
+    private static _calcActivityScore(analytics: import('../utils/historyAnalytics').AnalyticsSummary): number {
+        const entryScore = Math.min(analytics.dataRange.totalEntries / 10, 100);
         const stabilityScores = Object.values(analytics.stabilityMetrics.stabilityScore);
         const averageStability = stabilityScores.length > 0
             ? stabilityScores.reduce((sum, score) => sum + score, 0) / stabilityScores.length
             : 50;
-
         const variableFrequency = Object.values(analytics.variableAnalytics.changeFrequency);
         const totalChanges = variableFrequency.reduce((sum, freq) => sum + freq, 0);
-        const frequencyScore = Math.min(totalChanges / 5, 100); // Up to 100 points for changes
-
-        // Weighted average: 40% entries, 30% stability, 30% frequency
+        const frequencyScore = Math.min(totalChanges / 5, 100);
         return Math.round((entryScore * 0.4) + (averageStability * 0.3) + (frequencyScore * 0.3));
     }
 
-    private _getHtmlForWebview(webview: vscode.Webview): string {
-        const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'panel', 'panel.css'));
-        const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'panel', 'history-viewer.js'));
-
+    private static _getHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+        const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css'));
+        const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'history-viewer.js'));
         const nonce = getNonce();
 
         return `<!DOCTYPE html>
@@ -457,102 +366,106 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
         <body>
             <div class="history-container">
                 <div class="history-header">
-                    <h3>Environment History</h3>
-                    <div class="history-stats" id="stats"></div>
-                </div>
-
-                <div class="history-toolbar">
-                    <div class="view-toggles">
-                        <button id="list-view-btn" class="btn-secondary view-toggle active" data-view="list">📋 List</button>
-                        <button id="timeline-view-btn" class="btn-secondary view-toggle" data-view="timeline">📊 Timeline</button>
-                        <button id="analytics-view-btn" class="btn-secondary view-toggle" data-view="analytics">📈 Analytics</button>
+                    <div class="header-left">
+                        <h3>📋 Environment History</h3>
+                        <div class="history-stats" id="stats"></div>
                     </div>
-                    <button id="refresh-btn" class="btn-secondary">🔄 Refresh</button>
-                    <button id="advanced-filters-btn" class="btn-secondary">🔍 Advanced Filters</button>
+                    <div class="header-actions">
+                        <button id="view-timeline-btn" class="btn-icon-pill" title="Open Timeline View">📊 Timeline</button>
+                        <button id="refresh-btn" class="btn-icon-pill" title="Refresh">🔄</button>
+                        <button id="advanced-filters-btn" class="btn-icon-pill" title="Advanced Filters">🔍 Filters</button>
+                    </div>
                 </div>
 
-                <div class="advanced-filters-panel" id="advanced-filters-panel" style="display: none;">
-                    <div class="filters-section">
-                        <h4>🔍 Search & Filter</h4>
-                        <div class="filter-row">
-                            <div class="filter-group">
-                                <label for="advanced-search-input">Search Query:</label>
-                                <input type="text" id="advanced-search-input" placeholder="Search environment content..." class="filter-input">
-                                <div class="filter-options">
-                                    <label><input type="checkbox" id="regex-toggle"> Regex</label>
-                                    <select id="search-scope-select" class="filter-select-small">
-                                        <option value="all">All Content</option>
-                                        <option value="environments">Environments</option>
-                                        <option value="variables">Variables</option>
-                                        <option value="values">Values</option>
+                <div class="history-search-bar">
+                    <input type="text" id="search-input" placeholder="Quick search…" class="search-input-inline">
+                    <select id="filter-select" class="filter-select-inline">
+                        <option value="all">All actions</option>
+                        <option value="switch">Switch</option>
+                        <option value="rollback">Rollback</option>
+                        <option value="manual_edit">Edit</option>
+                        <option value="import">Import</option>
+                        <option value="initial">Initial</option>
+                    </select>
+                </div>
+
+                <div class="advanced-filters-backdrop" id="advanced-filters-backdrop"></div>
+                <div class="advanced-filters-panel" id="advanced-filters-panel">
+                    <div class="filters-header">
+                        <h4>🔍 Advanced Filters</h4>
+                        <button id="close-filters-btn-icon" class="btn-icon-close" title="Close">&times;</button>
+                    </div>
+                    <div class="drawer-content">
+                        <div class="filters-section">
+                            <h4>🔍 Search</h4>
+                            <div class="filter-row">
+                                <div class="filter-group">
+                                    <label for="advanced-search-input">Query:</label>
+                                    <input type="text" id="advanced-search-input" placeholder="Search…" class="filter-input">
+                                    <div class="filter-options">
+                                        <label><input type="checkbox" id="regex-toggle"> Regex</label>
+                                        <select id="search-scope-select" class="filter-select-small">
+                                            <option value="all">All</option>
+                                            <option value="environments">Environments</option>
+                                            <option value="variables">Variables</option>
+                                            <option value="values">Values</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="filters-section">
+                            <h4>📅 Date Range</h4>
+                            <div class="filter-row">
+                                <div class="filter-group">
+                                    <label>Preset:</label>
+                                    <select id="date-preset-select" class="filter-select-small"><option value="">Custom</option></select>
+                                </div>
+                                <div class="filter-group">
+                                    <label for="date-from-input">From:</label>
+                                    <input type="date" id="date-from-input" class="filter-input">
+                                </div>
+                                <div class="filter-group">
+                                    <label for="date-to-input">To:</label>
+                                    <input type="date" id="date-to-input" class="filter-input">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="filters-section">
+                            <h4>👥 Users &amp; Actions</h4>
+                            <div class="filter-row">
+                                <div class="filter-group">
+                                    <label>Users:</label>
+                                    <select id="user-filter-select" multiple class="filter-select-multi"><option value="">Loading…</option></select>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Actions:</label>
+                                    <select id="action-filter-select" multiple class="filter-select-multi">
+                                        <option value="switch">Switch</option>
+                                        <option value="rollback">Rollback</option>
+                                        <option value="manual_edit">Manual Edit</option>
+                                        <option value="import">Import</option>
+                                        <option value="initial">Initial</option>
                                     </select>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="filters-section">
-                        <h4>📅 Date Range</h4>
-                        <div class="filter-row">
-                            <div class="filter-group">
-                                <label>Date Presets:</label>
-                                <select id="date-preset-select" class="filter-select-small">
-                                    <option value="">Custom Range</option>
-                                </select>
-                            </div>
-                            <div class="filter-group">
-                                <label for="date-from-input">From:</label>
-                                <input type="date" id="date-from-input" class="filter-input">
-                            </div>
-                            <div class="filter-group">
-                                <label for="date-to-input">To:</label>
-                                <input type="date" id="date-to-input" class="filter-input">
+                        <div class="filters-section">
+                            <h4>🏷️ Environments &amp; Variables</h4>
+                            <div class="filter-row">
+                                <div class="filter-group">
+                                    <label>Environments:</label>
+                                    <select id="environment-filter-select" multiple class="filter-select-multi"><option value="">Loading…</option></select>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Variables:</label>
+                                    <select id="variable-filter-select" multiple class="filter-select-multi"><option value="">Loading…</option></select>
+                                </div>
                             </div>
                         </div>
                     </div>
-
-                    <div class="filters-section">
-                        <h4>👥 Users & Actions</h4>
-                        <div class="filter-row">
-                            <div class="filter-group">
-                                <label>Users:</label>
-                                <select id="user-filter-select" multiple class="filter-select-multi">
-                                    <option value="">Loading...</option>
-                                </select>
-                            </div>
-                            <div class="filter-group">
-                                <label>Actions:</label>
-                                <select id="action-filter-select" multiple class="filter-select-multi">
-                                    <option value="switch">Switch</option>
-                                    <option value="rollback">Rollback</option>
-                                    <option value="manual_edit">Manual Edit</option>
-                                    <option value="import">Import</option>
-                                    <option value="initial">Initial</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="filters-section">
-                        <h4>🏷️ Environments & Variables</h4>
-                        <div class="filter-row">
-                            <div class="filter-group">
-                                <label>Environments:</label>
-                                <select id="environment-filter-select" multiple class="filter-select-multi">
-                                    <option value="">Loading...</option>
-                                </select>
-                            </div>
-                            <div class="filter-group">
-                                <label>Variables:</label>
-                                <select id="variable-filter-select" multiple class="filter-select-multi">
-                                    <option value="">Loading...</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="filters-actions">
-                        <button id="apply-filters-btn" class="btn-primary">Apply Filters</button>
+                        <button id="apply-filters-btn" class="btn-primary">Apply</button>
                         <button id="clear-filters-btn" class="btn-secondary">Clear All</button>
                         <button id="close-filters-btn" class="btn-secondary">Close</button>
                         <div class="filter-stats" id="filter-stats"></div>
@@ -560,49 +473,22 @@ export class HistoryWebviewProvider implements vscode.WebviewViewProvider {
                 </div>
 
                 <div class="history-views">
-                    <div class="history-list active" id="history-list">
-                        <div class="loading">Loading history...</div>
-                    </div>
-
-                    <div class="timeline-container" id="timeline-container" style="display: none;">
-                        <div class="timeline-controls">
-                            <button id="zoom-in-btn" class="btn-secondary" title="Zoom In">🔍+</button>
-                            <button id="zoom-out-btn" class="btn-secondary" title="Zoom Out">🔍-</button>
-                            <button id="fit-to-screen-btn" class="btn-secondary" title="Fit to Screen">📐</button>
-                            <span class="zoom-level" id="zoom-level">100%</span>
-                        </div>
-                        <div class="timeline-wrapper">
-                            <svg class="timeline-svg" id="timeline-svg" width="100%" height="400">
-                                <defs>
-                                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                                        <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
-                                    </marker>
-                                </defs>
-                                <g class="timeline-content" id="timeline-content"></g>
-                            </svg>
-                        </div>
-                        <div class="timeline-minimap" id="timeline-minimap" style="display: none;">
-                            <svg class="minimap-svg" id="minimap-svg" width="100%" height="60"></svg>
-                        </div>
-                    </div>
-
-                    <div class="analytics-container" id="analytics-container" style="display: none;">
-                        <div class="analytics-content" id="analytics-content">
-                            <div class="loading">Loading analytics...</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="history-detail" id="history-detail" style="display: none;">
-                    <div class="detail-header">
-                        <button id="back-btn" class="btn-secondary">← Back</button>
-                        <h4 id="detail-title"></h4>
-                    </div>
-                    <div class="detail-content" id="detail-content"></div>
-                    <div class="detail-actions" id="detail-actions"></div>
+                    <table class="history-table" id="history-list">
+                        <thead>
+                            <tr>
+                                <th>Date &amp; Time</th>
+                                <th>Environment</th>
+                                <th>Action</th>
+                                <th>Note</th>
+                                <th class="col-actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body">
+                            <tr><td colspan="5" class="loading">Loading history…</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-
             <script nonce="${nonce}" src="${scriptUri}"></script>
         </body>
         </html>`;

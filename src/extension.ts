@@ -22,11 +22,14 @@ import { LoginToSecureProjectCommand } from './commands/loginToSecureProject';
 
 // Import Providers & Managers
 import { HistoryWebviewProvider } from './providers/historyWebviewProvider';
+import { AnalyticsWebviewProvider } from './providers/analyticsWebviewProvider';
+import { TimelineWebviewProvider } from './providers/timelineWebviewProvider';
 import { WorkspaceManager } from './providers/workspaceManager';
 import { EnvironmentTreeProvider } from './providers/environmentTreeProvider';
 import { EnvironmentWebviewProvider } from './providers/environmentWebviewProvider';
 import { CommandsTreeProvider } from './providers/commandsTreeProvider';
 import { EnvironmentCompletionProvider } from './providers/environmentCompletionProvider';
+import { TrashBinWebviewProvider } from './providers/trashBinWebviewProvider';
 import { HistoryManager } from './utils/historyManager';
 import { UpdateManager } from './managers/UpdateManager';
 
@@ -45,8 +48,8 @@ export async function activate(context: vscode.ExtensionContext) {
     logger.setLevel(context.extensionMode === vscode.ExtensionMode.Development
         ? LogLevel.DEBUG
         : LogLevel.WARN
-        );
-    logger.info('DotEnvy extension is now active! 🚀' , 'Extension');
+    );
+    logger.info('DotEnvy extension is now active! 🚀', 'Extension');
 
     // ─── 0. Initialize LLMAnalyzer (must be first — other commands depend on it) ──
     //
@@ -68,19 +71,33 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
 
     // ─── Providers Initialization ──────────────────────────────────────────────
-    const treeProvider        = new EnvironmentTreeProvider(initialWorkspacePath);
-    const webviewProvider     = new EnvironmentWebviewProvider(context);
-    const historyWebviewProvider = new HistoryWebviewProvider(extensionUri, context);
-    const completionProvider  = new EnvironmentCompletionProvider(initialWorkspacePath);
+    const treeProvider = new EnvironmentTreeProvider(initialWorkspacePath);
+    const webviewProvider = new EnvironmentWebviewProvider(context);
+    // Initialize the static History panel (no longer a sidebar view)
+    HistoryWebviewProvider.init(extensionUri, context);
+    // Initialize the static Analytics panel
+    AnalyticsWebviewProvider.init(extensionUri, context);
+    // Initialize the static Timeline panel
+    TimelineWebviewProvider.init(extensionUri, context);
+    // Initialize the static Trash Bin panel
+    TrashBinWebviewProvider.init(extensionUri, context);
+    const completionProvider = new EnvironmentCompletionProvider(initialWorkspacePath);
     const commandsTreeProvider = new CommandsTreeProvider();
     const initIgnoreCommand = new InitDotenvyIgnoreCommand();
-    
+
     // ─── Registrations ─────────────────────────────────────────────────────────
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('dotenvy.environments', webviewProvider),
-        vscode.window.registerWebviewViewProvider(HistoryWebviewProvider.viewType, historyWebviewProvider),
         vscode.window.registerTreeDataProvider('dotenvy.explorer-environments', treeProvider),
         vscode.window.registerTreeDataProvider('dotenvy.commands', commandsTreeProvider),
+        // Command to open the History panel as a full WebviewPanel (tab)
+        vscode.commands.registerCommand('dotenvy.openHistoryPanel', () => HistoryWebviewProvider.openOrReveal()),
+        // Command to open the Analytics panel as a full WebviewPanel (tab)
+        vscode.commands.registerCommand('dotenvy.openAnalyticsPanel', () => AnalyticsWebviewProvider.openOrReveal()),
+        // Command to open the Timeline panel as a full WebviewPanel (tab)
+        vscode.commands.registerCommand('dotenvy.openTimelinePanel', () => TimelineWebviewProvider.openOrReveal()),
+        // Command to open the Trash Bin panel as a full WebviewPanel (tab)
+        vscode.commands.registerCommand('dotenvy.openTrashBin', () => TrashBinWebviewProvider.openOrReveal()),
     );
 
     // ─── 2. Completion Provider ────────────────────────────────────────────────
@@ -112,23 +129,23 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     // ─── Commands Initialization ───────────────────────────────────────────────
-    const switchEnvCommand         = new SwitchEnvironmentCommand();
-    const openPanelCommand         = new OpenEnvironmentPanelCommand();
-    const validateEnvCommand       = new ValidateEnvironmentCommand();
-    const diffEnvCommand           = new DiffEnvironmentCommand();
-    const installHookCommand       = new InstallGitHookCommand();
-    const removeHookCommand        = new RemoveGitHookCommand();
-    const pullFromCloudCommand     = new PullFromCloudCommand();
-    const pushToCloudCommand       = new PushToCloudCommand();
-    const scanSecretsCommand       = new ScanSecretsCommand();
-    const feedbackCommand          = new FeedbackCommand();
-    const viewHistoryCommand       = new ViewEnvironmentHistoryCommand();
+    const switchEnvCommand = new SwitchEnvironmentCommand();
+    const openPanelCommand = new OpenEnvironmentPanelCommand();
+    const validateEnvCommand = new ValidateEnvironmentCommand();
+    const diffEnvCommand = new DiffEnvironmentCommand();
+    const installHookCommand = new InstallGitHookCommand();
+    const removeHookCommand = new RemoveGitHookCommand();
+    const pullFromCloudCommand = new PullFromCloudCommand();
+    const pushToCloudCommand = new PushToCloudCommand();
+    const scanSecretsCommand = new ScanSecretsCommand();
+    const feedbackCommand = new FeedbackCommand();
+    const viewHistoryCommand = new ViewEnvironmentHistoryCommand();
     const setMasterPasswordCommand = new SetMasterPasswordCommand(context);
     const exportEnvironmentCommand = new ExportEnvironmentCommand();
 
-    const initSecureProjectCommand   = new InitSecureProjectCommand();
-    const addUserCommand             = new AddUserCommand();
-    const revokeUserCommand          = new RevokeUserCommand();
+    const initSecureProjectCommand = new InitSecureProjectCommand();
+    const addUserCommand = new AddUserCommand();
+    const revokeUserCommand = new RevokeUserCommand();
     const loginToSecureProjectCommand = new LoginToSecureProjectCommand();
 
     context.subscriptions.push(
@@ -164,16 +181,16 @@ export async function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('✅ DotEnvy: LLM secret saved securely.');
             }
         }),
-    
 
-    vscode.commands.registerCommand('dotenvy.addToIgnore', async (uri: vscode.Uri) => {
+
+        vscode.commands.registerCommand('dotenvy.addToIgnore', async (uri: vscode.Uri) => {
             const workspaceFolders = vscode.workspace.workspaceFolders;
             if (!workspaceFolders) { return; }
 
-            const rootPath     = workspaceFolders[0].uri.fsPath;
+            const rootPath = workspaceFolders[0].uri.fsPath;
             const relativePath = path.relative(rootPath, uri.fsPath).replace(/\\/g, '/');
-            const isDir        = (await vscode.workspace.fs.stat(uri)).type === vscode.FileType.Directory;
-            const pattern      = isDir ? `${relativePath}/**` : relativePath;
+            const isDir = (await vscode.workspace.fs.stat(uri)).type === vscode.FileType.Directory;
+            const pattern = isDir ? `${relativePath}/**` : relativePath;
 
             const ignoreUri = vscode.Uri.joinPath(workspaceFolders[0].uri, '.dotenvyignore');
             let content = '';
@@ -223,6 +240,9 @@ export async function activate(context: vscode.ExtensionContext) {
                         { source: 'auto' },
                     );
                     logger.info(`History recorded for ${fileName}`, 'extension');
+
+                    // Real-time update: Refresh the history webview if it's open
+                    await HistoryWebviewProvider.loadHistory(workspaceFolder.uri.fsPath);
                 } catch (error) {
                     logger.error('Failed to record history:', error, 'extension');
                 }
@@ -231,7 +251,7 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     // ─── Startup checks ────────────────────────────────────────────────────────
-    
+
     // Test LLM connection on startup (non-blocking)
     LLMAnalyzer.getInstance().testConnection().then(connected => {
         if (connected) {
