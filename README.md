@@ -1,7 +1,7 @@
 # dotenvy – VS Code Environment Manager
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
-[![Codename](https://img.shields.io/badge/codename-Nexus-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.0.0)
+[![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Codename](https://img.shields.io/badge/codename-Nexus-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.0.1)
 [![Publisher](https://img.shields.io/badge/publisher-FreeRave-red.svg)](https://marketplace.visualstudio.com/publishers/FreeRave)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![VS Code Marketplace](https://img.shields.io/badge/vscode-marketplace-007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
@@ -63,11 +63,11 @@ Track your usage, stability metrics, and most active environments directly from 
 Manage all your environments seamlessly from a clean, native sidebar.
 <img width="100%" alt="Environment Switcher" src="https://github.com/user-attachments/assets/c2139b3c-4dfc-4a3c-86b5-adf0b7b7fa89" />
 
-### 🔍 **Secrets Guard** 🧠 — v1.6.0
+### 🧠 AI Secrets Guard (Enterprise Grade) 🔒
 
 Production-grade secret detection powered by a **custom ML model** with HMAC-secured communication and an interactive Secrets Panel.
 
-#### What's new in v1.6.0:
+#### Key Engine Features:
 - **🔐 OS-Encrypted Secret Storage** — Shared secret stored in VS Code SecretStorage (Keychain / libsecret / Credential Manager), never in the compiled bundle
 - **35-Feature ML Model (fixed)** — Feature count corrected from 31 → 35, entropy normalization fixed to match Python backend exactly
 - **📋 Secrets Panel** — Full WebviewPanel shows all detected secrets (no more 5-item cap) with filter by confidence, search, View / Move to .env / Not a Secret buttons
@@ -75,6 +75,14 @@ Production-grade secret detection powered by a **custom ML model** with HMAC-sec
 - **🚫 .dotenvyignore** — New file (same syntax as `.gitignore`) lets you exclude files and folders from secret scanning
 - **📝 Centralized Logging** — All extension logs visible in VS Code Output panel → DotEnvy
 - **🔄 Smart Fallback** — Local fallback analysis uses all 35 features including variable name signals (e.g. `DB_PASS` increases risk even with low entropy)
+
+### 🔒 Data Privacy & Security (Secrets Guard)
+We take your code's security seriously. Here is exactly how DotEnvy handles your data during AI secret scanning:
+
+* **Targeted Analysis:** DotEnvy does NOT upload your entire workspace. Only the specific line containing a suspected secret (and its immediate surrounding context) is sent to our LLM engine for verification.
+* **Zero Retention (Ephemeral Processing):** The `secret_value` and `context` sent for analysis are processed exclusively in-memory. **We do not store, log, or save your source code or secrets on our servers.**
+* **Opt-in Model Training:** We only use data to train our ML models when you explicitly provide feedback (e.g., clicking "Not a Secret" or "Move to .env"). This sends 35 anonymized numerical features and your action label.
+* **Secure Communication:** All API requests are strictly authenticated using a unique `X-Machine-ID` and an HMAC `X-Extension-Signature` to prevent abuse and secure data in transit.
 
 ---
 
@@ -157,7 +165,7 @@ Run **`DotEnvy: Init .dotenvyignore`** to create a default file, or right-click 
 - **Manual**: Download `.vsix` file and install via VS Code
 
 ### Requirements
-- VS Code **1.110.0** or later
+- VS Code **1.90.0** or later
 
 ---
 

@@ -27,6 +27,15 @@ export interface LLMHealthResponse {
 
 const SECRET_STORAGE_KEY = 'dotenvy.llm.sharedSecret';
 
+const KNOWN_SECRET_PATTERNS: { name: string; regex: RegExp }[] = [
+    { name: 'AWS Access Key',     regex: /AKIA[0-9A-Z]{16}/ },
+    { name: 'Stripe Live Key',    regex: /sk_live_[0-9a-zA-Z]{24,}/ },
+    { name: 'Stripe Test Key',    regex: /sk_test_[0-9a-zA-Z]{24,}/ },
+    { name: 'GitHub Token',       regex: /ghp_[a-zA-Z0-9]{36}/ },
+    { name: 'OpenAI Key',         regex: /sk-[a-zA-Z0-9]{48}/ },
+    { name: 'Google API Key',     regex: /AIza[0-9A-Za-z\-_]{35}/ },
+];
+
 export class LLMAnalyzer {
 
     private static instance: LLMAnalyzer | null = null;
@@ -39,6 +48,7 @@ export class LLMAnalyzer {
     private circuitBreakerOpen = false;
     private lastFailureTime = 0;
     private readonly CIRCUIT_BREAKER_TIMEOUT = 60_000;
+    private communityBlacklist: Set<string> = new Set();
 
     private constructor(context: vscode.ExtensionContext) {
         this.secrets = context.secrets;
@@ -49,6 +59,7 @@ export class LLMAnalyzer {
             LLMAnalyzer.instance = new LLMAnalyzer(context);
         }
         await LLMAnalyzer.instance.loadSecret();
+        await LLMAnalyzer.instance.syncBlacklist().catch(() => {});
         return LLMAnalyzer.instance;
     }
 
@@ -60,10 +71,22 @@ export class LLMAnalyzer {
     }
 
     private async loadSecret(): Promise<void> {
+        // 1. Try SecretStorage (User manually set it)
         this.sharedSecret = await this.secrets.get(SECRET_STORAGE_KEY);
+
+        // 2. Fallback to embedded secret (Substituted at build time by scripts/build-with-env.js)
         if (!this.sharedSecret) {
-            logger.warn('[DotEnvy] ⚠️  Shared secret not found in SecretStorage.', 'LLMAnalyzer');
-        } else {
+            // @ts-ignore - process.env is handled by our custom build script substitution
+            const embeddedSecret = process.env.EXTENSION_SHARED_SECRET || 'REPLACE_AT_BUILD_TIME';
+            if (embeddedSecret !== 'REPLACE_AT_BUILD_TIME') {
+                this.sharedSecret = embeddedSecret;
+                logger.info('[DotEnvy] ✅ Shared secret loaded from build configuration.', 'LLMAnalyzer');
+            }
+        }
+
+        if (!this.sharedSecret) {
+            logger.warn('[DotEnvy] ⚠️ Shared secret not found in SecretStorage or build config.', 'LLMAnalyzer');
+        } else if (!this.sharedSecret.includes('from build configuration')) {
             logger.info('[DotEnvy] ✅ Shared secret loaded from SecretStorage.', 'LLMAnalyzer');
         }
     }
@@ -135,6 +158,29 @@ export class LLMAnalyzer {
     }
 
     public async analyzeSecret(secretValue: string, context: string, variableName?: string): Promise<string> {
+        // L1 — Regex (free, instant)
+        const regexHit = KNOWN_SECRET_PATTERNS.find(p => p.regex.test(secretValue));
+        if (regexHit) {
+            logger.info(`[DotEnvy] Regex match: ${regexHit.name}`, 'LLMAnalyzer');
+            if (variableName) { this.syncHashToServer(variableName, secretValue).catch(() => {}); }
+            return 'high';
+        }
+
+        // L2 — Community Blacklist (Local Cache - Fast Path)
+        if (variableName) {
+            const h = this.hashEntry(variableName, secretValue);
+            if (this.communityBlacklist.has(h)) {
+                logger.info(`[DotEnvy] Community blacklist match: ${variableName}`, 'LLMAnalyzer');
+                return 'high';
+            }
+        }
+
+        // L3 — Entropy gate (skip LLM entirely for low-entropy values)
+        const features = this.extractFeatures(secretValue, context, variableName);
+        const entropy  = features[7] * 8.0;   // f[7] = entropy/8
+        if (entropy < 3.5) { return 'low'; }
+
+        // L4 — LLM (The brain)
         this.shouldResetCircuitBreaker();
 
         if (this.circuitBreakerOpen || !this.sharedSecret) {
@@ -148,16 +194,23 @@ export class LLMAnalyzer {
 
             if (response) {
                 this.recordSuccess();
+                let result = 'low';
+
                 if (response.is_likely_secret &&
                     (response.risk_level === 'high' || response.risk_level === 'critical')) {
-                    return 'high';
-                }
-                if (response.enhanced_confidence) {
+                    result = 'high';
+                } else if (response.enhanced_confidence) {
                     const map: Record<string, string> = {
                         critical: 'high', high: 'high', medium: 'medium', low: 'low',
                     };
-                    return map[response.enhanced_confidence.toLowerCase()] || response.enhanced_confidence;
+                    result = map[response.enhanced_confidence.toLowerCase()] || response.enhanced_confidence;
                 }
+
+                // If LLM says "high", sync to server to help the community
+                if (result === 'high' && variableName) {
+                    this.syncHashToServer(variableName, secretValue).catch(() => {});
+                }
+                return result;
             }
         } catch (error) {
             this.recordFailure();
@@ -176,6 +229,88 @@ export class LLMAnalyzer {
     // ✅ الآن يستخدم FeatureExtractor — carbon copy من feature_extractor.py
     public extractFeatures(secretValue: string, context: string, variableName?: string): number[] {
         return FeatureExtractor.extract(secretValue, context, variableName);
+    }
+
+    public hashEntry(variableName: string, value: string): string {
+        const prefix = value.slice(0, 8);
+        return crypto
+            .createHash('sha256')
+            .update(`${variableName}:${prefix}`)
+            .digest('hex')
+            .substring(0, 16);
+    }
+
+    public async syncHashToServer(variableName: string, value: string): Promise<void> {
+        if (!this.sharedSecret) { return; }
+        const hash = this.hashEntry(variableName, value);
+        try {
+            await this.makeSignedRequest('/extension/blacklist/add', { hash });
+        } catch (e) {
+            logger.warn(`Hash sync failed: ${e instanceof Error ? e.message : 'Unknown'}`, 'LLMAnalyzer');
+        }
+    }
+
+    public async reportFalsePositive(variableName: string, value: string): Promise<void> {
+        if (!this.sharedSecret) { return; }
+        const hash = this.hashEntry(variableName, value);
+        try {
+            const res = await this.makeSignedRequest('/extension/blacklist/report_fp', { hash }) as any;
+            if (res && res.status === 'removed') {
+                this.communityBlacklist.delete(hash);
+                logger.info('[DotEnvy] 🚀 False positive threshold met. Hash removed from blacklist.', 'LLMAnalyzer');
+            }
+        } catch (e) {
+            logger.warn(`FP report failed: ${e instanceof Error ? e.message : 'Unknown'}`, 'LLMAnalyzer');
+        }
+    }
+
+    private async syncBlacklist(): Promise<void> {
+        if (!this.sharedSecret) { return; }
+        try {
+            const res = await this.makeSignedGetRequest('/extension/blacklist') as { hashes: string[] };
+            if (res && res.hashes) {
+                this.communityBlacklist = new Set(res.hashes);
+                logger.info(`[DotEnvy] 🔄 Community Blacklist synced (${this.communityBlacklist.size} hashes).`, 'LLMAnalyzer');
+            }
+        } catch (e) {
+            logger.warn(`Blacklist sync failed: ${e instanceof Error ? e.message : 'Unknown'}`, 'LLMAnalyzer');
+        }
+    }
+
+    private async makeSignedGetRequest(endpoint: string): Promise<unknown> {
+        if (!this.sharedSecret) {
+            throw new Error('[DotEnvy] Cannot sign — secret not loaded.');
+        }
+        const body = '';
+        const timestamp = String(Math.floor(Date.now() / 1000));
+        const signature = crypto
+            .createHmac('sha256', this.sharedSecret)
+            .update(`${timestamp}.${body}`)
+            .digest('hex');
+
+        return new Promise((resolve, reject) => {
+            const url = new URL(endpoint, this.serviceUrl);
+            const client = url.protocol === 'https:' ? https : http;
+            const req = client.request({
+                hostname: url.hostname,
+                port: url.port || (url.protocol === 'https:' ? 443 : 80),
+                path: url.pathname,
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'DotEnvy-Extension/2.0',
+                    'X-Extension-Timestamp': timestamp,
+                    'X-Extension-Signature': signature,
+                    'X-Machine-ID': this.getMachineId(),
+                },
+            }, (res) => {
+                let b = '';
+                res.on('data', (c) => { b += c.toString(); });
+                res.on('end', () => { try { resolve(JSON.parse(b)); } catch { resolve(b); } });
+            });
+            req.on('error', reject);
+            req.setTimeout(5000, () => { req.destroy(); reject(new Error('Timeout')); });
+            req.end();
+        });
     }
 
     private async makeSignedRequest(endpoint: string, data: unknown): Promise<unknown> {
