@@ -28,7 +28,7 @@ export class GitHookManager {
 			await fs.promises.writeFile(hookPath, hookScript, { mode: 0o755 });
 			vscode.window.showInformationMessage('✅ dotenvy pre-commit hook installed successfully!');
 		} catch (error) {
-			throw new Error(`Failed to install hook: ${error}`);
+			throw new Error(`Failed to install hook: ${error}`, { cause: error });
 		}
 	}
 
@@ -46,7 +46,7 @@ export class GitHookManager {
 				vscode.window.showInformationMessage('No dotenvy hook found to remove.');
 			}
 		} catch (error) {
-			throw new Error(`Failed to remove hook: ${error}`);
+			throw new Error(`Failed to remove hook: ${error}`, { cause: error });
 		}
 	}
 

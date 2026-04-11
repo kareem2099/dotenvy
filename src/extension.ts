@@ -30,6 +30,8 @@ import { EnvironmentWebviewProvider } from './providers/environmentWebviewProvid
 import { CommandsTreeProvider } from './providers/commandsTreeProvider';
 import { EnvironmentCompletionProvider } from './providers/environmentCompletionProvider';
 import { TrashBinWebviewProvider } from './providers/trashBinWebviewProvider';
+import { VariableWebviewProvider } from './providers/variableWebviewProvider';
+import { SecretDetector } from './utils/secretDetector';
 import { HistoryManager } from './utils/historyManager';
 import { UpdateManager } from './managers/UpdateManager';
 
@@ -81,6 +83,8 @@ export async function activate(context: vscode.ExtensionContext) {
     TimelineWebviewProvider.init(extensionUri, context);
     // Initialize the static Trash Bin panel
     TrashBinWebviewProvider.init(extensionUri, context);
+    // Initialize the static Variable Manager panel
+    VariableWebviewProvider.init(extensionUri, context);
     const completionProvider = new EnvironmentCompletionProvider(initialWorkspacePath);
     const commandsTreeProvider = new CommandsTreeProvider();
     const initIgnoreCommand = new InitDotenvyIgnoreCommand();
@@ -96,6 +100,8 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('dotenvy.openAnalyticsPanel', () => AnalyticsWebviewProvider.openOrReveal()),
         // Command to open the Timeline panel as a full WebviewPanel (tab)
         vscode.commands.registerCommand('dotenvy.openTimelinePanel', () => TimelineWebviewProvider.openOrReveal()),
+        // Command to open the Variable Manager panel as a full WebviewPanel (tab)
+        vscode.commands.registerCommand('dotenvy.openVariableManager', (fileName?) => VariableWebviewProvider.openOrReveal(fileName)),
         // Command to open the Trash Bin panel as a full WebviewPanel (tab)
         vscode.commands.registerCommand('dotenvy.openTrashBin', () => TrashBinWebviewProvider.openOrReveal()),
     );
@@ -263,6 +269,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     UpdateManager.checkNewVersion(context);
     FeedbackManager.init(context);
+
+    // Start real-time secret monitoring
+    SecretDetector.startFileWatcher();
 }
 
 export function deactivate() {

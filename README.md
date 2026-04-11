@@ -1,9 +1,14 @@
 # dotenvy – VS Code Environment Manager
 
-[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Codename](https://img.shields.io/badge/codename-Nexus-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.0.0)
 [![Publisher](https://img.shields.io/badge/publisher-FreeRave-red.svg)](https://marketplace.visualstudio.com/publishers/FreeRave)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![VS Code Marketplace](https://img.shields.io/badge/vscode-marketplace-007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+
+<div align="center">
+  <img width="800" alt="DotEnvy Variable Manager" src="https://github.com/user-attachments/assets/46565ce7-fa75-4d39-b582-e32ebcdee0f1" />
+</div>
 
 🚀 **dotenvy** makes it effortless to manage and switch between your `.env` files directly inside VS Code. No more manual renaming or copy-pasting—just pick your environment and start coding immediately!
 
@@ -40,6 +45,24 @@ Automatic backup creation before switching, with portable AES-256-GCM encrypted 
 ### 📊 **Status Bar Integration**
 Real-time environment indicator in status bar showing current configuration, validation status, and cloud sync state.
 
+## 🚀 What's New in v2.0.0? (Nexus)
+
+### 🗑️ Session Trash Bin (Lifesaver!)
+Deleted a crucial variable by mistake? No worries. Restore it with a single click from the new Session Trash Bin.
+<img width="100%" alt="Trash Bin Demo" src="https://github.com/user-attachments/assets/7a84cb1a-2b6e-447e-9c7c-8510d266b4b0" />
+
+### 🔍 Native VS Code Diff & History
+Review your `.env` changes exactly like you review Git commits. 
+<img width="100%" alt="Native Diff Demo" src="https://github.com/user-attachments/assets/d3905fa6-6b1c-478f-ba50-a993d45515d7" />
+
+### 📊 Environment Analytics
+Track your usage, stability metrics, and most active environments directly from your dashboard.
+<img width="100%" alt="Analytics Dashboard" src="https://github.com/user-attachments/assets/70b17cee-f866-42f0-922d-0942d181fe48" />
+
+### ⚙️ Compact Switcher & Settings
+Manage all your environments seamlessly from a clean, native sidebar.
+<img width="100%" alt="Environment Switcher" src="https://github.com/user-attachments/assets/c2139b3c-4dfc-4a3c-86b5-adf0b7b7fa89" />
+
 ### 🔍 **Secrets Guard** 🧠 — v1.6.0
 
 Production-grade secret detection powered by a **custom ML model** with HMAC-secured communication and an interactive Secrets Panel.
@@ -61,12 +84,14 @@ All commands are accessible via the Command Palette (`Ctrl+Shift+P` / `⌘+Shift
 
 ### 🔄 Environment Manager
 - **`DotEnvy: Switch Environment`** — Switch between `.env` files
-- **`DotEnvy: Open Environment Panel`** — Open the interactive management panel
+- **`DotEnvy: Open Variable Manager`** — Open the full-page variable editor tab
 - **`DotEnvy: Validate Environment Files`** — Validate for syntax errors and required variables
-- **`DotEnvy: Diff Environment Files`** — Compare environment files side-by-side
 
-### 📊 Environment History
-- **`DotEnvy: View Environment History`** — View historical changes with timestamps
+### 📊 Explorers & Analytics
+- **`DotEnvy: View Environment History`** — View the dense history table and slide-over advanced filters
+- **`DotEnvy: Open Trash Bin`** — Recover accidental deletions or changes in real-time
+- **`DotEnvy: Open Analytics Panel`** — View heatmap and stability metrics
+- **`DotEnvy: Open Timeline Panel`** — View the SVG timeline viewer tab
 
 ### 🛡️ Git Integration
 - **`DotEnvy: Install Git Commit Hook`** — Block commits containing secrets
@@ -205,44 +230,13 @@ Run **`DotEnvy: Init .dotenvyignore`** to create a default file, or right-click 
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Roadmap & Contributing
 
-* [x] Auto-switch env based on Git branch
-* [x] Environment validation + diff view
-* [x] Git commit hook to block secrets
-* [x] Cloud sync with Doppler (E2E encrypted)
-* [x] Multi-user key wrapping (envelope encryption)
-* [x] Portable encrypted backups (PBE + PBKDF2)
-* [x] AI-powered secret detection (LLM v1 — 14 features)
-* [x] HMAC-secured LLM service (v1.5.0 — 35 features, 18.4x cache, SSE streaming)
-* [x] **OS-encrypted secret storage + Secrets Panel + .dotenvyignore + AI feedback loop (v1.6.0)**
-
-* [ ] Wire `/extension/feedback` on Railway — model learns from user corrections
-* [ ] Persist trained model across Railway deploys (persistent volume)
-* [ ] Streaming confidence updates in VS Code panel (SSE → UI)
-* [ ] Proper backpropagation + Adam optimizer for ML model
-* [ ] Expand training dataset to 150+ samples
-* [ ] Support for Vault, AWS Secrets Manager
-* [ ] Shareable environment templates
-
----
-
-## 🤝 Contributing
-
-PRs are welcome! If you have ideas for features, open an issue.
+For upcoming features, see [ROADMAP.md](ROADMAP.md).  
+Issues and PRs are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
 
 ---
 
 ## 📜 License
 
-MIT © 2026 FreeRave (Kareem)
-
----
-
-## Development
-
-```bash
-git clone https://github.com/kareem2099/dotenvy
-npm install
-# Open in VS Code and press F5 to start debugging
-```
+This project is licensed under the Apache License, Version 2.0 - see the [LICENSE](LICENSE) file for details.

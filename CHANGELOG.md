@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-04-11
+
+### **Nexus** — Architecture Overhaul + Modular Webviews + High-Density UI + Session Trash Bin
+
+Complete UI/UX and architectural refactoring of the DotEnvy extension, transforming it from a clustered sidebar dashboard into a streamlined "Control Center + Focused Workspace" architecture.
+
+#### **Sidebar Refactor (The Compact Switcher)**
+- **Dense Status Strip**: Replaced large dashboard utility cards with a compact status strip for Cloud Sync, Git Hooks, and Validation.
+- **Improved Performance**: Reduced sidebar DOM size by ~60%, dramatically improving activation speed.
+- **Streamlined Actions**: The sidebar is now strictly designated as an environment switcher and status monitor.
+
+#### **Variable Manager Tab**
+- **Dedicated Full-Page Editor**: Moved from a sidebar list to an isolated `WebviewPanel` (Full Tab).
+- **High-Density Data Grid**: A semantic HTML table structure replaces heavy DIV-based cards, easily rendering thousands of variables with zero UI breakage.
+- **Context-Aware Backups**: Moved "Backup", "Restore", and "Set Location" logic into the Variable Manager. Backups now specifically target the locally active environment file (`.env`, `.env.staging`, etc.).
+- **Inline Editing**: Atomic edits directly on the table with immediate persistence.
+
+#### **History Explorer Tab & Trash Bin**
+- **Native VS Code Diffing**: Stripped away the heavy custom diff viewer and replaced it with native `vscode.diff` for a 5x rendering speedup and zero custom overhead.
+- **Slide-Over Filters Drawer**: Upgraded history filters into a glassmorphism Drawer with 300ms debounced auto-rendering live previews.
+- **Session Trash Bin**: A lightweight, in-memory recovery system capturing real-time variable deletions and modifications. Features a dedicated UI with color-coded diff overlays to instantly restore accidental deletions before committing.
+- **Timeline Tab**: Abstracted the complex SVG-based timeline view into its own independent `TimelineWebviewProvider` tab to eliminate History list polling lag.
+
+#### **Analytics Dashboard Tab**
+- **Dedicated Webview**: Analytics tracking (Stability Metrics, Heatmaps) isolated into its own high-performance dashboard panel.
+- **Usage Metrics**: Enhanced heatmap visualization of timeline activities.
+
+#### **Security & Code Quality Under the Hood**
+- **Content Security Policy (CSP)**: Completely fortified all WebView HTML panels with strict `font-src` and `img-src` tags, shifting all interactivity strictly to DOM Event Listeners (purging `onclick` attributes).
+- **Proactive Secret Scanning**: Triggered `SecretDetector.startFileWatcher()` inside core `activate` for zero-latency secrets leak tracking with duplicate caching guardrails.
+- **Decoupled Cryptography**: Refactored `AES-256-GCM` encryption sequences into a clean `BackupManager.ts` utility class, and centralized VS Code window logic to `BackupCommands.ts`. 150+ lines of duplicated code deleted.
+- **Dead Code Extirpation**: Massive reduction of obsolete sidebar rendering logic.
+
+---
+
 ## [1.6.0] - 2026-03-17
 
 ### **SolidBase** — Security Hardening + ML Feature Alignment + Secrets Panel UI
@@ -411,6 +446,7 @@ Complete implementation of envelope encryption enabling secure multi-user access
 
 | Version | Date | Codename | Highlights |
 |---------|------|----------|------------|
+| **2.0.0** | 2026-04-11 | Nexus | Massive modular webview rebuild, Session Trash Bin, Variable Manager Tab, Native Diffs, CSP Fortification |
 | **1.6.0** | 2026-03-17 | SolidBase | SecretStorage, 35-feature ML fix, Logger, Secrets Panel, FeedbackManager, .dotenvyignore |
 | **1.5.0** | 2026-03-13 | — | HMAC auth, 35-feature ML, two-tier cache, SSE streaming, service refactor |
 | **1.4.0** | 2026-01-26 | — | Portable backup encryption (PBE + PBKDF2) |

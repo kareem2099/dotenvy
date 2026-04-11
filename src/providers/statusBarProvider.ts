@@ -246,7 +246,7 @@ export class StatusBarProvider implements vscode.Disposable {
 			return;
 		}
 
-		let text = '';
+		let text: string;
 		let tooltip = `Cloud Sync: ${status.provider || 'Unknown'}`;
 
 		if (status.encryptionEnabled) {

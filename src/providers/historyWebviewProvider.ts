@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { logger } from '../utils/logger';
+import { loadWebviewHtml } from '../utils/webviewUtils';
 
 export class HistoryWebviewProvider {
     public static readonly viewType = 'dotenvy.historyViewer';
@@ -22,8 +23,13 @@ export class HistoryWebviewProvider {
 
     /** Open (or reveal) the History webview panel */
     public static async openOrReveal(): Promise<void> {
-        const context = HistoryWebviewProvider._context!;
-        const extensionUri = HistoryWebviewProvider._extensionUri!;
+        const context      = HistoryWebviewProvider._context;
+        const extensionUri = HistoryWebviewProvider._extensionUri;
+
+        if (!context || !extensionUri) {
+            vscode.window.showErrorMessage('History Manager not initialized.');
+            return;
+        }
 
         if (HistoryWebviewProvider._panel) {
             HistoryWebviewProvider._panel.reveal(vscode.ViewColumn.One);
@@ -158,7 +164,17 @@ export class HistoryWebviewProvider {
         HistoryWebviewProvider._panel?.webview.postMessage(message);
     }
 
-    private static async _handleMessage(message: { type: string;[key: string]: any }): Promise<void> {
+    private static async _handleMessage(message: { 
+        type: string; 
+        workspacePath: string; 
+        entryId: string; 
+        variableName: string;
+        filters: HistoryFilterOptions;
+        pattern: string;
+        timestamp: string;
+        environmentName: string;
+        reason?: string;
+    }): Promise<void> {
         switch (message.type) {
             case 'refresh': {
                 const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -350,156 +366,15 @@ export class HistoryWebviewProvider {
     }
 
     private static _getHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-        const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css'));
-        const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'history-viewer.js'));
-        const nonce = getNonce();
-
-        return `<!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <link href="${styleUri}" rel="stylesheet">
-            <title>Environment History</title>
-        </head>
-        <body>
-            <div class="history-container">
-                <div class="history-header">
-                    <div class="header-left">
-                        <h3>📋 Environment History</h3>
-                        <div class="history-stats" id="stats"></div>
-                    </div>
-                    <div class="header-actions">
-                        <button id="view-timeline-btn" class="btn-icon-pill" title="Open Timeline View">📊 Timeline</button>
-                        <button id="refresh-btn" class="btn-icon-pill" title="Refresh">🔄</button>
-                        <button id="advanced-filters-btn" class="btn-icon-pill" title="Advanced Filters">🔍 Filters</button>
-                    </div>
-                </div>
-
-                <div class="history-search-bar">
-                    <input type="text" id="search-input" placeholder="Quick search…" class="search-input-inline">
-                    <select id="filter-select" class="filter-select-inline">
-                        <option value="all">All actions</option>
-                        <option value="switch">Switch</option>
-                        <option value="rollback">Rollback</option>
-                        <option value="manual_edit">Edit</option>
-                        <option value="import">Import</option>
-                        <option value="initial">Initial</option>
-                    </select>
-                </div>
-
-                <div class="advanced-filters-backdrop" id="advanced-filters-backdrop"></div>
-                <div class="advanced-filters-panel" id="advanced-filters-panel">
-                    <div class="filters-header">
-                        <h4>🔍 Advanced Filters</h4>
-                        <button id="close-filters-btn-icon" class="btn-icon-close" title="Close">&times;</button>
-                    </div>
-                    <div class="drawer-content">
-                        <div class="filters-section">
-                            <h4>🔍 Search</h4>
-                            <div class="filter-row">
-                                <div class="filter-group">
-                                    <label for="advanced-search-input">Query:</label>
-                                    <input type="text" id="advanced-search-input" placeholder="Search…" class="filter-input">
-                                    <div class="filter-options">
-                                        <label><input type="checkbox" id="regex-toggle"> Regex</label>
-                                        <select id="search-scope-select" class="filter-select-small">
-                                            <option value="all">All</option>
-                                            <option value="environments">Environments</option>
-                                            <option value="variables">Variables</option>
-                                            <option value="values">Values</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="filters-section">
-                            <h4>📅 Date Range</h4>
-                            <div class="filter-row">
-                                <div class="filter-group">
-                                    <label>Preset:</label>
-                                    <select id="date-preset-select" class="filter-select-small"><option value="">Custom</option></select>
-                                </div>
-                                <div class="filter-group">
-                                    <label for="date-from-input">From:</label>
-                                    <input type="date" id="date-from-input" class="filter-input">
-                                </div>
-                                <div class="filter-group">
-                                    <label for="date-to-input">To:</label>
-                                    <input type="date" id="date-to-input" class="filter-input">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="filters-section">
-                            <h4>👥 Users &amp; Actions</h4>
-                            <div class="filter-row">
-                                <div class="filter-group">
-                                    <label>Users:</label>
-                                    <select id="user-filter-select" multiple class="filter-select-multi"><option value="">Loading…</option></select>
-                                </div>
-                                <div class="filter-group">
-                                    <label>Actions:</label>
-                                    <select id="action-filter-select" multiple class="filter-select-multi">
-                                        <option value="switch">Switch</option>
-                                        <option value="rollback">Rollback</option>
-                                        <option value="manual_edit">Manual Edit</option>
-                                        <option value="import">Import</option>
-                                        <option value="initial">Initial</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="filters-section">
-                            <h4>🏷️ Environments &amp; Variables</h4>
-                            <div class="filter-row">
-                                <div class="filter-group">
-                                    <label>Environments:</label>
-                                    <select id="environment-filter-select" multiple class="filter-select-multi"><option value="">Loading…</option></select>
-                                </div>
-                                <div class="filter-group">
-                                    <label>Variables:</label>
-                                    <select id="variable-filter-select" multiple class="filter-select-multi"><option value="">Loading…</option></select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="filters-actions">
-                        <button id="apply-filters-btn" class="btn-primary">Apply</button>
-                        <button id="clear-filters-btn" class="btn-secondary">Clear All</button>
-                        <button id="close-filters-btn" class="btn-secondary">Close</button>
-                        <div class="filter-stats" id="filter-stats"></div>
-                    </div>
-                </div>
-
-                <div class="history-views">
-                    <table class="history-table" id="history-list">
-                        <thead>
-                            <tr>
-                                <th>Date &amp; Time</th>
-                                <th>Environment</th>
-                                <th>Action</th>
-                                <th>Note</th>
-                                <th class="col-actions">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="history-body">
-                            <tr><td colspan="5" class="loading">Loading history…</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <script nonce="${nonce}" src="${scriptUri}"></script>
-        </body>
-        </html>`;
+        return loadWebviewHtml({
+            webview,
+            extensionUri,
+            templatePath: ['resources', 'panel', 'history-viewer.html'],
+            tokens: {
+                styleUri:  webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css')).toString(),
+                scriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'history-viewer.js')).toString(),
+            },
+        });
     }
 }
 
-function getNonce(): string {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
-}

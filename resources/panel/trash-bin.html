@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https:; font-src 'self' data: https:; style-src {{CSP_SOURCE}} 'unsafe-inline'; script-src 'nonce-{{NONCE}}';">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="{{STYLE_URI}}" rel="stylesheet">
+    <title>Session Trash Bin</title>
+</head>
+<body>
+    <div class="trash-bin-container">
+        <div class="trash-header">
+            <div>
+                <h3>🗑️ Session Trash Bin <span class="trash-count" id="trash-count">0</span></h3>
+                <p style="margin:0;font-size:0.8rem;opacity:0.6;">Variables deleted or modified this session. Clears on VS Code restart.</p>
+            </div>
+            <button class="btn btn-secondary" id="clear-all-btn">🗑 Clear All</button>
+        </div>
+        <div class="trash-list" id="trash-list">
+            <div class="trash-empty">🎉 Nothing in the bin — your variables are safe!</div>
+        </div>
+    </div>
+    <script nonce="{{NONCE}}" src="{{SCRIPT_URI}}"></script>
+</body>
+</html>

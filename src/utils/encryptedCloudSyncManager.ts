@@ -97,7 +97,7 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
 
             return JSON.parse(decrypted.toString('utf8'));
         } catch (error) {
-            throw new Error(`Cloud payload decryption failed: ${(error as Error).message}`);
+            throw new Error(`Cloud payload decryption failed: ${(error as Error).message}`, { cause: error });
         }
     }
 

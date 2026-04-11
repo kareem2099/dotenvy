@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https:; font-src 'self' data: https:; style-src {{CSP_SOURCE}} 'unsafe-inline'; script-src 'nonce-{{NONCE}}';">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="{{STYLE_URI}}" rel="stylesheet">
+    <title>Variable Manager</title>
+</head>
+<body class="variable-manager-page">
+    <div class="vm-header">
+        <div class="vm-header-left">
+            <div class="vm-title-row">
+                <span class="vm-title-icon">⚙️</span>
+                <h1 class="vm-title">Variable Manager</h1>
+            </div>
+            <div id="file-badge" class="vm-file-badge">.env</div>
+        </div>
+        <div class="vm-header-right">
+            <input type="text" id="search-box" placeholder="🔍  Search keys or values..." class="vm-search-input">
+            <button id="add-var-btn" class="btn btn-primary vm-btn-add">＋ Add Variable</button>
+            <button id="refresh-btn" class="btn btn-secondary vm-btn-refresh">↺ Refresh</button>
+        </div>
+    </div>
+
+    <div class="vm-backup-bar" style="padding: 10px 20px; background: var(--vscode-sideBar-background); border-bottom: 1px solid var(--vscode-panel-border); display: flex; gap: 10px; align-items: center;">
+        <span style="font-size: 12px; color: var(--vscode-descriptionForeground); font-weight: 600;">BACKUPS:</span>
+        <button id="backup-selected-btn" class="btn btn-secondary btn-sm">💾 Backup Selected</button>
+        <button id="restore-backup-btn" class="btn btn-secondary btn-sm">⏳ Restore from Backup</button>
+        <button id="set-backup-location-btn" class="btn btn-secondary btn-sm">📁 Set Location</button>
+    </div>
+
+    <div class="vm-stats-bar" id="stats-bar">
+        <!-- Populated by JS -->
+    </div>
+
+    <div id="manager-root">
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading variables...</p>
+        </div>
+    </div>
+
+    <script nonce="{{NONCE}}" src="{{SCRIPT_URI}}"></script>
+</body>
+</html>

@@ -21,7 +21,9 @@ export class TrashBinManager {
     private _entries: TrashBinEntry[] = [];
     private _listeners: Array<() => void> = [];
 
-    private constructor() {}
+    private constructor() {
+        // Private constructor for singleton pattern
+    }
 
     public static getInstance(): TrashBinManager {
         if (!TrashBinManager._instance) {

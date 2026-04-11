@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { TrashBinManager, TrashBinEntry } from '../utils/trashBinManager';
 import { logger } from '../utils/logger';
+import { loadWebviewHtml } from '../utils/webviewUtils';
 
 export class TrashBinWebviewProvider {
     public static readonly viewType = 'dotenvy.trashBin';
@@ -21,8 +22,13 @@ export class TrashBinWebviewProvider {
     }
 
     public static async openOrReveal(): Promise<void> {
-        const context      = TrashBinWebviewProvider._context!;
-        const extensionUri = TrashBinWebviewProvider._extensionUri!;
+        const context      = TrashBinWebviewProvider._context;
+        const extensionUri = TrashBinWebviewProvider._extensionUri;
+
+        if (!context || !extensionUri) {
+            vscode.window.showErrorMessage('Trash Bin Manager not initialized.');
+            return;
+        }
 
         if (TrashBinWebviewProvider._panel) {
             TrashBinWebviewProvider._panel.reveal(vscode.ViewColumn.Two);
@@ -64,7 +70,7 @@ export class TrashBinWebviewProvider {
         TrashBinWebviewProvider._panel.webview.postMessage({ type: 'refresh', entries });
     }
 
-    private static async _handleMessage(msg: { type: string; [k: string]: any }): Promise<void> {
+    private static async _handleMessage(msg: { type: string; id?: string }): Promise<void> {
         switch (msg.type) {
             case 'restore': {
                 const entry = TrashBinManager.getInstance().getAll().find(e => e.id === msg.id);
@@ -123,41 +129,14 @@ export class TrashBinWebviewProvider {
     }
 
     private static _getHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-        const styleUri  = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css'));
-        const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'trash-bin.js'));
-        const nonce     = getNonce();
-
-        return `<!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <link href="${styleUri}" rel="stylesheet">
-            <title>Session Trash Bin</title>
-        </head>
-        <body>
-            <div class="trash-bin-container">
-                <div class="trash-header">
-                    <div>
-                        <h3>🗑️ Session Trash Bin <span class="trash-count" id="trash-count">0</span></h3>
-                        <p style="margin:0;font-size:0.8rem;opacity:0.6;">Variables deleted or modified this session. Clears on VS Code restart.</p>
-                    </div>
-                    <button class="btn-secondary" id="clear-all-btn">Clear All</button>
-                </div>
-                <div class="trash-list" id="trash-list">
-                    <div class="trash-empty">🎉 Nothing in the bin — your variables are safe!</div>
-                </div>
-            </div>
-            <script nonce="${nonce}" src="${scriptUri}"></script>
-        </body>
-        </html>`;
+        return loadWebviewHtml({
+            webview,
+            extensionUri,
+            templatePath: ['resources', 'panel', 'trash-bin.html'],
+            tokens: {
+                styleUri:  webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css')).toString(),
+                scriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'trash-bin.js')).toString(),
+            },
+        });
     }
-}
-
-function getNonce(): string {
-    let text = '';
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) text += chars.charAt(Math.floor(Math.random() * chars.length));
-    return text;
 }

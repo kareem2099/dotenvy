@@ -166,7 +166,7 @@ function updateEnvironmentsGrid(data) {
             <div class="env-card-actions">
                 <button class="btn btn-primary btn-sm" onclick="switchTo('${env.name}')">Switch</button>
                 <button class="btn btn-secondary btn-sm" onclick="diffWithCurrent('${env.name}')">Compare</button>
-                <button class="btn btn-secondary btn-sm" onclick="editFile('${env.fileName}')">Edit</button>
+                <button class="btn-secondary btn-sm" onclick="openVariableManager('${env.fileName}')">Edit</button>
             </div>
         `;
         container.appendChild(card);
@@ -179,94 +179,14 @@ function updateEnvironmentsGrid(data) {
 
 function updateCurrentEnvironment(data) {
     const section = document.getElementById('current-env-section');
-    const content = document.getElementById('current-env-content');
-
+    if (!section) return; // Skip if section was removed from UI
     if (!data.currentFile) {
         section.style.display = 'none';
         return;
     }
     section.style.display = 'block';
-
-    if (data.currentFile.variables && data.currentFile.variables.length > 0) {
-        renderVariablesWithLocks(data.currentFile.variables, content);
-    } else {
-        content.innerHTML = `<pre style="font-family:var(--vscode-editor-font-family)">${data.currentFile.content}</pre>`;
-    }
 }
 
-function renderVariablesWithLocks(variables, container) {
-    container.innerHTML = '';
-    const list = document.createElement('div');
-    list.style.cssText = 'display:flex; flex-direction:column; gap:0.5rem; padding:1rem; background:var(--vscode-editor-background); border-radius:8px; border:1px solid var(--vscode-panel-border);';
-
-    variables.forEach(variable => {
-        const row = document.createElement('div');
-        row.style.cssText = 'display:flex; align-items:center; gap:0.75rem; padding:0.5rem; background:var(--vscode-input-background); border-radius:6px; transition:all 0.2s;';
-
-        // 🔒 Lock Button
-        const lockBtn = document.createElement('button');
-        lockBtn.className = `variable-lock-btn`;
-        lockBtn.innerHTML = variable.isEncrypted ? '🔒' : '🔓';
-        lockBtn.title = variable.isEncrypted ? 'Decrypt' : 'Encrypt';
-        lockBtn.style.cssText = `width:32px; height:32px; border:none; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; background:${variable.isEncrypted ? 'var(--vscode-notificationsInfoIcon-foreground)' : 'var(--vscode-notificationsWarningIcon-foreground)'}; color:white;`;
-
-        lockBtn.onclick = () => {
-            const originalIcon = lockBtn.innerHTML;
-            lockBtn.innerHTML = '⏳';
-            lockBtn.disabled = true;
-            lockBtn.style.opacity = '0.6';
-
-            vscode.postMessage({ type: 'toggleVarEncryption', key: variable.key });
-
-            setTimeout(() => {
-                lockBtn.innerHTML = originalIcon;
-                lockBtn.disabled = false;
-                lockBtn.style.opacity = '1';
-            }, 2500);
-        };
-
-        // Key & Value
-        const keySpan = document.createElement('span');
-        keySpan.textContent = variable.key;
-        keySpan.style.cssText = 'font-weight:600; min-width:120px; color:var(--vscode-foreground);';
-
-        const valSpan = document.createElement('span');
-        valSpan.style.cssText = 'flex:1; word-break:break-all; color:var(--vscode-foreground);';
-
-        if (variable.isEncrypted) {
-            valSpan.textContent = variable.value.substring(0, 4) + '••••';
-            valSpan.style.opacity = '0.7';
-            valSpan.style.fontStyle = 'italic';
-        } else {
-            valSpan.textContent = variable.value;
-        }
-
-        // ✏️ Edit Button
-        const editBtn = document.createElement('button');
-        editBtn.className = 'variable-lock-btn';
-        editBtn.innerHTML = '✏️';
-        editBtn.title = 'Edit Value';
-        editBtn.style.cssText = `width:32px; height:32px; border:none; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.1); color:white;`;
-        editBtn.onclick = () => vscode.postMessage({ type: 'updateVariable', key: variable.key });
-
-        // 🗑️ Delete Button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'variable-lock-btn';
-        deleteBtn.innerHTML = '🗑️';
-        deleteBtn.title = 'Delete Variable';
-        deleteBtn.style.cssText = `width:32px; height:32px; border:none; border-radius:4px; cursor:pointer; display:flex; align-items:center; justify-content:center; background:rgba(239,68,68,0.2); color:#ef4444;`;
-        deleteBtn.onclick = () => vscode.postMessage({ type: 'deleteVariable', key: variable.key });
-
-        row.appendChild(lockBtn);
-        row.appendChild(editBtn);
-        row.appendChild(deleteBtn);
-        row.appendChild(keySpan);
-        row.appendChild(document.createTextNode('='));
-        row.appendChild(valSpan);
-        list.appendChild(row);
-    });
-    container.appendChild(list);
-}
 
 // ============================
 // 6. GLOBAL ACTIONS
@@ -274,6 +194,7 @@ function renderVariablesWithLocks(variables, container) {
 
 const actions = {
     switchTo: (env) => vscode.postMessage({ type: 'switchEnvironment', environment: env }),
+    openVariableManager: (file) => vscode.postMessage({ type: 'openVariableManager', fileName: file }),
     editFile: (file) => vscode.postMessage({ type: 'editFile', fileName: file }),
     diffWithCurrent: (env) => vscode.postMessage({ type: 'diffEnvironment', environment: env }),
     backupCurrentEnv: () => vscode.postMessage({ type: 'backupCurrentEnv' }),

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https:; font-src 'self' data: https:; style-src {{CSP_SOURCE}} 'unsafe-inline'; script-src 'nonce-{{NONCE}}';">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="{{STYLE_URI}}" rel="stylesheet">
+    <link href="{{EXTRA_STYLE_URI}}" rel="stylesheet">
+    <title>Environment Analytics</title>
+</head>
+<body>
+    <div class="analytics-header">
+        <h2>📈 Environment Analytics</h2>
+        <div class="header-meta">Usage insights &amp; stability metrics</div>
+        <button id="refresh-btn">🔄 Refresh</button>
+    </div>
+
+    <div id="analytics-root">
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading analytics…</p>
+        </div>
+    </div>
+
+    <script nonce="{{NONCE}}" src="{{SCRIPT_URI}}"></script>
+</body>
+</html>

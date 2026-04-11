@@ -130,7 +130,7 @@ export class EncryptedVarsManager {
             tag = Buffer.from(tagB64, 'base64');
             ct = Buffer.from(ctB64, 'base64');
         } catch (error) {
-            throw new Error('Invalid base64 encoding in encrypted data');
+            throw new Error('Invalid base64 encoding in encrypted data', { cause: error });
         }
 
         // Validate component sizes
@@ -157,7 +157,7 @@ export class EncryptedVarsManager {
                 ]);
                 return decrypted.toString('utf8');
             } catch (error) {
-                throw new Error('Decryption failed - invalid key or corrupted data');
+                throw new Error('Decryption failed - invalid key or corrupted data', { cause: error });
             }
         } else if (version === this.FORMAT_VERSION) {
             // Current version with improved parameters
@@ -171,7 +171,7 @@ export class EncryptedVarsManager {
                 ]);
                 return decrypted.toString('utf8');
             } catch (error) {
-                throw new Error('Decryption failed - invalid key or corrupted data');
+                throw new Error('Decryption failed - invalid key or corrupted data', { cause: error });
             }
         } else {
             throw new Error(`Unsupported encryption format version: ${version}. Please upgrade the extension.`);

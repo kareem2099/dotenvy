@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { HistoryManager } from '../utils/historyManager';
 import { HistoryAnalytics } from '../utils/historyAnalytics';
 import { logger } from '../utils/logger';
+import { loadWebviewHtml } from '../utils/webviewUtils';
 
 export class AnalyticsWebviewProvider {
     public static readonly viewType = 'dotenvy.analyticsViewer';
@@ -17,8 +18,13 @@ export class AnalyticsWebviewProvider {
 
     /** Open (or reveal) the Analytics webview panel */
     public static async openOrReveal(): Promise<void> {
-        const context      = AnalyticsWebviewProvider._context!;
-        const extensionUri = AnalyticsWebviewProvider._extensionUri!;
+        const context      = AnalyticsWebviewProvider._context;
+        const extensionUri = AnalyticsWebviewProvider._extensionUri;
+
+        if (!context || !extensionUri) {
+            vscode.window.showErrorMessage('Analytics Manager not initialized.');
+            return;
+        }
 
         if (AnalyticsWebviewProvider._panel) {
             AnalyticsWebviewProvider._panel.reveal(vscode.ViewColumn.One);
@@ -97,7 +103,7 @@ export class AnalyticsWebviewProvider {
         AnalyticsWebviewProvider._panel?.webview.postMessage(message);
     }
 
-    private static async _handleMessage(message: { type: string; [key: string]: any }): Promise<void> {
+    private static async _handleMessage(message: { type: string; workspacePath: string }): Promise<void> {
         switch (message.type) {
             case 'loadAnalytics':
                 await AnalyticsWebviewProvider.loadAnalytics(message.workspacePath);
@@ -113,233 +119,15 @@ export class AnalyticsWebviewProvider {
     }
 
     private static _getHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-        const styleUri  = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css'));
-        const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'analytics.js'));
-        const nonce     = getNonce();
-
-        return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="${styleUri}" rel="stylesheet">
-    <title>Environment Analytics</title>
-    <style>
-        /* ── Page chrome ── */
-        body { padding: 0; margin: 0; }
-
-        .analytics-header {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 50%, #667eea 100%);
-            padding: 1.25rem 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-        }
-        .analytics-header h2 {
-            margin: 0;
-            font-size: 1.4rem;
-            font-weight: 800;
-            color: #fff;
-            text-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .header-meta {
-            font-size: 0.8rem;
-            color: rgba(255,255,255,0.8);
-        }
-        #refresh-btn {
-            background: rgba(255,255,255,0.15);
-            border: 1px solid rgba(255,255,255,0.3);
-            color: #fff;
-            padding: 0.45rem 1rem;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            font-weight: 600;
-            backdrop-filter: blur(8px);
-            transition: all 0.2s;
-        }
-        #refresh-btn:hover { background: rgba(255,255,255,0.3); transform: scale(1.05); }
-
-        /* ── Scroll container ── */
-        #analytics-root {
-            padding: 1.5rem 2rem 3rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        /* ── Overview strip ── */
-        .overview-strip {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-        .overview-card {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            padding: 1.25rem 1rem;
-            text-align: center;
-            backdrop-filter: blur(16px);
-            box-shadow: var(--shadow-md);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .overview-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
-        .ov-value {
-            font-size: 2rem;
-            font-weight: 800;
-            background: var(--primary-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .ov-label { font-size: 0.75rem; color: var(--vscode-descriptionForeground); margin-top: 0.25rem; font-weight: 500; }
-
-        /* ── Section ── */
-        .a-section { margin-bottom: 2rem; }
-        .section-title {
-            font-size: 1.05rem;
-            font-weight: 700;
-            color: var(--vscode-foreground);
-            margin: 0 0 0.875rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        /* ── Card grid ── */
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
-        .a-card {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            padding: 1.125rem 1.25rem;
-            backdrop-filter: blur(16px);
-            box-shadow: var(--shadow-sm);
-            transition: box-shadow 0.2s, transform 0.2s;
-        }
-        .a-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
-        .a-card.full-width { grid-column: 1 / -1; }
-        .a-card-title {
-            font-size: 0.78rem;
-            font-weight: 700;
-            color: var(--vscode-descriptionForeground);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 0.75rem;
-        }
-
-        /* ── Top list with bar ── */
-        .top-list { display: flex; flex-direction: column; gap: 0.4rem; }
-        .top-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; }
-        .top-name { min-width: 80px; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--vscode-foreground); font-weight: 500; }
-        .top-bar-wrap { flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
-        .top-bar { height: 100%; background: var(--primary-gradient); border-radius: 3px; min-width: 4px; transition: width 0.5s ease; }
-        .top-count { min-width: 36px; text-align: right; font-weight: 700; color: var(--vscode-foreground); font-size: 0.8rem; }
-        .empty-row { color: var(--vscode-descriptionForeground); font-size: 0.82rem; padding: 0.5rem 0; }
-
-        /* ── Stability ── */
-        .stability-list { display: flex; flex-direction: column; gap: 0.45rem; }
-        .stab-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; }
-        .stab-name { min-width: 70px; max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--vscode-foreground); }
-        .stab-bar-wrap { flex: 1; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
-        .stab-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
-        .stab-pct { min-width: 38px; text-align: right; font-weight: 700; font-size: 0.8rem; }
-
-        /* ── Variable table ── */
-        .var-table { display: grid; grid-template-columns: 1.5fr 2fr 0.7fr 0.8fr; gap: 0; }
-        .var-header {
-            display: contents;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: var(--vscode-descriptionForeground);
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-        }
-        .var-header span { padding: 0.4rem 0.5rem; border-bottom: 2px solid var(--glass-border); }
-        .var-row { display: contents; font-size: 0.82rem; }
-        .var-row span { padding: 0.45rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--vscode-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .var-row-even span { background: rgba(255,255,255,0.03); }
-        .var-name { font-weight: 600; font-family: var(--font-mono, monospace); }
-        .var-val { color: var(--vscode-descriptionForeground) !important; font-family: var(--font-mono, monospace); font-size: 0.78rem; }
-        .var-changes { font-weight: 700; color: var(--vscode-foreground) !important; }
-        .var-vel { color: var(--vscode-descriptionForeground) !important; }
-
-        /* ── Heatmap ── */
-        .heatmap-wrap { display: flex; flex-direction: column; gap: 0.75rem; }
-        .heatmap-grid { display: flex; flex-wrap: wrap; gap: 4px; }
-        .heatmap-cell { width: 18px; height: 18px; border-radius: 3px; cursor: default; transition: transform 0.1s; }
-        .heatmap-cell:hover { transform: scale(1.4); }
-        .heatmap-legend { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--vscode-descriptionForeground); }
-        .legend-dots { display: flex; gap: 4px; }
-        .legend-dot { width: 14px; height: 14px; border-radius: 3px; }
-
-        /* ── Footer ── */
-        .a-footer {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1.5rem;
-            padding: 1rem;
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            font-size: 0.78rem;
-            color: var(--vscode-descriptionForeground);
-            margin-top: 1rem;
-        }
-
-        /* ── States ── */
-        .loading-state { text-align: center; padding: 4rem 2rem; color: var(--vscode-descriptionForeground); }
-        .spinner {
-            width: 48px; height: 48px;
-            border: 4px solid rgba(102,126,234,0.2);
-            border-top-color: #667eea;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin: 0 auto 1rem;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .error-state { text-align: center; padding: 3rem; color: #ef4444; font-size: 0.95rem; }
-        .empty-panel { text-align: center; padding: 4rem 2rem; }
-        .empty-icon { font-size: 4rem; margin-bottom: 1rem; }
-        .empty-panel h3 { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.5rem; }
-        .empty-panel p { color: var(--vscode-descriptionForeground); margin-bottom: 1.5rem; }
-        .btn.btn-primary { background: var(--primary-gradient); color: #fff; border: none; padding: 0.6rem 1.5rem; border-radius: 12px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
-    </style>
-</head>
-<body>
-    <div class="analytics-header">
-        <h2>📈 Environment Analytics</h2>
-        <div class="header-meta">Usage insights &amp; stability metrics</div>
-        <button id="refresh-btn">🔄 Refresh</button>
-    </div>
-
-    <div id="analytics-root">
-        <div class="loading-state">
-            <div class="spinner"></div>
-            <p>Loading analytics…</p>
-        </div>
-    </div>
-
-    <script nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
+        return loadWebviewHtml({
+            webview,
+            extensionUri,
+            templatePath: ['resources', 'panel', 'analytics.html'],
+            tokens: {
+                styleUri:      webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css')).toString(),
+                extraStyleUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'analytics.css')).toString(),
+                scriptUri:     webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'analytics.js')).toString(),
+            },
+        });
     }
-}
-
-function getNonce(): string {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
 }

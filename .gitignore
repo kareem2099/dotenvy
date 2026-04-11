@@ -16,6 +16,9 @@ dist/
 *.swp
 *.swo
 *~
+todo_list*.json
+roadmap*.json
+TECHNICAL_RECON_GUIDE.md
 
 # Test files
 test/encryption-test-standalone.js

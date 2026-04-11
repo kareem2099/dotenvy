@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { HistoryManager } from '../utils/historyManager';
 import { logger } from '../utils/logger';
+import { loadWebviewHtml } from '../utils/webviewUtils';
 
 export class TimelineWebviewProvider {
     public static readonly viewType = 'dotenvy.timelineViewer';
@@ -17,8 +17,13 @@ export class TimelineWebviewProvider {
 
     /** Open (or reveal) the Timeline webview panel */
     public static async openOrReveal(): Promise<void> {
-        const context      = TimelineWebviewProvider._context!;
-        const extensionUri = TimelineWebviewProvider._extensionUri!;
+        const context      = TimelineWebviewProvider._context;
+        const extensionUri = TimelineWebviewProvider._extensionUri;
+
+        if (!context || !extensionUri) {
+            vscode.window.showErrorMessage('Timeline Manager not initialized.');
+            return;
+        }
 
         if (TimelineWebviewProvider._panel) {
             TimelineWebviewProvider._panel.reveal(vscode.ViewColumn.Two);
@@ -84,7 +89,7 @@ export class TimelineWebviewProvider {
         TimelineWebviewProvider._panel?.webview.postMessage(message);
     }
 
-    private static async _handleMessage(message: { type: string; [key: string]: any }): Promise<void> {
+    private static async _handleMessage(message: { type: string; workspacePath: string }): Promise<void> {
         switch (message.type) {
             case 'loadHistory':
                 await TimelineWebviewProvider.loadTimeline(message.workspacePath);
@@ -107,64 +112,14 @@ export class TimelineWebviewProvider {
     }
 
     private static _getHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-        const styleUri  = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css'));
-        const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'timeline-viewer.js'));
-        const nonce     = getNonce();
-
-        return `<!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <link href="${styleUri}" rel="stylesheet">
-            <title>Environment Timeline</title>
-        </head>
-        <body class="timeline-only">
-            <div class="history-container">
-                <div class="history-header">
-                    <h3>📊 Environment Timeline</h3>
-                    <div class="history-stats" id="stats"></div>
-                </div>
-
-                <div class="history-toolbar">
-                    <div class="view-info">Visualizing environment lifecycle and changes</div>
-                    <button id="refresh-btn" class="btn-secondary">🔄 Refresh</button>
-                </div>
-
-                <div class="timeline-container standalone" id="timeline-container">
-                    <div class="timeline-controls">
-                        <button id="zoom-in-btn" class="btn-secondary" title="Zoom In">🔍+</button>
-                        <button id="zoom-out-btn" class="btn-secondary" title="Zoom Out">🔍-</button>
-                        <button id="fit-to-screen-btn" class="btn-secondary" title="Fit to Screen">📐</button>
-                        <span class="zoom-level" id="zoom-level">100%</span>
-                    </div>
-                    <div class="timeline-wrapper">
-                        <svg class="timeline-svg" id="timeline-svg" width="100%" height="600">
-                            <defs>
-                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                                    <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
-                                </marker>
-                            </defs>
-                            <g class="timeline-content" id="timeline-content"></g>
-                        </svg>
-                    </div>
-                    <div class="timeline-minimap" id="timeline-minimap" style="display: none;">
-                        <svg class="minimap-svg" id="minimap-svg" width="100%" height="80"></svg>
-                    </div>
-                </div>
-            </div>
-            <script nonce="${nonce}" src="${scriptUri}"></script>
-        </body>
-        </html>`;
+        return loadWebviewHtml({
+            webview,
+            extensionUri,
+            templatePath: ['resources', 'panel', 'timeline-viewer.html'],
+            tokens: {
+                styleUri:  webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css')).toString(),
+                scriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'timeline-viewer.js')).toString(),
+            },
+        });
     }
-}
-
-function getNonce(): string {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
 }

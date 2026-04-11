@@ -2,11 +2,11 @@
   "name": "dotenvy",
   "displayName": "DotEnvy – VS Code Environment Manager",
   "description": "Effortlessly manage, secure, and sync .env files directly inside VS Code with enterprise-grade encryption.",
-  "version": "1.6.0",
+  "version": "2.0.0",
   "icon": "resources/icons/icon.png",
   "publisher": "FreeRave",
   "author": "Kareem Ehab",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -39,7 +39,7 @@
     "substitute-env": "node scripts/build-with-env.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run substitute-env && npm run lint",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint src/**/*.ts",
     "test": "node ./out/test/runTest.js"
   },
   "contributes": {
@@ -131,7 +131,12 @@
       },
       {
         "command": "dotenvy.openEnvironmentPanel",
-        "title": "DotEnvy: Open Environment Panel"
+        "title": "DotEnvy: Open Main Dashboard"
+      },
+      {
+        "command": "dotenvy.openVariableManager",
+        "title": "DotEnvy: Open Variable Manager",
+        "icon": "$(edit)"
       },
       {
         "command": "dotenvy.setupLLMSecret",
@@ -239,7 +244,7 @@
       "dotenvy": [
         {
           "id": "dotenvy.environments",
-          "name": "Environment Manager",
+          "name": "Environment Switcher",
           "type": "webview",
           "icon": "$(settings-gear)"
         },
@@ -249,25 +254,23 @@
           "type": "tree",
           "icon": "$(lock)"
         }
-      ],
-      "explorer": [
-        {
-          "id": "dotenvy.explorer-environments",
-          "name": "Environments",
-          "icon": "$(settings-gear)"
-        }
       ]
     },
     "menus": {
       "view/title": [
         {
+          "command": "dotenvy.openVariableManager",
+          "when": "view == dotenvy.environments",
+          "group": "navigation@0"
+        },
+        {
           "command": "dotenvy.openHistoryPanel",
-          "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
+          "when": "view == dotenvy.environments",
           "group": "navigation@1"
         },
         {
           "command": "dotenvy.openAnalyticsPanel",
-          "when": "view == dotenvy.environments || view == dotenvy.explorer-environments",
+          "when": "view == dotenvy.environments",
           "group": "navigation@2"
         }
       ],
@@ -288,18 +291,20 @@
     "url": "https://github.com/kareem2099/dotenvy/issues"
   },
   "devDependencies": {
-    "@types/glob": "^7.2.0",
-    "@types/mocha": "^9.1.1",
-    "@types/node": "^16.18.126",
+    "@eslint/js": "^10.0.1",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^25.6.0",
     "@types/vscode": "^1.90.0",
-    "@typescript-eslint/eslint-plugin": "^5.1.0",
-    "@typescript-eslint/parser": "^5.1.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.1",
+    "@typescript-eslint/parser": "^8.58.1",
     "@vscode/test-electron": "^2.3.0",
     "dotenv": "^17.3.1",
-    "eslint": "^8.37.0",
-    "glob": "^7.2.3",
+    "eslint": "^10.2.0",
+    "glob": "^13.0.6",
+    "globals": "^17.4.0",
     "mocha": "^11.3.0",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.1"
   },
   "dependencies": {
     "uuid": "^13.0.0"

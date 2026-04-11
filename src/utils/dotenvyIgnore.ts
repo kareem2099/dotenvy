@@ -223,7 +223,7 @@ pnpm-lock.yaml
      * Supports: * ** ? [abc] {a,b}
      */
     private static globToRegex(glob: string): RegExp {
-        let regexStr = '';
+        let regexStr: string;
         let i = 0;
 
         // If pattern has no slash (except trailing), match in any directory

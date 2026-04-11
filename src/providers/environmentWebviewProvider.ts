@@ -108,6 +108,11 @@ interface CreateEnvironmentMessage extends BaseWebviewMessage {
     type: 'createEnvironment';
 }
 
+interface OpenVariableManagerMessage extends BaseWebviewMessage {
+    type: 'openVariableManager';
+    fileName: string;
+}
+
 interface BackupMessage extends BaseWebviewMessage {
     type: 'backupCurrentEnv';
 }
@@ -122,7 +127,7 @@ interface VariableActionMessage extends BaseWebviewMessage {
     key: string;
 }
 
-type WebviewMessage = BaseWebviewMessage | SwitchEnvironmentMessage | EditFileMessage | DiffEnvironmentMessage | CreateEnvironmentMessage | BackupMessage | ToggleVarEncryptionMessage | VariableActionMessage;
+type WebviewMessage = BaseWebviewMessage | SwitchEnvironmentMessage | EditFileMessage | OpenVariableManagerMessage | DiffEnvironmentMessage | CreateEnvironmentMessage | BackupMessage | ToggleVarEncryptionMessage | VariableActionMessage;
 
 export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
@@ -495,14 +500,14 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         try {
             raw = Buffer.from(payloadB64, 'base64').toString('utf8');
         } catch (e) {
-            throw new Error('Invalid encrypted payload');
+            throw new Error('Invalid encrypted payload', { cause: e });
         }
 
         let pack: { v: number; iv: string; ct: string; tag: string; s?: string };
         try {
             pack = JSON.parse(raw);
         } catch (e) {
-            throw new Error('Invalid encrypted payload format');
+            throw new Error('Invalid encrypted payload format', { cause: e });
         }
 
         // Support both version 1 (legacy) and version 2 (password-based)
@@ -540,6 +545,11 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
 
             case 'openTrashBin':
                 vscode.commands.executeCommand('dotenvy.openTrashBin');
+                break;
+
+            case 'openVariableManager':
+                const varManagerMsg = message as OpenVariableManagerMessage;
+                vscode.commands.executeCommand('dotenvy.openVariableManager', varManagerMsg.fileName);
                 break;
 
 

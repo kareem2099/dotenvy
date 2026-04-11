@@ -9,6 +9,8 @@
         vscode.postMessage({ type: 'clearAll' });
     });
 
+    if (listEl) listEl.addEventListener('click', handleRestoreClick);
+
     window.addEventListener('message', event => {
         const msg = event.data;
         if (msg.type === 'refresh') renderEntries(msg.entries);
@@ -43,8 +45,6 @@
             </div>`;
         }).join('');
 
-        // Delegate Restore clicks
-        listEl.addEventListener('click', handleRestoreClick);
     }
 
     function handleRestoreClick(event) {
