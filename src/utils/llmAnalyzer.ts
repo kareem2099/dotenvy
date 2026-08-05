@@ -76,7 +76,6 @@ export class LLMAnalyzer {
 
         // 2. Fallback to embedded secret (Substituted at build time by scripts/build-with-env.js)
         if (!this.sharedSecret) {
-            // @ts-ignore - process.env is handled by our custom build script substitution
             const embeddedSecret = process.env.EXTENSION_SHARED_SECRET || 'REPLACE_AT_BUILD_TIME';
             if (embeddedSecret !== 'REPLACE_AT_BUILD_TIME') {
                 this.sharedSecret = embeddedSecret;
