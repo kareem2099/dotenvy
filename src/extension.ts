@@ -199,7 +199,7 @@ export async function activate(context: vscode.ExtensionContext) {
             const pattern = isDir ? `${relativePath}/**` : relativePath;
 
             const ignoreUri = vscode.Uri.joinPath(workspaceFolders[0].uri, '.dotenvyignore');
-            let content = '';
+            let content: string;
             try {
                 content = Buffer.from(await vscode.workspace.fs.readFile(ignoreUri)).toString('utf8');
             } catch {
