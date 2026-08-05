@@ -5,9 +5,53 @@ import { SecretsGuard } from './secretsGuard';
 import { EnvironmentValidator } from './environmentValidator';
 import { ConfigUtils } from './configUtils';
 import { GitCommitHookConfig } from '../types/environment';
+import { WorkspaceManager } from '../providers/workspaceManager';
 import { spawn } from 'child_process';
 
 export class GitHookManager {
+	/**
+	 * Show install/remove menu for the git hook.
+	 */
+	static async manageHook(preferredPath?: string): Promise<void> {
+		const workspacePath = await WorkspaceManager.resolveWorkspacePath(preferredPath, 'Select workspace for Git hook');
+		if (!workspacePath) {
+			vscode.window.showErrorMessage('No workspace folder open.');
+			return;
+		}
+
+		if (!fs.existsSync(path.join(workspacePath, '.git'))) {
+			vscode.window.showErrorMessage('This workspace is not a Git repository.');
+			return;
+		}
+
+		const installed = this.isHookInstalled(workspacePath);
+		const options = installed
+			? [
+				{ label: '$(trash) Remove Git Hook', description: 'Remove the dotenvy pre-commit hook', action: 'remove' as const },
+				{ label: '$(refresh) Reinstall Git Hook', description: 'Overwrite the existing pre-commit hook', action: 'install' as const }
+			]
+			: [
+				{ label: '$(link) Install Git Hook', description: 'Block commits with secrets and .env files', action: 'install' as const }
+			];
+
+		const choice = await vscode.window.showQuickPick(options, {
+			placeHolder: installed ? 'Git hook is installed — choose an action' : 'Install dotenvy Git hook'
+		});
+
+		if (!choice) {
+			return;
+		}
+
+		if (choice.action === 'remove') {
+			const { RemoveGitHookCommand } = await import('../commands/removeGitHook');
+			await new RemoveGitHookCommand().execute(workspacePath);
+			return;
+		}
+
+		const { InstallGitHookCommand } = await import('../commands/installGitHook');
+		await new InstallGitHookCommand().execute(workspacePath);
+	}
+
 	/**
 	 * Install pre-commit hook that blocks commits with sensitive data
 	 */

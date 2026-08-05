@@ -32,6 +32,24 @@ export class CommandsTreeProvider implements vscode.TreeDataProvider<vscode.Tree
     private getAllCommands(): CommandInfo[] {
         return [
             {
+                command: 'dotenvy.initSecureProject',
+                title: 'Init Secure Project',
+                category: 'DotEnvy',
+                description: 'Initialize a new secure project with multi-user key wrapping encryption'
+            },
+            {
+                command: 'dotenvy.initDotenvyIgnore',
+                title: 'Init .dotenvyignore',
+                category: 'DotEnvy',
+                description: 'Create a default .dotenvyignore file to exclude paths from secret scanning'
+            },
+            {
+                command: 'dotenvy.loginToSecureProject',
+                title: 'Login to Secure Project',
+                category: 'DotEnvy',
+                description: 'Authenticate and unlock the secure project environment'
+            },
+            {
                 command: 'dotenvy.openEnvironmentPanel',
                 title: 'Open Environment Panel',
                 category: 'DotEnvy',
@@ -96,12 +114,6 @@ export class CommandsTreeProvider implements vscode.TreeDataProvider<vscode.Tree
                 description: 'Opens the environment history viewer to see past changes'
             },
             {
-                command: 'dotenvy.initSecureProject',
-                title: 'Init Secure Project',
-                category: 'DotEnvy',
-                description: 'Initialize a new secure project with multi-user key wrapping encryption'
-            },
-            {
                 command: 'dotenvy.addUser',
                 title: 'Add User to Secure Project',
                 category: 'DotEnvy',
@@ -112,12 +124,6 @@ export class CommandsTreeProvider implements vscode.TreeDataProvider<vscode.Tree
                 title: 'Revoke User Access',
                 category: 'DotEnvy',
                 description: 'Remove a user\'s access to the secure project environment'
-            },
-            {
-                command: 'dotenvy.loginToSecureProject',
-                title: 'Login to Secure Project',
-                category: 'DotEnvy',
-                description: 'Authenticate and unlock the secure project environment'
             }
         ];
     }

@@ -1,65 +1,101 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { EnvironmentProvider } from '../providers/environmentProvider';
 import { EnvironmentValidator } from '../utils/environmentValidator';
 import { ConfigUtils } from '../utils/configUtils';
 import { WorkspaceManager } from '../providers/workspaceManager';
 
 export class ValidateEnvironmentCommand implements vscode.Disposable {
-	public async execute(): Promise<void> {
-		const workspaceManager = WorkspaceManager.getInstance();
-		const allWorkspaces = workspaceManager.getAllWorkspaces();
-
-		if (allWorkspaces.length === 0) {
+	/**
+	 * Show validation menu and run the selected action.
+	 */
+	static async manageValidation(preferredWorkspacePath?: string): Promise<void> {
+		const rootPath = await WorkspaceManager.resolveWorkspacePath(preferredWorkspacePath, 'Select workspace to validate');
+		if (!rootPath) {
 			vscode.window.showErrorMessage('No workspace folder open.');
 			return;
 		}
 
-		// If multiple workspaces, let user choose which one
-		let selectedWorkspace;
-		if (allWorkspaces.length === 1) {
-			selectedWorkspace = allWorkspaces[0];
-		} else {
-			const workspaceItems = workspaceManager.getWorkspaceQuickPickItems();
-			const selectedItem = await vscode.window.showQuickPick(workspaceItems, {
-				placeHolder: 'Select workspace to validate'
-			});
-
-			if (!selectedItem) return;
-
-			selectedWorkspace = allWorkspaces.find(
-				ws => ws.workspace.name === selectedItem.label && ws.workspace.uri.fsPath === selectedItem.description
-			);
-		}
-
-		if (!selectedWorkspace) return;
-
-		const workspace = selectedWorkspace.workspace;
-		const rootPath = workspace.uri.fsPath;
-		// Use workspace environment provider or create fallback for robustness
-		let environmentProvider = selectedWorkspace.environmentProvider;
-		if (!environmentProvider) {
-			// Fallback: create new provider if workspace data is incomplete
-			environmentProvider = new EnvironmentProvider(rootPath);
-		}
-
-		// Get validation rules
 		const validationRules = await ConfigUtils.getValidationRules();
-		if (!validationRules) {
-			const configPath = `${rootPath}/.dotenvy.json`;
-			vscode.window.showInformationMessage(
-				`No validation rules configured. Add validation rules to: ${configPath}`
-			);
+		const configPath = path.join(rootPath, '.dotenvy.json');
+		const hasRules = !!validationRules;
+
+		const options = hasRules
+			? [
+				{ label: '$(check) Validate All Environments', description: 'Run validation rules on every .env file', action: 'validate' as const },
+				{ label: '$(gear) Open Validation Config', description: configPath, action: 'config' as const }
+			]
+			: [
+				{ label: '$(gear) Configure Validation Rules', description: `Add rules to ${configPath}`, action: 'config' as const },
+				{ label: '$(check) Validate All Environments', description: 'Requires validation rules in .dotenvy.json', action: 'validate' as const }
+			];
+
+		const choice = await vscode.window.showQuickPick(options, {
+			placeHolder: hasRules ? 'Environment validation' : 'No validation rules configured yet'
+		});
+
+		if (!choice) {
 			return;
 		}
 
-		// Get all environments
+		if (choice.action === 'config') {
+			await ValidateEnvironmentCommand.openValidationConfig(rootPath, configPath);
+			return;
+		}
+
+		await new ValidateEnvironmentCommand().execute(rootPath);
+	}
+
+	private static async openValidationConfig(rootPath: string, configPath: string): Promise<void> {
+		if (!fs.existsSync(configPath)) {
+			const defaultConfig = {
+				validation: {
+					required: ['NODE_ENV'],
+					types: {
+						PORT: 'number'
+					}
+				}
+			};
+			fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf8');
+			vscode.window.showInformationMessage(`Created ${path.basename(configPath)} with sample validation rules.`);
+		}
+
+		const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(configPath));
+		await vscode.window.showTextDocument(doc);
+	}
+
+	public async execute(preferredWorkspacePath?: string): Promise<void> {
+		const rootPath = await WorkspaceManager.resolveWorkspacePath(preferredWorkspacePath, 'Select workspace to validate');
+
+		if (!rootPath) {
+			vscode.window.showErrorMessage('No workspace folder open.');
+			return;
+		}
+
+		const environmentProvider = new EnvironmentProvider(rootPath);
+
+		const validationRules = await ConfigUtils.getValidationRules();
+		if (!validationRules) {
+			const configPath = path.join(rootPath, '.dotenvy.json');
+			const configure = await vscode.window.showInformationMessage(
+				'No validation rules configured.',
+				'Open Config',
+				'Cancel'
+			);
+
+			if (configure === 'Open Config') {
+				await ValidateEnvironmentCommand.openValidationConfig(rootPath, configPath);
+			}
+			return;
+		}
+
 		const environments = await environmentProvider.getEnvironments();
 		if (environments.length === 0) {
 			vscode.window.showInformationMessage('No .env.* files found to validate.');
 			return;
 		}
 
-		// Validate all environment files
 		const validationResults = new Map<string, Record<string, unknown>>();
 
 		for (const env of environments) {
@@ -79,7 +115,6 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 			}
 		}
 
-		// Show results
 		await this.showValidationResults(validationResults);
 	}
 
@@ -94,7 +129,6 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 			return;
 		}
 
-		// Show validation issues
 		if (invalidEnvs.length === 1) {
 			const result = invalidEnvs[0] as Record<string, unknown>;
 			const envName = (result.environment as Record<string, unknown>).name as string;
@@ -113,7 +147,6 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 				await vscode.window.showTextDocument(doc, { preview: true });
 			}
 		} else {
-			// Multiple invalid environments - show quick pick
 			const items = invalidEnvs.map(result => {
 				const resultRecord = result as Record<string, unknown>;
 				const env = resultRecord.environment as Record<string, unknown>;

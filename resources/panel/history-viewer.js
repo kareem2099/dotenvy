@@ -423,12 +423,12 @@
         if (!stats) return;
 
         statsDiv.innerHTML = `
-            <div class="stat-item">
-                <span class="stat-label">Total:</span>
+            <div class="stat-chip">
+                <span class="stat-label">Total</span>
                 <span class="stat-value">${stats.totalEntries}</span>
             </div>
-            <div class="stat-item">
-                <span class="stat-label">Size:</span>
+            <div class="stat-chip">
+                <span class="stat-label">Size</span>
                 <span class="stat-value">${formatBytes(stats.storageSize)}</span>
             </div>
         `;

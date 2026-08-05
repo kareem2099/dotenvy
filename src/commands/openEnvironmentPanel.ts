@@ -10,6 +10,7 @@ import { QuickEnvConfig } from '../types/environment';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from '../utils/logger';
+import { UserManager } from '../utils/userManager';
 
 interface WebviewMessage {
     type: string;
@@ -129,6 +130,7 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
 
         // Validation status
         const validationStatus = await this.getValidationStatus(rootPath, envPath, config);
+        const secureProjectInitialized = await UserManager.isSecureProjectInitialized();
 
         // Send comprehensive dashboard data
         this.panel.webview.postMessage({
@@ -139,7 +141,8 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
             cloudSync: cloudSyncStatus,
             gitHook: gitHookStatus,
             validation: validationStatus,
-            hasWorkspace: !!vscode.workspace.workspaceFolders
+            hasWorkspace: !!vscode.workspace.workspaceFolders,
+            secureProjectInitialized
         });
     }
 
@@ -319,18 +322,14 @@ DEBUG=false
                 break;
 
             // Git hook actions
-            case 'instalGitHook': // Typo in frontend - should be installGitHook
+            case 'instalGitHook':
             case 'installGitHook':
-                const { InstallGitHookCommand: InstallHookCmd } = await import('./installGitHook');
-                const installHookCommand = new InstallHookCmd();
-                await installHookCommand.execute();
+                await new (await import('./installGitHook')).InstallGitHookCommand().execute(rootPath);
                 await this.refreshEnvironments();
                 break;
 
             case 'removeGitHook':
-                const { RemoveGitHookCommand } = await import('./removeGitHook');
-                const removeHookCommand = new RemoveGitHookCommand();
-                await removeHookCommand.execute();
+                await new (await import('./removeGitHook')).RemoveGitHookCommand().execute(rootPath);
                 await this.refreshEnvironments();
                 break;
 
@@ -338,18 +337,23 @@ DEBUG=false
                 vscode.commands.executeCommand('vscode.openFolder');
                 break;
 
+            case 'initSecureProject':
+                await vscode.commands.executeCommand('dotenvy.initSecureProject');
+                await this.refreshEnvironments();
+                break;
+
+            case 'initDotenvyIgnore':
+                await vscode.commands.executeCommand('dotenvy.initDotenvyIgnore');
+                break;
+
             case 'manageGitHook':
-                const { InstallGitHookCommand: ManageHookCmd } = await import('./installGitHook');
-                const manageHookCommand = new ManageHookCmd();
-                await manageHookCommand.execute();
+                await GitHookManager.manageHook(rootPath);
                 await this.refreshEnvironments();
                 break;
 
             // Validation actions
             case 'validateEnvironment':
-                const { ValidateEnvironmentCommand } = await import('./validateEnvironment');
-                const validateCommand = new ValidateEnvironmentCommand();
-                await validateCommand.execute();
+                await (await import('./validateEnvironment')).ValidateEnvironmentCommand.manageValidation(rootPath);
                 await this.refreshEnvironments();
                 break;
         }

@@ -1527,8 +1527,47 @@ h6 {
 
 .history-stats {
     display: flex;
-    gap: var(--space-lg);
-    font-size: 0.875rem;
+    gap: var(--space-sm);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.history-stats .stat-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 4px 12px;
+    min-height: 24px;
+    line-height: 1;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    font-size: 0.8rem;
+    box-sizing: border-box;
+}
+
+.history-stats .stat-chip .stat-label {
+    font-weight: 500;
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.75rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+}
+
+.history-stats .stat-chip .stat-value {
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--vscode-foreground);
+    font-size: 0.8rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    background: none;
+    padding: 0;
+    border: none;
+    border-radius: 0;
 }
 
 .stat-item {
@@ -1545,10 +1584,6 @@ h6 {
 .stat-value {
     font-weight: 700;
     color: var(--vscode-foreground);
-    background: var(--glass-bg);
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: 8px;
-    border: 1px solid var(--glass-border);
 }
 
 .history-toolbar {
@@ -3133,6 +3168,14 @@ h6 {
     text-align: right;
 }
 
+.history-table td.empty-state,
+.history-table td.loading,
+.history-table td.error-state {
+    border-radius: 0;
+    border: 2px dashed var(--glass-border);
+    background: var(--glass-bg);
+}
+
 .history-row {
     border-bottom: 1px solid rgba(255,255,255,0.04);
     transition: background var(--transition-fast);
@@ -3958,4 +4001,245 @@ mark.search-highlight {
     .vm-cell--actions { justify-content: flex-start; }
 }
 
+/* ── Sidebar view (Environment Switcher webview) ── */
+body.sidebar-view {
+    overflow-x: hidden;
+}
+
+body.sidebar-view .header {
+    padding: 10px 12px;
+}
+
+body.sidebar-view .header h2 {
+    font-size: 0.9rem;
+    margin: 0 0 6px;
+}
+
+body.sidebar-view .header-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+body.sidebar-view .header-actions .btn {
+    min-height: 24px;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+}
+
+body.sidebar-view .dashboard {
+    padding: 10px 12px;
+}
+
+body.sidebar-view .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+body.sidebar-view .dashboard-card {
+    min-height: auto;
+    border-radius: 8px;
+    box-shadow: none;
+    backdrop-filter: none;
+    background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
+}
+
+body.sidebar-view .dashboard-card::before {
+    display: none;
+}
+
+body.sidebar-view .dashboard-card:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--vscode-widget-border, rgba(255, 255, 255, 0.15));
+}
+
+body.sidebar-view .card-header {
+    padding: 10px 12px;
+    background: transparent;
+    border-bottom: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.08));
+}
+
+body.sidebar-view .card-icon {
+    font-size: 1rem;
+    margin-right: 6px;
+    filter: none;
+}
+
+body.sidebar-view .card-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+body.sidebar-view .card-content {
+    padding: 10px 12px;
+}
+
+body.sidebar-view .dashboard-card .card-content {
+    justify-content: flex-start;
+}
+
+body.sidebar-view .status-indicator {
+    padding: 2px 6px;
+    font-size: 0.65rem;
+    border-radius: 4px;
+    letter-spacing: 0;
+    box-shadow: none;
+}
+
+body.sidebar-view .status-indicator::before,
+body.sidebar-view .status-indicator::after {
+    display: none;
+    animation: none;
+}
+
+body.sidebar-view .sync-last,
+body.sidebar-view .sync-time {
+    font-size: 0.65rem;
+    margin-top: 6px;
+    opacity: 0.75;
+}
+
+body.sidebar-view .hook-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+body.sidebar-view .hook-actions .btn {
+    min-height: 22px;
+    padding: 2px 8px;
+    font-size: 0.65rem;
+    flex: 1;
+}
+
+body.sidebar-view .hook-status,
+body.sidebar-view .sync-status,
+body.sidebar-view .validation-status {
+    margin: 0;
+}
+
+body.sidebar-view .environments,
+body.sidebar-view .backup-section {
+    padding: 10px 12px;
+}
+
+body.sidebar-view .section-header {
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+}
+
+body.sidebar-view .section-header h3 {
+    font-size: 0.9rem;
+}
+
+body.sidebar-view .environments-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    width: 100%;
+}
+
+body.sidebar-view .env-card {
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 8px;
+    box-shadow: none;
+    backdrop-filter: none;
+    background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
+}
+
+body.sidebar-view .env-card::before {
+    display: none;
+}
+
+body.sidebar-view .env-card:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--vscode-widget-border, rgba(255, 255, 255, 0.15));
+}
+
+body.sidebar-view .env-card-header {
+    padding: 10px 12px;
+    background: transparent;
+}
+
+body.sidebar-view .env-card-actions {
+    padding: 10px 12px;
+    gap: 8px;
+}
+
+body.sidebar-view .env-card-title .env-name {
+    font-size: 0.9rem;
+}
+
+body.sidebar-view .welcome-message p {
+    max-width: none;
+}
+
+body.sidebar-view .backup-settings {
+    gap: 10px;
+    width: 100%;
+}
+
+body.sidebar-view .setting-item {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+}
+
+/* Setup / onboarding (shown before dashboard until initialized) */
+.setup-section {
+    padding: 12px;
+}
+
+.setup-card {
+    background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.setup-title {
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.setup-description {
+    margin: 0 0 12px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--vscode-descriptionForeground);
+}
+
+.setup-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+body.sidebar-view .setup-section {
+    padding: 10px 12px;
+}
+
+body.sidebar-view .setup-card {
+    padding: 12px;
+}
+
+body.sidebar-view .setup-title {
+    font-size: 0.9rem;
+}
+
+body.sidebar-view .setup-description {
+    font-size: 0.75rem;
+    margin-bottom: 10px;
+}
+
+body.sidebar-view .setup-actions .btn {
+    min-height: 26px;
+    font-size: 0.7rem;
+}
 

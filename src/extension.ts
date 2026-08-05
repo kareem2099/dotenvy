@@ -25,7 +25,6 @@ import { HistoryWebviewProvider } from './providers/historyWebviewProvider';
 import { AnalyticsWebviewProvider } from './providers/analyticsWebviewProvider';
 import { TimelineWebviewProvider } from './providers/timelineWebviewProvider';
 import { WorkspaceManager } from './providers/workspaceManager';
-import { EnvironmentTreeProvider } from './providers/environmentTreeProvider';
 import { EnvironmentWebviewProvider } from './providers/environmentWebviewProvider';
 import { CommandsTreeProvider } from './providers/commandsTreeProvider';
 import { EnvironmentCompletionProvider } from './providers/environmentCompletionProvider';
@@ -73,7 +72,6 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
 
     // ─── Providers Initialization ──────────────────────────────────────────────
-    const treeProvider = new EnvironmentTreeProvider(initialWorkspacePath);
     const webviewProvider = new EnvironmentWebviewProvider(context);
     // Initialize the static History panel (no longer a sidebar view)
     HistoryWebviewProvider.init(extensionUri, context);
@@ -92,7 +90,6 @@ export async function activate(context: vscode.ExtensionContext) {
     // ─── Registrations ─────────────────────────────────────────────────────────
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('dotenvy.environments', webviewProvider),
-        vscode.window.registerTreeDataProvider('dotenvy.explorer-environments', treeProvider),
         vscode.window.registerTreeDataProvider('dotenvy.commands', commandsTreeProvider),
         // Command to open the History panel as a full WebviewPanel (tab)
         vscode.commands.registerCommand('dotenvy.openHistoryPanel', () => HistoryWebviewProvider.openOrReveal()),
@@ -130,7 +127,7 @@ export async function activate(context: vscode.ExtensionContext) {
             for (const added of event.added) {
                 await workspaceManager.addWorkspace(added);
             }
-            treeProvider.refresh();
+            await webviewProvider.onWorkspaceFoldersChanged();
         }),
     );
 

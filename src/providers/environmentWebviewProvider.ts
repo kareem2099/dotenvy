@@ -15,6 +15,7 @@ import * as crypto from 'crypto';
 import * as os from 'os';
 import { logger } from '../utils/logger';
 import { TrashBinManager } from '../utils/trashBinManager';
+import { UserManager } from '../utils/userManager';
 
 // Dashboard data interfaces
 interface EnvironmentData {
@@ -81,6 +82,7 @@ interface DashboardData {
     gitHook: GitHookStatus;
     validation: ValidationStatus;
     hasWorkspace: boolean;
+    secureProjectInitialized: boolean;
     backupSettings: BackupSettings;
 }
 
@@ -187,6 +189,26 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         }, undefined, this.context.subscriptions);
     }
 
+    async onWorkspaceFoldersChanged(): Promise<void> {
+        const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+        this.environmentProvider = new EnvironmentProvider(rootPath);
+        this.cachedDashboardData = null;
+
+        if (!this._view) {
+            return;
+        }
+
+        this._view.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [
+                vscode.Uri.joinPath(extensionUri, 'resources'),
+                vscode.Uri.file(rootPath)
+            ]
+        };
+
+        await this.refreshEnvironments();
+    }
+
     private updateWebviewContent(webview: vscode.Webview): void {
         webview.html = this.getWebviewContent();
     }
@@ -206,6 +228,7 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         // Replace placeholders with actual URIs
         html = html.replace('{{panelCssUri}}', cssUri.toString());
         html = html.replace('{{panelJsUri}}', jsUri.toString());
+        html = html.replace('<body>', '<body class="sidebar-view">');
 
         return html;
     }
@@ -305,6 +328,8 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         // Validation status
         const validationStatus = await this.getValidationStatus(rootPath, envPath, config);
 
+        const secureProjectInitialized = await UserManager.isSecureProjectInitialized();
+
         // Get backup configuration
         const backupConfig = vscode.workspace.getConfiguration('dotenvy');
         const backupPath = backupConfig.get<string>('backupPath', '');
@@ -327,6 +352,7 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
             gitHook: gitHookStatus,
             validation: validationStatus,
             hasWorkspace: !!vscode.workspace.workspaceFolders,
+            secureProjectInitialized,
             backupSettings: {
                 path: backupPath,
                 encrypt: encryptBackups
@@ -670,16 +696,12 @@ DEBUG=false
             // Git hook actions
             case 'instalGitHook': // Typo in frontend - should be installGitHook
             case 'installGitHook':
-                const { InstallGitHookCommand: InstallHookCmd } = await import('../commands/installGitHook');
-                const installHookCommand = new InstallHookCmd();
-                await installHookCommand.execute();
+                await new (await import('../commands/installGitHook')).InstallGitHookCommand().execute(rootPath);
                 await this.refreshEnvironments();
                 break;
 
             case 'removeGitHook':
-                const { RemoveGitHookCommand } = await import('../commands/removeGitHook');
-                const removeHookCommand = new RemoveGitHookCommand();
-                await removeHookCommand.execute();
+                await new (await import('../commands/removeGitHook')).RemoveGitHookCommand().execute(rootPath);
                 await this.refreshEnvironments();
                 break;
 
@@ -687,10 +709,17 @@ DEBUG=false
                 vscode.commands.executeCommand('vscode.openFolder');
                 break;
 
+            case 'initSecureProject':
+                await vscode.commands.executeCommand('dotenvy.initSecureProject');
+                await this.refreshEnvironments();
+                break;
+
+            case 'initDotenvyIgnore':
+                await vscode.commands.executeCommand('dotenvy.initDotenvyIgnore');
+                break;
+
             case 'manageGitHook':
-                const { InstallGitHookCommand: ManageHookCmd } = await import('../commands/installGitHook');
-                const manageHookCommand = new ManageHookCmd();
-                await manageHookCommand.execute();
+                await GitHookManager.manageHook(rootPath);
                 await this.refreshEnvironments();
                 break;
 
@@ -857,9 +886,7 @@ DEBUG=false
                 break;
 
             case 'validateEnvironment':
-                const { ValidateEnvironmentCommand } = await import('../commands/validateEnvironment');
-                const validateCommand = new ValidateEnvironmentCommand();
-                await validateCommand.execute();
+                await (await import('../commands/validateEnvironment')).ValidateEnvironmentCommand.manageValidation(rootPath);
                 await this.refreshEnvironments();
                 break;
 

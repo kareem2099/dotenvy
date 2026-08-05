@@ -2,48 +2,23 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { GitHookManager } from '../utils/gitHookManager';
-import { GitUtils } from '../utils/gitUtils';
-import { WorkspaceManager } from '../providers/workspaceManager';
 import { GitCommitHookConfig } from '../types/environment';
+import { WorkspaceManager } from '../providers/workspaceManager';
 
 interface GitHookFileConfig {
     gitCommitHook?: GitCommitHookConfig;
 }
 
 export class InstallGitHookCommand implements vscode.Disposable {
-	public async execute(): Promise<void> {
-		const workspaceManager = WorkspaceManager.getInstance();
-		const allWorkspaces = workspaceManager.getAllWorkspaces();
+	public async execute(preferredWorkspacePath?: string): Promise<void> {
+		const workspacePath = await WorkspaceManager.resolveWorkspacePath(preferredWorkspacePath, 'Select workspace to install Git hook in');
 
-		if (allWorkspaces.length === 0) {
+		if (!workspacePath) {
 			vscode.window.showErrorMessage('No workspace folder open.');
 			return;
 		}
 
-		// If multiple workspaces, let user choose which one
-		let selectedWorkspace;
-		if (allWorkspaces.length === 1) {
-			selectedWorkspace = allWorkspaces[0];
-		} else {
-			const workspaceItems = workspaceManager.getWorkspaceQuickPickItems();
-			const selectedItem = await vscode.window.showQuickPick(workspaceItems, {
-				placeHolder: 'Select workspace to install Git hook in'
-			});
-
-			if (!selectedItem) return;
-
-			selectedWorkspace = allWorkspaces.find(
-				ws => ws.workspace.name === selectedItem.label && ws.workspace.uri.fsPath === selectedItem.description
-			);
-		}
-
-		if (!selectedWorkspace) return;
-
-		const workspace = selectedWorkspace.workspace;
-		const workspacePath = workspace.uri.fsPath;
-
-		// Check if it's a Git repository
-		if (!await GitUtils.isGitRepository(workspacePath)) {
+		if (!fs.existsSync(path.join(workspacePath, '.git'))) {
 			vscode.window.showErrorMessage('This workspace is not a Git repository.');
 			return;
 		}

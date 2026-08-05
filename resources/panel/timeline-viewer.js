@@ -82,12 +82,12 @@
     function updateStats(stats) {
         if (!stats || !statsDiv) return;
         statsDiv.innerHTML = `
-            <div class="stat-item">
-                <span class="stat-label">Entries:</span>
+            <div class="stat-chip">
+                <span class="stat-label">Entries</span>
                 <span class="stat-value">${stats.totalEntries}</span>
             </div>
-            <div class="stat-item">
-                <span class="stat-label">Span:</span>
+            <div class="stat-chip">
+                <span class="stat-label">Span</span>
                 <span class="stat-value">${calculateDateSpan(stats.oldestEntry, stats.newestEntry)}</span>
             </div>
         `;

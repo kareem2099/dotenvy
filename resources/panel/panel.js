@@ -77,6 +77,7 @@ const buttonEffects = {
 function updateDashboard(data) {
     console.log('📊 Updating dashboard...', data);
 
+    updateSetupSection(data);
     updateCloudCard(data);
     updateGitHookCard(data);
     updateValidationCard(data);
@@ -93,13 +94,52 @@ function updateDashboard(data) {
     }, 50);
 }
 
+function updateSetupSection(data) {
+    const section = document.getElementById('setup-section');
+    const title = document.getElementById('setup-title');
+    const description = document.getElementById('setup-description');
+    const actions = document.getElementById('setup-actions');
+    const dashboard = document.getElementById('dashboard');
+    const header = document.querySelector('.header');
+
+    if (!section || !title || !description || !actions) {
+        return;
+    }
+
+    if (data.secureProjectInitialized) {
+        section.hidden = true;
+        if (dashboard) dashboard.hidden = false;
+        if (header) header.hidden = false;
+        return;
+    }
+
+    section.hidden = false;
+    if (dashboard) dashboard.hidden = true;
+    if (header) header.hidden = true;
+
+    if (!data.hasWorkspace) {
+        title.textContent = 'Welcome to DotEnvy';
+        description.textContent = 'Open a workspace folder to initialize the extension.';
+        actions.innerHTML = `<button class="btn btn-primary btn-sm" onclick="openWorkspace()">Open Workspace</button>`;
+        return;
+    }
+
+    title.textContent = 'Initialize DotEnvy';
+    description.textContent = 'Set up your secure project to enable environment management and encryption.';
+    actions.innerHTML = `
+        <button class="btn btn-primary btn-sm" onclick="initSecureProject()">Init Secure Project</button>
+        <button class="btn btn-secondary btn-sm" onclick="initDotenvyIgnore()">Init .dotenvyignore</button>
+    `;
+}
+
 function updateCloudCard(data) {
     const el = document.getElementById('cloud-status');
     const syncEl = document.getElementById('last-sync');
     if (el && syncEl) {
         const connected = data.cloudSync?.connected || false;
-        el.innerHTML = `<span class="status-indicator ${connected ? 'status-connected' : 'status-disconnected'}">${connected ? 'Connected' : 'Not Connected'}</span>`;
-        syncEl.innerHTML = `<span class="sync-time">Last: ${data.cloudSync?.lastSync ? formatTimeDiff(data.cloudSync.lastSync) : 'Never'}</span>`;
+        el.className = `status-indicator ${connected ? 'status-connected' : 'status-disconnected'}`;
+        el.textContent = connected ? 'Connected' : 'Not Connected';
+        syncEl.textContent = `Last: ${data.cloudSync?.lastSync ? formatTimeDiff(data.cloudSync.lastSync) : 'Never'}`;
     }
 }
 
@@ -107,7 +147,8 @@ function updateGitHookCard(data) {
     const el = document.getElementById('hook-status');
     if (el) {
         const installed = data.gitHook?.installed || false;
-        el.innerHTML = `<span class="status-indicator ${installed ? 'status-active' : 'status-warning'}">${installed ? 'Installed' : 'Not Installed'}</span>`;
+        el.className = `status-indicator ${installed ? 'status-active' : 'status-warning'}`;
+        el.textContent = installed ? 'Installed' : 'Not Installed';
     }
 }
 
@@ -117,7 +158,8 @@ function updateValidationCard(data) {
     if (statusEl && errorsEl) {
         const valid = data.validation?.valid ?? true;
         const errors = data.validation?.errors || 0;
-        statusEl.innerHTML = `<span class="status-indicator ${valid ? 'status-valid' : 'status-invalid'}">${valid ? 'Valid' : 'Invalid'}</span>`;
+        statusEl.className = `status-indicator ${valid ? 'status-valid' : 'status-invalid'}`;
+        statusEl.textContent = valid ? 'Valid' : 'Invalid';
         errorsEl.innerHTML = errors > 0 ? `<span class="error-count">${errors} errors</span>` : '';
         errorsEl.style.display = errors > 0 ? 'block' : 'none';
     }
@@ -211,6 +253,8 @@ const actions = {
     chooseBackupLocation: () => vscode.postMessage({ type: 'chooseBackupLocation' }),
     restoreFromBackup: () => vscode.postMessage({ type: 'restoreFromBackup' }),
     openWorkspace: () => vscode.postMessage({ type: 'openWorkspace' }),
+    initSecureProject: () => vscode.postMessage({ type: 'initSecureProject' }),
+    initDotenvyIgnore: () => vscode.postMessage({ type: 'initDotenvyIgnore' }),
     openHistoryPanel: () => vscode.postMessage({ type: 'openHistoryPanel' }),
     openAnalyticsPanel: () => vscode.postMessage({ type: 'openAnalyticsPanel' }),
     openTrashBin: () => vscode.postMessage({ type: 'openTrashBin' }),
