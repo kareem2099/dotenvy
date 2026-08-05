@@ -37,6 +37,185 @@ export class ConfigUtils {
 	}
 
 	/**
+	 * Build a default .dotenvy.json config with auto-discovered environments and project name.
+	 */
+	static async buildDefaultConfig(rootPath: string): Promise<QuickEnvConfig> {
+		return {
+			environments: await this.discoverEnvironments(rootPath),
+			cloudSync: {
+				provider: 'doppler',
+				project: this.resolveProjectName(rootPath),
+				config: 'development',
+				token: ''
+			}
+		};
+	}
+
+	/**
+	 * Fill missing project/environments fields without overwriting user values.
+	 */
+	static async hydrateConfig(config: QuickEnvConfig, rootPath: string): Promise<QuickEnvConfig> {
+		const hydrated: QuickEnvConfig = {
+			...config,
+			environments: { ...(config.environments ?? {}) },
+			cloudSync: config.cloudSync
+				? { ...config.cloudSync }
+				: {
+					provider: 'doppler',
+					project: this.resolveProjectName(rootPath),
+					config: 'development',
+					token: ''
+				}
+		};
+
+		if (!hydrated.environments || Object.keys(hydrated.environments).length === 0) {
+			hydrated.environments = await this.discoverEnvironments(rootPath);
+		}
+
+		if (hydrated.cloudSync && !hydrated.cloudSync.project?.trim()) {
+			hydrated.cloudSync.project = this.resolveProjectName(rootPath);
+		}
+
+		return hydrated;
+	}
+
+	/**
+	 * Create or refresh .dotenvy.json in the selected workspace folder.
+	 */
+	static async writeWorkspaceConfigFile(
+		rootPath: string,
+		existingConfig?: QuickEnvConfig | null,
+		configFilename = '.dotenvy.json'
+	): Promise<QuickEnvConfig> {
+		const configPath = path.join(rootPath, configFilename);
+		const config = existingConfig
+			? await this.hydrateConfig(existingConfig, rootPath)
+			: await this.buildDefaultConfig(rootPath);
+
+		if (fs.existsSync(configPath)) {
+			await fs.promises.copyFile(configPath, `${configPath}.backup`);
+		}
+
+		await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
+		await this.ensureConfigInGitignore(rootPath, configFilename);
+		await this.saveQuickEnvConfig(config);
+
+		return config;
+	}
+
+	private static async ensureConfigInGitignore(rootPath: string, configFilename: string): Promise<void> {
+		const gitignorePath = path.join(rootPath, '.gitignore');
+		let gitignoreContent = '';
+
+		try {
+			if (fs.existsSync(gitignorePath)) {
+				gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+			}
+		} catch {
+			// Ignore read errors
+		}
+
+		if (!gitignoreContent.includes(configFilename)) {
+			gitignoreContent += `\n${configFilename}`;
+			fs.writeFileSync(gitignorePath, gitignoreContent);
+		}
+	}
+
+	/**
+	 * Scan the workspace for .env.* files and map them to environment names.
+	 */
+	static async discoverEnvironments(rootPath: string): Promise<Record<string, string>> {
+		const excludedSuffixes = new Set(['backup', 'example', 'template']);
+		const excludeGlob = '**/{node_modules,.git,dist,build,out,.venv,.next,coverage}/**';
+		const discovered: Array<{ name: string; relativePath: string }> = [];
+
+		try {
+			const pattern = new vscode.RelativePattern(rootPath, '**/.env.*');
+			const files = await vscode.workspace.findFiles(pattern, excludeGlob, 200);
+
+			for (const uri of files) {
+				if (uri.scheme !== 'file') {
+					continue;
+				}
+
+				const relativePath = path.relative(rootPath, uri.fsPath);
+				if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+					continue;
+				}
+
+				const fileName = path.basename(uri.fsPath);
+				if (!fileName.startsWith('.env.') || fileName === '.env') {
+					continue;
+				}
+
+				const envName = fileName.substring(5);
+				if (!envName || excludedSuffixes.has(envName.toLowerCase())) {
+					continue;
+				}
+
+				discovered.push({
+					name: envName,
+					relativePath: relativePath.replace(/\\/g, '/')
+				});
+			}
+		} catch (error) {
+			logger.warn(`Failed to discover environments: ${error}`, 'ConfigUtils');
+		}
+
+		return this.buildEnvironmentMap(discovered);
+	}
+
+	/**
+	 * Resolve Doppler project name from package.json or workspace folder.
+	 */
+	static resolveProjectName(rootPath: string): string {
+		const packageJsonPath = path.join(rootPath, 'package.json');
+
+		try {
+			if (fs.existsSync(packageJsonPath)) {
+				const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as { name?: string };
+				if (pkg.name?.trim()) {
+					return this.normalizeProjectName(pkg.name);
+				}
+			}
+		} catch (error) {
+			logger.warn(`Failed to read package.json for project name: ${error}`, 'ConfigUtils');
+		}
+
+		return this.normalizeProjectName(path.basename(rootPath));
+	}
+
+	private static normalizeProjectName(name: string): string {
+		const unscoped = name.startsWith('@') ? (name.split('/').pop() ?? name) : name;
+		return unscoped.trim().toLowerCase().replace(/[_\s]+/g, '-');
+	}
+
+	private static buildEnvironmentMap(
+		discovered: Array<{ name: string; relativePath: string }>
+	): Record<string, string> {
+		const nameCounts = new Map<string, number>();
+
+		for (const entry of discovered) {
+			nameCounts.set(entry.name, (nameCounts.get(entry.name) ?? 0) + 1);
+		}
+
+		const environments: Record<string, string> = {};
+
+		for (const entry of discovered) {
+			let key = entry.name;
+
+			if ((nameCounts.get(entry.name) ?? 0) > 1) {
+				const parentDir = path.basename(path.dirname(entry.relativePath));
+				key = parentDir && parentDir !== '.' ? `${parentDir}-${entry.name}` : entry.name;
+			}
+
+			environments[key] = entry.relativePath;
+		}
+
+		return environments;
+	}
+
+	/**
 	 * Save QuickEnv config to VSCode storage and .dotenvy.json file
 	 */
 	static async saveQuickEnvConfig(config: QuickEnvConfig): Promise<void> {
@@ -87,7 +266,7 @@ export class ConfigUtils {
 	 */
 	static async getCustomEnvironments(): Promise<Map<string, string> | null> {
 		const config = await this.readQuickEnvConfig();
-		if (!config || !config.environments) {
+		if (!config?.environments || Object.keys(config.environments).length === 0) {
 			return null;
 		}
 

@@ -29,16 +29,28 @@ export class EnvironmentProvider {
 
 		// Check if we have a workspace
 		if (vscode.workspace.workspaceFolders) {
-			// Use workspace findFiles for better performance
-			const files = await vscode.workspace.findFiles('**/.env.*', '**/node_modules/**', 100);
+			// Use workspace findFiles for better performance (includes subfolders)
+			const pattern = new vscode.RelativePattern(this.rootPath, '**/.env.*');
+			const files = await vscode.workspace.findFiles(
+				pattern,
+				'**/{node_modules,.git,dist,build,out,.venv,.next,coverage}/**',
+				100
+			);
 			return files
-				.filter(uri => uri.scheme === 'file' && path.dirname(uri.fsPath) === this.rootPath)
+				.filter(uri => {
+					if (uri.scheme !== 'file') {
+						return false;
+					}
+					const relativePath = path.relative(this.rootPath, uri.fsPath);
+					return relativePath && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+				})
 				.map(uri => {
 					const fileName = path.basename(uri.fsPath);
 					const envName = fileName.substring(5); // Remove .env.
+					const relativePath = path.relative(this.rootPath, uri.fsPath).replace(/\\/g, '/');
 					return {
 						name: envName,
-						fileName,
+						fileName: relativePath,
 						filePath: uri.fsPath
 					};
 				})

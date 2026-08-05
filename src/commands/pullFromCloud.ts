@@ -48,48 +48,14 @@ export class PullFromCloudCommand implements vscode.Disposable {
 		const config = await ConfigUtils.readQuickEnvConfig();
 		const configPath = path.join(rootPath, '.dotenvy.json');
 		if (!config?.cloudSync || !config.cloudSync.project || !config.cloudSync.config || !config.cloudSync.token) {
-			// Create basic configuration file automatically
-			const basicConfig = {
-				environments: {},
-				cloudSync: {
-					provider: 'doppler' as const,
-					project: '',
-					config: 'development',
-					token: ''
-				}
-			};
-
-			await fs.promises.writeFile(
-				configPath,
-				JSON.stringify(basicConfig, null, 2),
-				'utf8'
-			);
-
-			// Auto-add to gitignore
-			const gitignorePath = path.join(rootPath, '.gitignore');
-			let gitignoreContent = '';
-			try {
-				if (fs.existsSync(gitignorePath)) {
-					gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
-				}
-			} catch (error) {
-				// Ignore
-			}
-
-			if (!gitignoreContent.includes('.dotenvy.json')) {
-				gitignoreContent += '\n.dotenvy.json';
-				fs.writeFileSync(gitignorePath, gitignoreContent);
-			}
-
-			// Store in VSCode storage too
-			await ConfigUtils.saveQuickEnvConfig(basicConfig);
+			await ConfigUtils.writeWorkspaceConfigFile(rootPath, config);
 
 			// Open the file for user to edit
 			const doc = await vscode.workspace.openTextDocument(configPath);
 			await vscode.window.showTextDocument(doc);
 
 			vscode.window.showInformationMessage(
-				'Configuration file created! Fill in your project details and token, then save and try again.'
+				'Configuration file created! Environments and project name were auto-detected. Add your Doppler token, then save and try again.'
 			);
 
 			return;
@@ -157,46 +123,14 @@ export class PullFromCloudCommand implements vscode.Disposable {
 					}
 
 					const newConfigPath = path.join(rootPath, configFilename);
-					const basicConfig = {
-						environments: {},
-						cloudSync: {
-							provider: 'doppler' as const,
-							project: '',
-							config: 'development',
-							token: ''
-						}
-					};
-
-					await fs.promises.writeFile(
-						newConfigPath,
-						JSON.stringify(basicConfig, null, 2),
-						'utf8'
-					);
-
-					// Add the new filename to gitignore
-					const gitignorePath = path.join(rootPath, '.gitignore');
-					let gitignoreContent = '';
-					try {
-						if (fs.existsSync(gitignorePath)) {
-							gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
-						}
-					} catch (error) {
-						// Ignore
-					}
-
-					if (!gitignoreContent.includes(configFilename)) {
-						gitignoreContent += '\n' + configFilename;
-						fs.writeFileSync(gitignorePath, gitignoreContent);
-					}
-
-					await ConfigUtils.saveQuickEnvConfig(basicConfig);
+					await ConfigUtils.writeWorkspaceConfigFile(rootPath, undefined, configFilename);
 
 					// Open the file for user to edit
 					const doc = await vscode.workspace.openTextDocument(newConfigPath);
 					await vscode.window.showTextDocument(doc);
 
 					vscode.window.showInformationMessage(
-						`${configFilename} created! Fill in your project details and token, then save and try again.`
+						`${configFilename} created! Environments and project name were auto-detected. Add your Doppler token, then save and try again.`
 					);
 				}
 

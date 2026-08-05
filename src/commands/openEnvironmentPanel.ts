@@ -333,6 +333,16 @@ DEBUG=false
                 await this.refreshEnvironments();
                 break;
 
+            case 'openDopplerDashboard': {
+                const quickEnvConfig = await ConfigUtils.readQuickEnvConfig();
+                const dashboardUrl = DopplerSyncManager.getDashboardUrl(
+                    quickEnvConfig?.cloudSync?.project,
+                    quickEnvConfig?.cloudSync?.config
+                );
+                await vscode.env.openExternal(vscode.Uri.parse(dashboardUrl));
+                break;
+            }
+
             case 'openWorkspace':
                 vscode.commands.executeCommand('vscode.openFolder');
                 break;

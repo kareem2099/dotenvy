@@ -255,6 +255,7 @@ const actions = {
     openWorkspace: () => vscode.postMessage({ type: 'openWorkspace' }),
     initSecureProject: () => vscode.postMessage({ type: 'initSecureProject' }),
     initDotenvyIgnore: () => vscode.postMessage({ type: 'initDotenvyIgnore' }),
+    openDopplerDashboard: () => vscode.postMessage({ type: 'openDopplerDashboard' }),
     openHistoryPanel: () => vscode.postMessage({ type: 'openHistoryPanel' }),
     openAnalyticsPanel: () => vscode.postMessage({ type: 'openAnalyticsPanel' }),
     openTrashBin: () => vscode.postMessage({ type: 'openTrashBin' }),

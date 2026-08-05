@@ -9,6 +9,22 @@ type DopplerSecretData = {
 export class DopplerSyncManager extends CloudSyncManager {
 	private resolvedConfig?: string;
 
+	static getDashboardUrl(project?: string, config?: string): string {
+		const base = 'https://dashboard.doppler.com';
+		const trimmedProject = project?.trim();
+		if (!trimmedProject) {
+			return base;
+		}
+
+		const projectUrl = `${base}/workplace/projects/${encodeURIComponent(trimmedProject)}`;
+		const trimmedConfig = config?.trim();
+		if (!trimmedConfig) {
+			return projectUrl;
+		}
+
+		return `${projectUrl}/configs/${encodeURIComponent(trimmedConfig)}`;
+	}
+
 	/**
 	 * Fetch secrets from Doppler
 	 */

@@ -561,6 +561,16 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
                 await this.refreshEnvironments();
                 break;
 
+            case 'openDopplerDashboard': {
+                const quickEnvConfig = await ConfigUtils.readQuickEnvConfig();
+                const dashboardUrl = DopplerSyncManager.getDashboardUrl(
+                    quickEnvConfig?.cloudSync?.project,
+                    quickEnvConfig?.cloudSync?.config
+                );
+                await vscode.env.openExternal(vscode.Uri.parse(dashboardUrl));
+                break;
+            }
+
             case 'openHistoryPanel':
                 vscode.commands.executeCommand('dotenvy.openHistoryPanel');
                 break;
