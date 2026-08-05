@@ -1,4 +1,5 @@
 import * as https from 'https';
+import * as vscode from 'vscode';
 import { CloudSyncConfig } from '../types/environment';
 
 export interface CloudSecrets {
@@ -52,12 +53,19 @@ export abstract class CloudSyncManager {
 	/**
 	 * Fetch secrets from the cloud provider
 	 */
-	abstract fetchSecrets(): Promise<CloudSyncResult>;
+	abstract fetchSecrets(context?: vscode.ExtensionContext): Promise<CloudSyncResult>;
 
 	/**
 	 * Push local environment to cloud provider (if supported)
 	 */
-	abstract pushSecrets(secrets: CloudSecrets): Promise<CloudSyncResult>;
+	abstract pushSecrets(secrets: CloudSecrets, context?: vscode.ExtensionContext): Promise<CloudSyncResult>;
+
+	/**
+	 * Replace remote secrets: upsert locals and delete orphans
+	 */
+	async replaceSecrets(secrets: CloudSecrets, context?: vscode.ExtensionContext): Promise<CloudSyncResult> {
+		return this.pushSecrets(secrets, context);
+	}
 
 	/**
 	 * Test connection to the cloud provider

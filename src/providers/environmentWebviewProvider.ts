@@ -16,6 +16,9 @@ import * as os from 'os';
 import { logger } from '../utils/logger';
 import { TrashBinManager } from '../utils/trashBinManager';
 import { UserManager } from '../utils/userManager';
+import { registerPanelNotifier, showActionStart, showSyncToast } from '../utils/panelNotification';
+import { LocalizationService, t } from '../i18n';
+import { getWebviewLocalePayload } from '../i18n/webviewLocale';
 
 // Dashboard data interfaces
 interface EnvironmentData {
@@ -187,6 +190,9 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         view.webview.onDidReceiveMessage(async (message) => {
             await this.handleMessage(message);
         }, undefined, this.context.subscriptions);
+
+        const panelNotifier = registerPanelNotifier(message => view.webview.postMessage(message));
+        view.onDidDispose(() => panelNotifier.dispose());
     }
 
     async onWorkspaceFoldersChanged(): Promise<void> {
@@ -233,14 +239,14 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         return html;
     }
 
-    private async refreshEnvironments(): Promise<void> {
+    async refreshEnvironments(): Promise<void> {
         if (!this._view || !this.environmentProvider) return;
 
         const rootPath = this.environmentProvider['rootPath'];
         const envPath = path.join(rootPath, '.env');
 
         // Gather comprehensive dashboard data
-        const config = await ConfigUtils.readQuickEnvConfig();
+        const config = await ConfigUtils.readQuickEnvConfig(rootPath);
         const environments = await this.environmentProvider.getEnvironments();
         const currentEnvironment = await this.environmentProvider.getCurrentEnvironment();
 
@@ -330,6 +336,10 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
 
         const secureProjectInitialized = await UserManager.isSecureProjectInitialized();
 
+        if (secureProjectInitialized) {
+            await ConfigUtils.ensureWorkspaceConfigFile(rootPath);
+        }
+
         // Get backup configuration
         const backupConfig = vscode.workspace.getConfiguration('dotenvy');
         const backupPath = backupConfig.get<string>('backupPath', '');
@@ -343,8 +353,12 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         // Prepare dashboard data
+        const localePayload = getWebviewLocalePayload('panel.');
+
         const dashboardData = {
             type: 'refresh',
+            locale: localePayload.locale,
+            strings: localePayload.strings,
             environments: enhancedEnvironments,
             currentFile,
             currentEnvironment: currentEnvName,
@@ -557,12 +571,21 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         const rootPath = this.environmentProvider['rootPath'];
 
         switch (message.type) {
+            case 'setLocale': {
+                const localeMsg = message as { locale?: string };
+                if (localeMsg.locale) {
+                    await LocalizationService.getInstance().setLocale(localeMsg.locale);
+                    await this.refreshEnvironments();
+                }
+                break;
+            }
+
             case 'refresh':
                 await this.refreshEnvironments();
                 break;
 
             case 'openDopplerDashboard': {
-                const quickEnvConfig = await ConfigUtils.readQuickEnvConfig();
+                const quickEnvConfig = await ConfigUtils.readQuickEnvConfig(rootPath);
                 const dashboardUrl = DopplerSyncManager.getDashboardUrl(
                     quickEnvConfig?.cloudSync?.project,
                     quickEnvConfig?.cloudSync?.config
@@ -603,15 +626,16 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
 
                         const warnings = SecretsGuard.checkFile(selectedEnv.filePath);
                         if (warnings.length > 0) {
-                            vscode.window.showWarningMessage(
-                                `⚠️ Selected environment contains potential secrets: ${warnings.join(', ')}`
+                            showSyncToast(
+                                t('webview.secretsInEnv', { warnings: warnings.join(', ') }),
+                                'warning'
                             );
                         }
 
-                        vscode.window.showInformationMessage(`Environment switched to ${selectedEnv.name}`);
+                        showSyncToast(t('webview.envSwitched', { name: selectedEnv.name }), 'success');
                         await this.refreshEnvironments();
                     } catch (error) {
-                        vscode.window.showErrorMessage(`Failed to switch environment: ${(error as Error).message}`);
+                        showSyncToast(t('webview.switchFailed', { message: (error as Error).message }), 'error');
                     }
                 }
                 break;
@@ -641,7 +665,7 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
                             });
                             await vscode.window.showTextDocument(doc, { preview: true });
                         } catch (error) {
-                            vscode.window.showErrorMessage(`Failed to show diff: ${(error as Error).message}`);
+                            showSyncToast(t('webview.diffFailed', { message: (error as Error).message }), 'error');
                         }
                     }
                 } else {
@@ -654,12 +678,12 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
 
             case 'createEnvironment':
                 const fileName = await vscode.window.showInputBox({
-                    prompt: 'Enter environment file name (e.g., .env.staging)',
-                    placeHolder: '.env.newenv',
+                    prompt: t('webview.createEnvPrompt'),
+                    placeHolder: t('webview.createEnvPlaceholder'),
                     value: '.env.',
                     validateInput: (value: string) => {
-                        if (!value.startsWith('.env.')) return 'Must start with .env.';
-                        if (fs.existsSync(path.join(rootPath, value))) return 'File already exists';
+                        if (!value.startsWith('.env.')) return t('webview.mustStartWithEnv');
+                        if (fs.existsSync(path.join(rootPath, value))) return t('webview.fileExists');
                         return null;
                     }
                 });
@@ -677,30 +701,39 @@ DEBUG=false
 `.replace(/\r?\n/g, '\n');
 
                         fs.writeFileSync(path.join(rootPath, fileName), templateContent, 'utf8');
-                        vscode.window.showInformationMessage(`Created ${fileName}`);
+                        showSyncToast(t('webview.envCreated', { fileName }), 'success');
                         await this.refreshEnvironments();
 
                         // Open the new file for editing
                         const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(rootPath, fileName)));
                         await vscode.window.showTextDocument(doc);
                     } catch (error) {
-                        vscode.window.showErrorMessage(`Failed to create environment file: ${(error as Error).message}`);
+                        showSyncToast(t('webview.createFailed', { message: (error as Error).message }), 'error');
                     }
                 }
                 break;
 
             // Cloud sync actions
             case 'pullFromCloud':
-                const { PullFromCloudCommand } = await import('../commands/pullFromCloud');
-                const pullCommand = new PullFromCloudCommand();
-                await pullCommand.execute();
-                await this.refreshEnvironments();
+                try {
+                    const { PullFromCloudCommand } = await import('../commands/pullFromCloud');
+                    const pullCommand = new PullFromCloudCommand();
+                    await pullCommand.execute(rootPath);
+                    await this.refreshEnvironments();
+                } catch (error) {
+                    showSyncToast(t('pull.failed', { message: (error as Error).message }), 'error');
+                }
                 break;
 
             case 'pushToCloud':
-                const { PushToCloudCommand } = await import('../commands/pushToCloud');
-                const pushCommand = new PushToCloudCommand();
-                await pushCommand.execute();
+                try {
+                    const { PushToCloudCommand } = await import('../commands/pushToCloud');
+                    const pushCommand = new PushToCloudCommand();
+                    await pushCommand.execute(rootPath);
+                    await this.refreshEnvironments();
+                } catch (error) {
+                    showSyncToast(t('push.failed', { message: (error as Error).message }), 'error');
+                }
                 break;
 
             // Git hook actions
@@ -735,8 +768,9 @@ DEBUG=false
 
             // Validation actions
             case 'backupCurrentEnv':
+                showActionStart(t('webview.backup.actionStart'));
                 if (!fs.existsSync(path.join(rootPath, '.env'))) {
-                    vscode.window.showErrorMessage('No .env file found to backup.');
+                    showSyncToast(t('webview.backup.noEnv'), 'error');
                     return;
                 }
 
@@ -813,7 +847,7 @@ DEBUG=false
                         });
 
                         if (!password) {
-                            vscode.window.showInformationMessage('Backup cancelled.');
+                            showSyncToast(t('webview.backup.cancelled'), 'info');
                             return;
                         }
 
@@ -825,7 +859,7 @@ DEBUG=false
                         });
 
                         if (password !== passwordConfirm) {
-                            vscode.window.showErrorMessage('Passwords do not match. Backup cancelled.');
+                            showSyncToast(t('webview.backup.passwordMismatch'), 'error');
                             return;
                         }
 
@@ -840,7 +874,7 @@ DEBUG=false
                         backupPath = path.join(backupDir, filename);
                         fs.writeFileSync(backupPath, packaged, 'utf8');
 
-                        vscode.window.showInformationMessage(`✅ Password-protected backup created!\n📁 ${filename}\n🔐 This backup is portable - works on any device with your password.`);
+                        showSyncToast(t('webview.backup.passwordProtected', { filename }), 'success');
 
                     } else if (encryptionChoice.value === 'legacy') {
                         // Legacy SecretStorage-based encryption (version 1)
@@ -851,8 +885,8 @@ DEBUG=false
                         backupPath = path.join(backupDir, filename);
                         fs.writeFileSync(backupPath, packaged, 'utf8');
 
-                        vscode.window.showInformationMessage(`Encrypted backup created: ${filename}`);
-                        vscode.window.showWarningMessage('⚠️ Legacy encrypted backups use a local key. If VS Code data is lost, backups may become inaccessible. Consider using password protection instead.');
+                        showSyncToast(t('webview.backup.legacyCreated', { filename }), 'success');
+                        showSyncToast(t('webview.backup.legacyWarning'), 'warning');
 
                     } else {
                         // No encryption
@@ -860,12 +894,12 @@ DEBUG=false
                         backupPath = path.join(backupDir, filename);
                         fs.writeFileSync(backupPath, content, 'utf8');
 
-                        vscode.window.showInformationMessage(`Backup created: ${filename}\n⚠️ This backup is not encrypted.`);
+                        showSyncToast(t('webview.backup.plainCreated', { filename }), 'warning');
                     }
 
                 } catch (error) {
                     logger.error('Failed to create backup:', error, 'environmentWebviewProvider');
-                    vscode.window.showErrorMessage(`Failed to create backup: ${(error as Error).message}`);
+                    showSyncToast(t('webview.backup.failed', { message: (error as Error).message }), 'error');
                     return;
                 }
 
@@ -884,7 +918,7 @@ DEBUG=false
                 if (folderUri && folderUri[0]) {
                     const config = vscode.workspace.getConfiguration('dotenvy');
                     await config.update('backupPath', folderUri[0].fsPath, vscode.ConfigurationTarget.Global);
-                    vscode.window.showInformationMessage(`Backup location set to: ${folderUri[0].fsPath}`);
+                    showSyncToast(t('webview.backup.locationSet', { path: folderUri[0].fsPath }), 'success');
                     await this.refreshEnvironments();
                 }
                 break;
@@ -906,7 +940,7 @@ DEBUG=false
                 const targetKey = toggleMsg.key;
 
                 if (!targetKey) {
-                    vscode.window.showErrorMessage('No variable key provided for encryption toggle');
+                    showSyncToast(t('webview.var.noKey'), 'error');
                     return;
                 }
 
@@ -922,7 +956,7 @@ DEBUG=false
                     // 3. Find and toggle the target variable
                     const varData = currentVars.get(targetKey);
                     if (!varData) {
-                        vscode.window.showErrorMessage(`Variable '${targetKey}' not found in .env file`);
+                        showSyncToast(t('webview.var.notFound', { key: targetKey }), 'error');
                         return;
                     }
 
@@ -938,12 +972,14 @@ DEBUG=false
                     // 6. Refresh UI and show feedback
                     await this.refreshEnvironments();
 
-                    const action = varData.encrypted ? 'Encrypted' : 'Decrypted';
-                    const icon = varData.encrypted ? '🔒' : '🔓';
-                    vscode.window.showInformationMessage(`${icon} ${action} variable '${targetKey}'`);
+                    if (varData.encrypted) {
+                        showSyncToast(t('webview.var.encrypted', { key: targetKey }), 'success');
+                    } else {
+                        showSyncToast(t('webview.var.decrypted', { key: targetKey }), 'success');
+                    }
 
                 } catch (error) {
-                    vscode.window.showErrorMessage(`Failed to toggle encryption for '${targetKey}': ${(error as Error).message}`);
+                    showSyncToast(t('webview.var.toggleFailed', { key: targetKey, message: (error as Error).message }), 'error');
                 }
                 break;
             }
@@ -959,7 +995,7 @@ DEBUG=false
                     
                     const varData = currentVars.get(targetKey);
                     if (!varData) {
-                        vscode.window.showErrorMessage(`Variable '${targetKey}' not found.`);
+                        showSyncToast(t('webview.var.notFound', { key: targetKey }), 'error');
                         return;
                     }
 
@@ -984,10 +1020,10 @@ DEBUG=false
                         currentVars.set(targetKey, varData);
                         await EncryptedEnvironmentFile.writeEnvFile(envFilePath, currentVars, this.context, cryptoKey);
                         await this.refreshEnvironments();
-                        vscode.window.showInformationMessage(`✅ Updated ${targetKey}`);
+                        showSyncToast(t('webview.var.updated', { key: targetKey }), 'success');
                     }
                 } catch (error) {
-                    vscode.window.showErrorMessage(`Update failed: ${(error as Error).message}`);
+                    showSyncToast(t('webview.var.updateFailed', { message: (error as Error).message }), 'error');
                 }
                 break;
             }
@@ -1005,7 +1041,7 @@ DEBUG=false
                     if (!varData) return;
 
                     const confirm = await vscode.window.showWarningMessage(
-                        `Delete variable '${targetKey}'?`, { modal: true }, 'Delete'
+                        t('webview.var.deleteConfirm', { key: targetKey }), { modal: true }, 'Delete'
                     );
 
                     if (confirm === 'Delete') {
@@ -1021,15 +1057,16 @@ DEBUG=false
                         currentVars.delete(targetKey);
                         await EncryptedEnvironmentFile.writeEnvFile(envFilePath, currentVars, this.context, cryptoKey);
                         await this.refreshEnvironments();
-                        vscode.window.showInformationMessage(`🗑️ Deleted ${targetKey}`);
+                        showSyncToast(t('webview.var.deleted', { key: targetKey }), 'success');
                     }
                 } catch (error) {
-                    vscode.window.showErrorMessage(`Delete failed: ${(error as Error).message}`);
+                    showSyncToast(t('webview.var.deleteFailed', { message: (error as Error).message }), 'error');
                 }
                 break;
             }
 
             case 'restoreFromBackup':
+                showActionStart(t('webview.restore.actionStart'));
                 // Get backup configuration
                 const restoreConfig = vscode.workspace.getConfiguration('dotenvy');
                 const restoreBackupPath = restoreConfig.get<string>('backupPath', '');
@@ -1041,7 +1078,7 @@ DEBUG=false
                 }
 
                 if (!fs.existsSync(restoreBackupDir)) {
-                    vscode.window.showErrorMessage('No backup directory found.');
+                    showSyncToast(t('webview.restore.noDir'), 'error');
                     return;
                 }
 
@@ -1052,7 +1089,7 @@ DEBUG=false
                     .reverse(); // Most recent first
 
                 if (allBackupFiles.length === 0) {
-                    vscode.window.showInformationMessage('No backups found.');
+                    showSyncToast(t('webview.restore.noneFound'), 'info');
                     return;
                 }
 
@@ -1098,7 +1135,7 @@ DEBUG=false
                             });
 
                             if (!password) {
-                                vscode.window.showInformationMessage('Restore cancelled.');
+                                showSyncToast(t('webview.restore.cancelled'), 'info');
                                 return;
                             }
 
@@ -1107,19 +1144,18 @@ DEBUG=false
                                 const key = await this.deriveKeyFromPassword(password, salt);
                                 decryptedContent = this.decryptWithKey(fileContent, key);
                             } catch (error) {
-                                vscode.window.showErrorMessage('❌ Incorrect password or corrupted backup file.');
+                                showSyncToast(t('webview.restore.badPassword'), 'error');
                                 return;
                             }
 
                         } else {
-                            // Version 1: Legacy SecretStorage-based encryption
-                            vscode.window.showInformationMessage('📦 Legacy encrypted backup detected. Using VSCode SecretStorage...');
+                            showSyncToast(t('webview.restore.legacyDetected'), 'info');
 
                             try {
                                 const key = await this.ensureAndGetStoredKey();
                                 decryptedContent = this.decryptWithKey(fileContent, key);
                             } catch (error) {
-                                vscode.window.showErrorMessage('❌ Failed to decrypt legacy backup. VSCode SecretStorage key may be missing.');
+                                showSyncToast(t('webview.restore.legacyFailed'), 'error');
                                 return;
                             }
                         }
@@ -1149,7 +1185,7 @@ DEBUG=false
                     }
 
                     fs.writeFileSync(targetPath, decryptedContent, 'utf8');
-                    vscode.window.showInformationMessage(`✅ Restored backup to ${path.basename(targetPath)}`);
+                    showSyncToast(t('webview.restore.success', { fileName: path.basename(targetPath) }), 'success');
 
                     // Open the restored file
                     const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(targetPath));
@@ -1158,7 +1194,7 @@ DEBUG=false
                     await this.refreshEnvironments();
 
                 } catch (error) {
-                    vscode.window.showErrorMessage(`Failed to restore backup: ${(error as Error).message}`);
+                    showSyncToast(t('webview.restore.failed', { message: (error as Error).message }), 'error');
                 }
                 break;
         }

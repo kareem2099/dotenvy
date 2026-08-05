@@ -11,6 +11,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from '../utils/logger';
 import { UserManager } from '../utils/userManager';
+import { registerPanelNotifier, showSyncToast } from '../utils/panelNotification';
+import { LocalizationService, t } from '../i18n';
+import { getWebviewLocalePayload } from '../i18n/webviewLocale';
 
 interface WebviewMessage {
     type: string;
@@ -27,7 +30,7 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
         const extUri = extensionUri;
 
         if (!extUri) {
-            vscode.window.showErrorMessage('Could not find extension URI.');
+            vscode.window.showErrorMessage(t('extension.error.noExtensionUri'));
             return;
         }
 
@@ -37,7 +40,7 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
         if (!this.panel) {
             this.panel = vscode.window.createWebviewPanel(
                 'dotenvy.environments',
-                'Environment Manager',
+                t('panel.title'),
                 vscode.ViewColumn.One,
                 {
                     enableScripts: true,
@@ -50,7 +53,10 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
 
             this.panel.webview.html = await this.getWebviewContent(extUri);
 
+            const panelNotifier = registerPanelNotifier(message => this.panel?.webview.postMessage(message));
+
             this.panel.onDidDispose(() => {
+                panelNotifier.dispose();
                 this.panel = undefined;
             });
 
@@ -132,9 +138,13 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
         const validationStatus = await this.getValidationStatus(rootPath, envPath, config);
         const secureProjectInitialized = await UserManager.isSecureProjectInitialized();
 
+        const localePayload = getWebviewLocalePayload('panel.');
+
         // Send comprehensive dashboard data
         this.panel.webview.postMessage({
             type: 'refresh',
+            locale: localePayload.locale,
+            strings: localePayload.strings,
             environments: enhancedEnvironments,
             currentFile,
             currentEnvironment: currentEnvironment?.name || null,
@@ -209,6 +219,15 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
         const rootPath = this.environmentProvider['rootPath'];
 
         switch (message.type) {
+            case 'setLocale': {
+                const localeMsg = message as WebviewMessage & { locale?: string };
+                if (localeMsg.locale) {
+                    await LocalizationService.getInstance().setLocale(localeMsg.locale);
+                    await this.refreshEnvironments();
+                }
+                break;
+            }
+
             case 'switchEnvironment':
                 const selectedEnv = (await this.environmentProvider.getEnvironments())
                     .find(env => env.name === message.environment);
@@ -222,15 +241,16 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
 
                         const warnings = SecretsGuard.checkFile(selectedEnv.filePath);
                         if (warnings.length > 0) {
-                            vscode.window.showWarningMessage(
-                                `⚠️ Selected environment contains potential secrets: ${warnings.join(', ')}`
+                            showSyncToast(
+                                t('webview.secretsInEnv', { warnings: warnings.join(', ') }),
+                                'warning'
                             );
                         }
 
-                        vscode.window.showInformationMessage(`Environment switched to ${selectedEnv.name}`);
+                        showSyncToast(t('webview.envSwitched', { name: selectedEnv.name }), 'success');
                         await this.refreshEnvironments();
                     } catch (error) {
-                        vscode.window.showErrorMessage(`Failed to switch environment: ${(error as Error).message}`);
+                        showSyncToast(t('webview.switchFailed', { message: (error as Error).message }), 'error');
                     }
                 }
                 break;
@@ -259,7 +279,7 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
                             });
                             await vscode.window.showTextDocument(doc, { preview: true });
                         } catch (error) {
-                            vscode.window.showErrorMessage(`Failed to show diff: ${(error as Error).message}`);
+                            showSyncToast(t('webview.diffFailed', { message: (error as Error).message }), 'error');
                         }
                     }
                 } else {
@@ -272,12 +292,12 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
 
             case 'createEnvironment':
                 const fileName = await vscode.window.showInputBox({
-                    prompt: 'Enter environment file name (e.g., .env.staging)',
-                    placeHolder: '.env.newenv',
+                    prompt: t('webview.createEnvPrompt'),
+                    placeHolder: t('webview.createEnvPlaceholder'),
                     value: '.env.',
                     validateInput: (value: string) => {
-                        if (!value.startsWith('.env.')) return 'Must start with .env.';
-                        if (fs.existsSync(path.join(rootPath, value))) return 'File already exists';
+                        if (!value.startsWith('.env.')) return t('webview.mustStartWithEnv');
+                        if (fs.existsSync(path.join(rootPath, value))) return t('webview.fileExists');
                         return null;
                     }
                 });
@@ -295,30 +315,39 @@ DEBUG=false
 `.replace(/\r?\n/g, '\n');
 
                         fs.writeFileSync(path.join(rootPath, fileName), templateContent, 'utf8');
-                        vscode.window.showInformationMessage(`Created ${fileName}`);
+                        showSyncToast(t('webview.envCreated', { fileName }), 'success');
                         await this.refreshEnvironments();
 
                         // Open the new file for editing
                         const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(rootPath, fileName)));
                         await vscode.window.showTextDocument(doc);
                     } catch (error) {
-                        vscode.window.showErrorMessage(`Failed to create environment file: ${(error as Error).message}`);
+                        showSyncToast(t('webview.createFailed', { message: (error as Error).message }), 'error');
                     }
                 }
                 break;
 
             // Cloud sync actions
             case 'pullFromCloud':
-                const { PullFromCloudCommand } = await import('./pullFromCloud');
-                const pullCommand = new PullFromCloudCommand();
-                await pullCommand.execute();
-                await this.refreshEnvironments();
+                try {
+                    const { PullFromCloudCommand } = await import('./pullFromCloud');
+                    const pullCommand = new PullFromCloudCommand();
+                    await pullCommand.execute(rootPath);
+                    await this.refreshEnvironments();
+                } catch (error) {
+                    showSyncToast(t('pull.failed', { message: (error as Error).message }), 'error');
+                }
                 break;
 
             case 'pushToCloud':
-                const { PushToCloudCommand } = await import('./pushToCloud');
-                const pushCommand = new PushToCloudCommand();
-                await pushCommand.execute();
+                try {
+                    const { PushToCloudCommand } = await import('./pushToCloud');
+                    const pushCommand = new PushToCloudCommand();
+                    await pushCommand.execute(rootPath);
+                    await this.refreshEnvironments();
+                } catch (error) {
+                    showSyncToast(t('push.failed', { message: (error as Error).message }), 'error');
+                }
                 break;
 
             // Git hook actions

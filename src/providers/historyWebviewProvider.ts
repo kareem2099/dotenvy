@@ -8,6 +8,8 @@ import * as os from 'os';
 import * as path from 'path';
 import { logger } from '../utils/logger';
 import { loadWebviewHtml } from '../utils/webviewUtils';
+import { postLocaleToPanel } from '../i18n/webviewLocale';
+import { t } from '../i18n';
 
 export class HistoryWebviewProvider {
     public static readonly viewType = 'dotenvy.historyViewer';
@@ -21,13 +23,17 @@ export class HistoryWebviewProvider {
         HistoryWebviewProvider._context = context;
     }
 
+    public static refreshLocale(): void {
+        postLocaleToPanel(HistoryWebviewProvider._panel, 'history.');
+    }
+
     /** Open (or reveal) the History webview panel */
     public static async openOrReveal(): Promise<void> {
         const context      = HistoryWebviewProvider._context;
         const extensionUri = HistoryWebviewProvider._extensionUri;
 
         if (!context || !extensionUri) {
-            vscode.window.showErrorMessage('History Manager not initialized.');
+            vscode.window.showErrorMessage(t('history.notInitialized'));
             return;
         }
 
@@ -38,7 +44,7 @@ export class HistoryWebviewProvider {
 
         const panel = vscode.window.createWebviewPanel(
             HistoryWebviewProvider.viewType,
-            'Environment History',
+            t('history.title'),
             vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -49,6 +55,7 @@ export class HistoryWebviewProvider {
 
         HistoryWebviewProvider._panel = panel;
         panel.webview.html = HistoryWebviewProvider._getHtml(panel.webview, extensionUri);
+        postLocaleToPanel(panel, 'history.');
 
         // Handle messages from the webview
         panel.webview.onDidReceiveMessage(async (message) => {
@@ -373,6 +380,7 @@ export class HistoryWebviewProvider {
             tokens: {
                 styleUri:  webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css')).toString(),
                 scriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'history-viewer.js')).toString(),
+                i18nScriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'webview-i18n.js')).toString(),
             },
         });
     }

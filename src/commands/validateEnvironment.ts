@@ -5,15 +5,19 @@ import { EnvironmentProvider } from '../providers/environmentProvider';
 import { EnvironmentValidator } from '../utils/environmentValidator';
 import { ConfigUtils } from '../utils/configUtils';
 import { WorkspaceManager } from '../providers/workspaceManager';
+import { showActionStart, showSyncToast } from '../utils/panelNotification';
+import { t } from '../i18n';
 
 export class ValidateEnvironmentCommand implements vscode.Disposable {
 	/**
 	 * Show validation menu and run the selected action.
 	 */
 	static async manageValidation(preferredWorkspacePath?: string): Promise<void> {
-		const rootPath = await WorkspaceManager.resolveWorkspacePath(preferredWorkspacePath, 'Select workspace to validate');
+		showActionStart(t('validate.actionStart'));
+
+		const rootPath = await WorkspaceManager.resolveWorkspacePath(preferredWorkspacePath, t('common.selectWorkspace'));
 		if (!rootPath) {
-			vscode.window.showErrorMessage('No workspace folder open.');
+			showSyncToast(t('validate.cancelledNoWorkspace'), 'info');
 			return;
 		}
 
@@ -23,16 +27,16 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 
 		const options = hasRules
 			? [
-				{ label: '$(check) Validate All Environments', description: 'Run validation rules on every .env file', action: 'validate' as const },
-				{ label: '$(gear) Open Validation Config', description: configPath, action: 'config' as const }
+				{ label: `$(check) ${t('validate.validateAll')}`, description: t('validate.validateAllDesc'), action: 'validate' as const },
+				{ label: `$(gear) ${t('validate.openConfigLabel')}`, description: configPath, action: 'config' as const }
 			]
 			: [
-				{ label: '$(gear) Configure Validation Rules', description: `Add rules to ${configPath}`, action: 'config' as const },
-				{ label: '$(check) Validate All Environments', description: 'Requires validation rules in .dotenvy.json', action: 'validate' as const }
+				{ label: `$(gear) ${t('validate.configureRules')}`, description: t('validate.configureRulesDesc', { path: configPath }), action: 'config' as const },
+				{ label: `$(check) ${t('validate.validateAllRequiresRules')}`, description: t('validate.validateAllRequiresRulesDesc'), action: 'validate' as const }
 			];
 
 		const choice = await vscode.window.showQuickPick(options, {
-			placeHolder: hasRules ? 'Environment validation' : 'No validation rules configured yet'
+			placeHolder: hasRules ? t('validate.placeholder') : t('validate.noRulesPlaceholder')
 		});
 
 		if (!choice) {
@@ -58,7 +62,7 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 				}
 			};
 			fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf8');
-			vscode.window.showInformationMessage(`Created ${path.basename(configPath)} with sample validation rules.`);
+			showSyncToast(t('validate.configCreated', { fileName: path.basename(configPath) }), 'success');
 		}
 
 		const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(configPath));
@@ -66,10 +70,10 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 	}
 
 	public async execute(preferredWorkspacePath?: string): Promise<void> {
-		const rootPath = await WorkspaceManager.resolveWorkspacePath(preferredWorkspacePath, 'Select workspace to validate');
+		const rootPath = await WorkspaceManager.resolveWorkspacePath(preferredWorkspacePath, t('common.selectWorkspace'));
 
 		if (!rootPath) {
-			vscode.window.showErrorMessage('No workspace folder open.');
+			showSyncToast(t('validate.cancelledNoWorkspace'), 'info');
 			return;
 		}
 
@@ -78,21 +82,25 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 		const validationRules = await ConfigUtils.getValidationRules();
 		if (!validationRules) {
 			const configPath = path.join(rootPath, '.dotenvy.json');
+			const openConfigLabel = t('validate.openConfig');
+			const cancelLabel = t('common.cancel');
 			const configure = await vscode.window.showInformationMessage(
-				'No validation rules configured.',
-				'Open Config',
-				'Cancel'
+				t('validate.noRules'),
+				openConfigLabel,
+				cancelLabel
 			);
 
-			if (configure === 'Open Config') {
+			if (configure === openConfigLabel) {
 				await ValidateEnvironmentCommand.openValidationConfig(rootPath, configPath);
+			} else {
+				showSyncToast(t('validate.cancelledNoRules'), 'info');
 			}
 			return;
 		}
 
 		const environments = await environmentProvider.getEnvironments();
 		if (environments.length === 0) {
-			vscode.window.showInformationMessage('No .env.* files found to validate.');
+			showSyncToast(t('validate.noEnvFiles'), 'warning');
 			return;
 		}
 
@@ -123,8 +131,9 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 		const invalidEnvs = Array.from(validationResults.values()).filter(r => !r.isValid);
 
 		if (invalidEnvs.length === 0) {
-			vscode.window.showInformationMessage(
-				`✅ All ${validationResults.size} environment files passed validation!`
+			showSyncToast(
+				t('validate.allPassed', { count: validationResults.size }),
+				'success'
 			);
 			return;
 		}
@@ -134,12 +143,17 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 			const envName = (result.environment as Record<string, unknown>).name as string;
 			const errorDetails = EnvironmentValidator.formatErrors(result.errors as Array<{ type: 'type' | 'syntax' | 'missing' | 'custom'; message: string; [key: string]: unknown }>);
 
-			const showDetails = await vscode.window.showErrorMessage(
-				`❌ Validation failed for ${envName}`,
-				'Show Details'
+			showSyncToast(t('validate.failedFor', { name: envName }), 'error');
+
+			const showDetailsLabel = t('validate.showDetailsBtn');
+			const closeLabel = t('common.close');
+			const showDetails = await vscode.window.showWarningMessage(
+				t('validate.showDetails', { name: envName }),
+				showDetailsLabel,
+				closeLabel
 			);
 
-			if (showDetails === 'Show Details') {
+			if (showDetails === showDetailsLabel) {
 				const doc = await vscode.workspace.openTextDocument({
 					content: `Validation Report for ${envName}:\n\n${errorDetails}`,
 					language: 'text'
@@ -162,8 +176,13 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 			const invalidCount = invalidEnvs.length;
 			const totalCount = validationResults.size;
 
+			showSyncToast(
+				t('validate.summary', { valid: validCount, total: totalCount, failed: invalidCount }),
+				invalidCount > 0 ? 'error' : 'success'
+			);
+
 			const selected = await vscode.window.showQuickPick(items, {
-				placeHolder: `Validation Results: ${validCount}/${totalCount} passed, ${invalidCount} failed`
+				placeHolder: t('validate.resultsPlaceholder', { valid: validCount, total: totalCount, failed: invalidCount })
 			});
 
 			if (selected) {

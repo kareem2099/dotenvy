@@ -5,14 +5,14 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https:; font-src 'self' data: https:; style-src {{CSP_SOURCE}} 'unsafe-inline'; script-src 'nonce-{{NONCE}}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="{{STYLE_URI}}" rel="stylesheet">
-    <title>Variable Manager</title>
+    <title data-i18n="variableManager.title">Variable Manager</title>
 </head>
 <body class="variable-manager-page">
     <div class="vm-header">
         <div class="vm-header-left">
             <div class="vm-title-row">
                 <span class="vm-title-icon">⚙️</span>
-                <h1 class="vm-title">Variable Manager</h1>
+                <h1 class="vm-title" data-i18n="variableManager.title">Variable Manager</h1>
             </div>
             <div id="file-badge" class="vm-file-badge">.env</div>
         </div>
@@ -41,6 +41,7 @@
         </div>
     </div>
 
+    <script nonce="{{NONCE}}" src="{{I18N_SCRIPT_URI}}"></script>
     <script nonce="{{NONCE}}" src="{{SCRIPT_URI}}"></script>
 </body>
 </html>

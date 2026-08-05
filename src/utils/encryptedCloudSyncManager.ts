@@ -7,6 +7,7 @@ import {
     CLOUD_SYNC_VERSION_KEY,
     CLOUD_SYNC_LAST_SYNC_KEY,
     CLOUD_SYNC_ALGO_KEY,
+    LEGACY_CLOUD_SYNC_ENCRYPTED_KEY,
     CLOUD_ENCRYPT_ALGO,
     CLOUD_ENCRYPT_FORMAT_VERSION,
     CLOUD_KEY_STORAGE,
@@ -101,6 +102,16 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
         }
     }
 
+    private static findEncryptedPayload(secrets: CloudSecrets): string | null {
+        if (secrets[CLOUD_SYNC_ENCRYPTED_KEY]) {
+            return secrets[CLOUD_SYNC_ENCRYPTED_KEY];
+        }
+        if (secrets[LEGACY_CLOUD_SYNC_ENCRYPTED_KEY]) {
+            return secrets[LEGACY_CLOUD_SYNC_ENCRYPTED_KEY];
+        }
+        return null;
+    }
+
     /**
      * Fetch secrets with automatic decryption
      */
@@ -112,19 +123,21 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
         }
 
         if (!context) {
-            throw new Error('Extension context required for encrypted cloud sync');
+            return {
+                success: false,
+                error: 'Extension context required for encrypted cloud sync'
+            };
         }
 
         try {
             // Cloud providers may return data in special format for encrypted sync
             // Look for encrypted payload marker
-            const encryptedKey = Object.keys(result.secrets).find(key => key === CLOUD_SYNC_ENCRYPTED_KEY);
-            if (!encryptedKey) {
+            const encryptedPayload = EncryptedCloudSyncManager.findEncryptedPayload(result.secrets);
+            if (!encryptedPayload) {
                 // No encryption detected - return as-is for backward compatibility
                 return result;
             }
 
-            const encryptedPayload = result.secrets[encryptedKey];
             const key = await EncryptedCloudSyncManager.getCloudEncryptionKey(context);
             const decryptedSecrets = EncryptedCloudSyncManager.decryptCloudPayload(encryptedPayload, key);
 
@@ -148,7 +161,7 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
      */
     async pushSecrets(secrets: CloudSecrets, context?: vscode.ExtensionContext): Promise<CloudSyncResult> {
         if (!this.encryptionEnabled || !context) {
-            return this.wrappedManager.pushSecrets(secrets);
+            return this.wrappedManager.pushSecrets(secrets, context);
         }
 
         try {
@@ -163,7 +176,7 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
                 [CLOUD_SYNC_ALGO_KEY]: CLOUD_ENCRYPT_ALGO
             };
 
-            const result = await this.wrappedManager.pushSecrets(encryptedSecrets);
+            const result = await this.wrappedManager.pushSecrets(encryptedSecrets, context);
 
             // Update last sync timestamp on successful push
             if (result.success) {
@@ -180,10 +193,50 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
     }
 
     /**
+     * Replace remote secrets, clearing orphans before pushing encrypted payload
+     */
+    async replaceSecrets(secrets: CloudSecrets, context?: vscode.ExtensionContext): Promise<CloudSyncResult> {
+        if (!this.encryptionEnabled || !context) {
+            return this.wrappedManager.replaceSecrets(secrets, context);
+        }
+
+        const cleanup = await this.wrappedManager.replaceSecrets({}, context);
+        if (!cleanup.success) {
+            return cleanup;
+        }
+
+        return this.pushSecrets(secrets, context);
+    }
+
+    /**
      * Test connection (no encryption needed)
      */
     async testConnection(): Promise<CloudSyncResult> {
         return this.wrappedManager.testConnection();
+    }
+
+    static async createManager(
+        config: CloudSyncConfig,
+        context: vscode.ExtensionContext
+    ): Promise<CloudSyncManager> {
+        const enableEncryption = !(config.encryptCloudSync === false);
+
+        if (enableEncryption) {
+            try {
+                return await EncryptedCloudSyncManager.createEncryptedManager(config, context, true);
+            } catch {
+                // Fall back to standard sync
+            }
+        }
+
+        switch (config.provider) {
+            case 'doppler': {
+                const { DopplerSyncManager } = await import('./dopplerSyncManager');
+                return new DopplerSyncManager(config);
+            }
+            default:
+                throw new Error(`Unsupported cloud provider: ${config.provider}`);
+        }
     }
 
     /**

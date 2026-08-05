@@ -1,6 +1,10 @@
 import * as https from 'https';
+import * as vscode from 'vscode';
+import { t } from '../i18n';
 import { CloudSyncManager, CloudSecrets, CloudSyncResult } from './cloudSyncManager';
-
+import { CloudSyncConfig } from '../types/environment';
+import { isCloudMetadataKey } from '../constants';
+import { DOPPLER_RESERVED_KEYS } from './envSyncUtils';
 // Doppler API response format for individual secrets
 type DopplerSecretData = {
 	computed: string;
@@ -64,32 +68,76 @@ export class DopplerSyncManager extends CloudSyncManager {
 	 * Push secrets to Doppler (sync local env to cloud)
 	 * Uses bulk update endpoint for efficiency
 	 */
-	async pushSecrets(secrets: CloudSecrets): Promise<CloudSyncResult> {
-		try {
-			const effectiveConfig = this.resolvedConfig || this.config.config;
-			
-			// Doppler's bulk secrets endpoint expects a change_requests array
-			// originalName is required for each secret (same as name for new/update operations)
-			const changeRequests = Object.entries(secrets).map(([key, value]) => ({
-				name: key,
-				originalName: key,
-				value: value,
-				shouldPrompt: false
-			}));
+	async pushSecrets(secrets: CloudSecrets, _context?: vscode.ExtensionContext): Promise<CloudSyncResult> {
+		return this.applySecretChanges(secrets, []);
+	}
 
-			const url = `https://api.doppler.com/v3/configs/config/secrets`;
+	/**
+	 * Replace all syncable secrets in Doppler with the provided set (delete orphans)
+	 */
+	async replaceSecrets(secrets: CloudSecrets, _context?: vscode.ExtensionContext): Promise<CloudSyncResult> {
+		const remote = await this.fetchSecrets();
+		if (!remote.success) {
+			return remote;
+		}
+
+		const remoteSecrets = DopplerSyncManager.filterSyncableSecrets(remote.secrets ?? {});
+		const localKeys = new Set(Object.keys(secrets));
+		const keysToDelete = Object.keys(remoteSecrets).filter(key => !localKeys.has(key));
+
+		for (const key of Object.keys(remote.secrets ?? {})) {
+			if (key.startsWith('__dotenvy_') && !keysToDelete.includes(key)) {
+				keysToDelete.push(key);
+			}
+		}
+
+		return this.applySecretChanges(secrets, keysToDelete);
+	}
+
+	static filterSyncableSecrets(secrets: CloudSecrets): CloudSecrets {
+		const filtered: CloudSecrets = {};
+		for (const [key, value] of Object.entries(secrets)) {
+			if (DOPPLER_RESERVED_KEYS.includes(key)) {
+				continue;
+			}
+			if (isCloudMetadataKey(key)) {
+				continue;
+			}
+			filtered[key] = value;
+		}
+		return filtered;
+	}
+
+	private async applySecretChanges(
+		secrets: CloudSecrets,
+		keysToDelete: string[]
+	): Promise<CloudSyncResult> {
+		try {
+			const token = await this.getToken();
+			this.token = token;
+			const effectiveConfig = this.resolvedConfig || this.config.config;
+			const normalizedSecrets = this.normalizeSecretValues(secrets);
+
+			for (const key of keysToDelete) {
+				await this.deleteSecret(key, effectiveConfig, token);
+			}
+
+			if (Object.keys(normalizedSecrets).length === 0) {
+				return { success: true, secrets: normalizedSecrets };
+			}
+
 			const payload = {
 				project: this.config.project,
 				config: effectiveConfig,
-				change_requests: changeRequests
+				secrets: normalizedSecrets
 			};
 
 			const options: https.RequestOptions = {
 				hostname: 'api.doppler.com',
-				path: url.replace('https://api.doppler.com', ''),
+				path: '/v3/configs/config/secrets',
 				method: 'POST',
 				headers: {
-					'Authorization': `Bearer ${this.token}`,
+					'Authorization': `Bearer ${token}`,
 					'Content-Type': 'application/json'
 				}
 			};
@@ -98,7 +146,7 @@ export class DopplerSyncManager extends CloudSyncManager {
 
 			return {
 				success: true,
-				secrets: secrets
+				secrets: normalizedSecrets
 			};
 
 		} catch (error) {
@@ -107,6 +155,33 @@ export class DopplerSyncManager extends CloudSyncManager {
 				error: `Failed to push to Doppler: ${(error as Error).message}`
 			};
 		}
+	}
+
+	private normalizeSecretValues(secrets: CloudSecrets): CloudSecrets {
+		const normalized: CloudSecrets = {};
+		for (const [key, value] of Object.entries(secrets)) {
+			normalized[key] = value === undefined || value === null ? '' : String(value);
+		}
+		return normalized;
+	}
+
+	private async deleteSecret(name: string, config: string, token: string): Promise<void> {
+		const query = new URLSearchParams({
+			project: this.config.project,
+			config,
+			name
+		});
+
+		const options: https.RequestOptions = {
+			hostname: 'api.doppler.com',
+			path: `/v3/configs/config/secret?${query.toString()}`,
+			method: 'DELETE',
+			headers: {
+				'Authorization': `Bearer ${token}`
+			}
+		};
+
+		await this.makeRequest(options);
 	}
 
 	/**
@@ -129,18 +204,115 @@ export class DopplerSyncManager extends CloudSyncManager {
 				}
 				return { success: true };
 			} catch (error) {
-				// If it's not a "config not found" error, fail immediately
 				const errorMessage = (error as Error).message;
-				if (!errorMessage.includes("Could not find requested config") &&
-					!errorMessage.includes("not found") &&
-					!errorMessage.includes("404")) {
+				if (DopplerSyncManager.isInvalidProjectError(errorMessage)) {
+					return {
+						success: false,
+						error: `Invalid Doppler project "${this.config.project}". Select the correct project slug from your Doppler workplace.`
+					};
+				}
+
+				if (!errorMessage.includes('Could not find requested config') &&
+					!errorMessage.includes('not found') &&
+					!errorMessage.includes('404')) {
 					return { success: false, error: `Authentication failed: ${errorMessage}` };
 				}
 				// Otherwise, try next config
 			}
 		}
 
-		return { success: false, error: `Could not find config "${this.config.config}" in project "${this.config.project}". Please check your configuration.` };
+		return { success: false, error: `Could not find config "${this.config.config}" in project "${this.config.project}". Try "dev", "stg", or "prd".` };
+	}
+
+	async listProjects(): Promise<Array<{ slug: string; name: string }>> {
+		const response = await this.makeDopplerRequest('https://api.doppler.com/v3/projects?per_page=100');
+		const parsed = JSON.parse(response) as {
+			projects?: Array<{ slug?: string; name: string; id?: string }>;
+		};
+
+		return (parsed.projects ?? [])
+			.map(project => ({
+				slug: project.slug || project.name,
+				name: project.name
+			}))
+			.filter(project => Boolean(project.slug));
+	}
+
+	static async promptProjectSelection(
+		rootPath: string,
+		syncConfig: CloudSyncConfig
+	): Promise<CloudSyncConfig | null> {
+		const manager = new DopplerSyncManager(syncConfig);
+
+		try {
+			const projects = await manager.listProjects();
+			if (projects.length === 0) {
+				vscode.window.showErrorMessage(t('doppler.noProjects'));
+				return null;
+			}
+
+			const selected = await vscode.window.showQuickPick(
+				projects.map(project => ({
+					label: project.name,
+					description: project.slug,
+					slug: project.slug
+				})),
+				{
+					placeHolder: t('doppler.selectProject'),
+					matchOnDescription: true
+				}
+			);
+
+			if (!selected) {
+				return null;
+			}
+
+			const { ConfigUtils } = await import('./configUtils');
+			const config = await ConfigUtils.readQuickEnvConfig(rootPath);
+			if (!config?.cloudSync) {
+				return null;
+			}
+
+			config.cloudSync.project = selected.slug;
+			await ConfigUtils.saveQuickEnvConfig(config, rootPath);
+			vscode.window.showInformationMessage(t('doppler.projectSet', { slug: selected.slug }));
+			return config.cloudSync;
+		} catch (error) {
+			vscode.window.showErrorMessage(t('doppler.listFailed', { message: (error as Error).message }));
+			return null;
+		}
+	}
+
+	static isInvalidProjectError(error?: string): boolean {
+		return Boolean(error && /valid project/i.test(error));
+	}
+
+	static async handleConnectionFailure(
+		rootPath: string,
+		syncConfig: CloudSyncConfig,
+		error?: string
+	): Promise<CloudSyncConfig | null> {
+		const errorDetails = error ? t('doppler.errorDetails', { error }) : t('doppler.cannotConnect');
+		const actions: string[] = [];
+
+		if (DopplerSyncManager.isInvalidProjectError(error)) {
+			actions.push(t('doppler.selectProjectAction'));
+		}
+
+		actions.push(t('doppler.openConfig'), t('common.cancel'));
+
+		const choice = await vscode.window.showErrorMessage(`❌ ${errorDetails}`, ...actions);
+
+		if (choice === t('doppler.selectProjectAction')) {
+			return DopplerSyncManager.promptProjectSelection(rootPath, syncConfig);
+		}
+
+		if (choice === t('doppler.openConfig')) {
+			const { ConfigUtils } = await import('./configUtils');
+			await ConfigUtils.openWorkspaceConfigEditor(rootPath);
+		}
+
+		return null;
 	}
 
 	/**
@@ -170,12 +342,15 @@ export class DopplerSyncManager extends CloudSyncManager {
 	 * Make authenticated request to Doppler API
 	 */
 	private async makeDopplerRequest(url: string, method = 'GET'): Promise<string> {
+		const token = await this.getToken();
+		this.token = token;
+
 		const options: https.RequestOptions = {
 			hostname: 'api.doppler.com',
 			path: url.replace('https://api.doppler.com', ''),
 			method: method,
 			headers: {
-				'Authorization': `Bearer ${this.token}`,
+				'Authorization': `Bearer ${token}`,
 				'Content-Type': 'application/json'
 			}
 		};

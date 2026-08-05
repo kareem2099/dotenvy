@@ -6,10 +6,34 @@
 // ==========================================
 // 1. Cloud Sync Constants
 // ==========================================
-export const CLOUD_SYNC_ENCRYPTED_KEY = '__dotenvy_encrypted__';
-export const CLOUD_SYNC_VERSION_KEY = '__dotenvy_encryption_version__';
-export const CLOUD_SYNC_LAST_SYNC_KEY = '__dotenvy_last_sync__';
-export const CLOUD_SYNC_ALGO_KEY = '__dotenvy_encryption_algo__';
+// Doppler only allows uppercase letters, numbers, and underscores in secret names
+export const CLOUD_SYNC_ENCRYPTED_KEY = 'DOTENVY_ENCRYPTED';
+export const CLOUD_SYNC_VERSION_KEY = 'DOTENVY_ENCRYPTION_VERSION';
+export const CLOUD_SYNC_LAST_SYNC_KEY = 'DOTENVY_LAST_SYNC';
+export const CLOUD_SYNC_ALGO_KEY = 'DOTENVY_ENCRYPTION_ALGO';
+
+/** @deprecated Legacy keys from earlier dotenvy versions — kept for read/cleanup only */
+export const LEGACY_CLOUD_SYNC_ENCRYPTED_KEY = '__dotenvy_encrypted__';
+export const LEGACY_CLOUD_SYNC_VERSION_KEY = '__dotenvy_encryption_version__';
+export const LEGACY_CLOUD_SYNC_LAST_SYNC_KEY = '__dotenvy_last_sync__';
+export const LEGACY_CLOUD_SYNC_ALGO_KEY = '__dotenvy_encryption_algo__';
+
+export const CLOUD_SYNC_METADATA_KEYS = [
+	CLOUD_SYNC_ENCRYPTED_KEY,
+	CLOUD_SYNC_VERSION_KEY,
+	CLOUD_SYNC_LAST_SYNC_KEY,
+	CLOUD_SYNC_ALGO_KEY,
+	LEGACY_CLOUD_SYNC_ENCRYPTED_KEY,
+	LEGACY_CLOUD_SYNC_VERSION_KEY,
+	LEGACY_CLOUD_SYNC_LAST_SYNC_KEY,
+	LEGACY_CLOUD_SYNC_ALGO_KEY
+] as const;
+
+export function isCloudMetadataKey(key: string): boolean {
+	return (CLOUD_SYNC_METADATA_KEYS as readonly string[]).includes(key)
+		|| key.startsWith('__dotenvy_')
+		|| key.startsWith('DOTENVY_');
+}
 
 // ==========================================
 // 2. User Management Constants

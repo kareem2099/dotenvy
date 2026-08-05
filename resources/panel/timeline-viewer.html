@@ -5,17 +5,17 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https:; font-src 'self' data: https:; style-src {{CSP_SOURCE}} 'unsafe-inline'; script-src 'nonce-{{NONCE}}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="{{STYLE_URI}}" rel="stylesheet">
-    <title>Environment Timeline</title>
+    <title data-i18n="timeline.title">Environment Timeline</title>
 </head>
 <body class="timeline-only">
     <div class="history-container">
         <div class="history-header">
-            <h3>📊 Environment Timeline</h3>
+            <h3 data-i18n="timeline.title">📊 Environment Timeline</h3>
             <div class="history-stats" id="stats"></div>
         </div>
 
         <div class="history-toolbar">
-            <div class="view-info">Visualizing environment lifecycle and changes</div>
+            <div class="view-info" data-i18n="timeline.subtitle">Visualizing environment lifecycle and changes</div>
             <button id="refresh-btn" class="btn-secondary">🔄 Refresh</button>
         </div>
 
@@ -41,6 +41,7 @@
             </div>
         </div>
     </div>
+    <script nonce="{{NONCE}}" src="{{I18N_SCRIPT_URI}}"></script>
     <script nonce="{{NONCE}}" src="{{SCRIPT_URI}}"></script>
 </body>
 </html>

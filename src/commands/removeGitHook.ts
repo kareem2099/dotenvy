@@ -1,45 +1,60 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
 import { GitHookManager } from '../utils/gitHookManager';
 import { WorkspaceManager } from '../providers/workspaceManager';
+import { showActionStart, showSyncToast } from '../utils/panelNotification';
+import { t } from '../i18n';
 
 export class RemoveGitHookCommand implements vscode.Disposable {
 	public async execute(preferredWorkspacePath?: string): Promise<void> {
-		const workspacePath = await WorkspaceManager.resolveWorkspacePath(preferredWorkspacePath, 'Select workspace to remove Git hook from');
+		showActionStart(t('gitHook.remove.actionStart'));
 
-		if (!workspacePath) {
-			vscode.window.showErrorMessage('No workspace folder open.');
-			return;
-		}
-
-		if (!fs.existsSync(path.join(workspacePath, '.git'))) {
-			vscode.window.showErrorMessage('This workspace is not a Git repository.');
-			return;
-		}
-
-		// Check if hook is installed
-		if (!GitHookManager.isHookInstalled(workspacePath)) {
-			vscode.window.showInformationMessage('No dotenvy Git hook found to remove.');
-			return;
-		}
-
-		// Confirm removal
-		const confirm = await vscode.window.showWarningMessage(
-			'Remove dotenvy pre-commit hook?',
-			'Yes',
-			'Cancel'
+		const workspacePath = await WorkspaceManager.resolveWorkspacePath(
+			preferredWorkspacePath,
+			t('common.selectWorkspace')
 		);
 
-		if (confirm !== 'Yes') {
+		if (!workspacePath) {
+			showSyncToast(t('gitHook.remove.cancelledNoWorkspace'), 'info');
+			return;
+		}
+
+		const gitRoot = GitHookManager.resolveGitRoot(workspacePath);
+		if (!gitRoot) {
+			showSyncToast(t('common.notGitRepo'), 'error');
+			return;
+		}
+
+		if (!GitHookManager.isHookInstalled(workspacePath)) {
+			if (GitHookManager.hasPreCommitHook(workspacePath)) {
+				showSyncToast(
+					t('gitHook.remove.nonDotenvyHook'),
+					'warning'
+				);
+			} else {
+				showSyncToast(t('gitHook.remove.noneToRemove'), 'info');
+			}
+			return;
+		}
+
+		const removeLabel = t('common.remove');
+		const cancelLabel = t('common.cancel');
+		const confirm = await vscode.window.showWarningMessage(
+			t('gitHook.remove.confirm'),
+			{ modal: true },
+			removeLabel,
+			cancelLabel
+		);
+
+		if (confirm !== removeLabel) {
+			showSyncToast(t('gitHook.remove.cancelled'), 'info');
 			return;
 		}
 
 		try {
 			await GitHookManager.removeHook(workspacePath);
-			vscode.window.showInformationMessage('dotenvy commit hook successfully removed.');
+			showSyncToast(t('gitHook.remove.success'), 'success');
 		} catch (error) {
-			vscode.window.showErrorMessage(`Failed to remove Git hook: ${(error as Error).message}`);
+			showSyncToast(t('gitHook.remove.failed', { message: (error as Error).message }), 'error');
 		}
 	}
 

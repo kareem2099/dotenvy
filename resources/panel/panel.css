@@ -1043,6 +1043,10 @@ h6 {
     background: var(--success-gradient);
 }
 
+.notification.info {
+    background: var(--primary-gradient);
+}
+
 .notification.error {
     background: var(--danger-gradient);
 }
@@ -4008,6 +4012,9 @@ body.sidebar-view {
 
 body.sidebar-view .header {
     padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
 }
 
 body.sidebar-view .header h2 {
@@ -4023,6 +4030,156 @@ body.sidebar-view .header-actions {
 body.sidebar-view .header-actions .btn {
     min-height: 24px;
     padding: 2px 6px;
+    font-size: 0.7rem;
+}
+
+.header-language-divider {
+    border-top: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.12));
+    margin: 12px 0 10px;
+    width: 100%;
+}
+
+.header-language {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 2;
+}
+
+.language-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--vscode-descriptionForeground);
+    margin: 0;
+}
+
+.locale-dropdown {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+
+.locale-dropdown-trigger {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 32px;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: inherit;
+    line-height: 1.2;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background-color: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-sm);
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.locale-dropdown-trigger:hover {
+    background-color: rgba(255, 255, 255, 0.18);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.locale-dropdown-trigger:focus {
+    outline: none;
+    border-color: rgba(102, 126, 234, 0.5);
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+
+.locale-dropdown-value {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.locale-dropdown-chevron {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a0a0a0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 12px;
+    transition: transform var(--transition-fast);
+}
+
+.locale-dropdown.is-open .locale-dropdown-chevron {
+    transform: rotate(180deg);
+}
+
+.locale-dropdown-menu {
+    position: fixed;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: linear-gradient(135deg, rgba(88, 110, 210, 0.98) 0%, rgba(108, 68, 145, 0.98) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.locale-dropdown-menu[hidden] {
+    display: none !important;
+}
+
+.locale-dropdown-option {
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 10px;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: inherit;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.95);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.locale-dropdown-option:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.locale-dropdown-option.is-selected {
+    background: rgba(255, 255, 255, 0.24);
+    color: #fff;
+}
+
+body.sidebar-view .header {
+    overflow: visible;
+}
+
+body.sidebar-view .header-language {
+    margin-top: 2px;
+}
+
+body.sidebar-view .locale-dropdown-trigger {
+    min-height: 24px;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+}
+
+body.sidebar-view .locale-dropdown-option {
+    padding: 4px 8px;
     font-size: 0.7rem;
 }
 
