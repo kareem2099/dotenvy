@@ -15,30 +15,30 @@
             dotenvy Environment Manager
         </h2>
         <div class="header-actions">
-            <button class="btn btn-secondary btn-sm" onclick="openHistoryPanel()"
+            <button class="btn btn-secondary btn-sm" data-action="openHistoryPanel"
                 title="Open full Environment History viewer">
                 <span>🕐</span> History
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="openAnalyticsPanel()" title="Open Environment Analytics">
+            <button class="btn btn-secondary btn-sm" data-action="openAnalyticsPanel" title="Open Environment Analytics">
                 <span>📈</span> Analytics
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="openTrashBin()" title="Open Session Trash Bin">
+            <button class="btn btn-secondary btn-sm" data-action="openTrashBin" title="Open Session Trash Bin">
                 <span>🗑️</span> Trash Bin
             </button>
-            <button class="btn btn-danger btn-sm" onclick="scanSecrets()"
+            <button class="btn btn-danger btn-sm" data-action="scanSecrets"
                 title="Scan codebase for API keys and secrets">
                 <span class="scan-icon">🔍</span> Scan Secrets
             </button>
-            <button class="btn btn-primary btn-sm" onclick="pullFromCloud()">
+            <button class="btn btn-primary btn-sm" data-action="pullFromCloud">
                 <span class="sync-icon" id="sync-icon">☁️</span> Pull from Cloud
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="pushToCloud()">
+            <button class="btn btn-secondary btn-sm" data-action="pushToCloud">
                 <span class="sync-icon" id="push-icon">⬆️</span> Push to Cloud
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="manageGitHook()">
+            <button class="btn btn-secondary btn-sm" data-action="manageGitHook">
                 <span class="hook-icon" id="hook-icon">🔗</span> Git Hook
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="validateEnvironments()">
+            <button class="btn btn-secondary btn-sm" data-action="validateEnvironments">
                 <span class="validate-icon" id="validate-icon">✅</span> Validate
             </button>
         </div>
@@ -72,8 +72,8 @@
                         <span class="status-indicator status-warning" id="hook-status">Not Installed</span>
                     </div>
                     <div class="hook-actions">
-                        <button class="btn btn-sm btn-secondary" onclick="installHook()">Install</button>
-                        <button class="btn btn-sm btn-secondary" onclick="removeHook()">Remove</button>
+                        <button class="btn btn-sm btn-secondary" data-action="installHook">Install</button>
+                        <button class="btn btn-sm btn-secondary" data-action="removeHook">Remove</button>
                     </div>
                 </div>
             </div>
@@ -98,7 +98,7 @@
     <div class="environments" id="environments">
         <div class="section-header">
             <h3>Available Environments</h3>
-            <button class="btn btn-primary btn-sm" onclick="createEnvFile()">Create Environment</button>
+            <button class="btn btn-primary btn-sm" data-action="createEnvFile">Create Environment</button>
         </div>
         <div class="environments-grid" id="environments-list">
             <p>Loading environments...</p>

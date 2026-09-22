@@ -1,7 +1,7 @@
 # dotenvy – VS Code Environment Manager
 
-[![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
-[![Codename](https://img.shields.io/badge/codename-Nexus-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.0.1)
+[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Codename](https://img.shields.io/badge/codename-Aegis-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.1.0)
 [![Publisher](https://img.shields.io/badge/publisher-FreeRave-red.svg)](https://marketplace.visualstudio.com/publishers/FreeRave)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![VS Code Marketplace](https://img.shields.io/badge/vscode-marketplace-007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)

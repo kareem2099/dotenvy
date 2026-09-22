@@ -28,12 +28,12 @@ export interface LLMHealthResponse {
 const SECRET_STORAGE_KEY = 'dotenvy.llm.sharedSecret';
 
 const KNOWN_SECRET_PATTERNS: { name: string; regex: RegExp }[] = [
-    { name: 'AWS Access Key',     regex: /AKIA[0-9A-Z]{16}/ },
-    { name: 'Stripe Live Key',    regex: /sk_live_[0-9a-zA-Z]{24,}/ },
-    { name: 'Stripe Test Key',    regex: /sk_test_[0-9a-zA-Z]{24,}/ },
-    { name: 'GitHub Token',       regex: /ghp_[a-zA-Z0-9]{36}/ },
-    { name: 'OpenAI Key',         regex: /sk-[a-zA-Z0-9]{48}/ },
-    { name: 'Google API Key',     regex: /AIza[0-9A-Za-z\-_]{35}/ },
+    { name: 'AWS Access Key', regex: /AKIA[0-9A-Z]{16}/ },
+    { name: 'Stripe Live Key', regex: /sk_live_[0-9a-zA-Z]{24,}/ },
+    { name: 'Stripe Test Key', regex: /sk_test_[0-9a-zA-Z]{24,}/ },
+    { name: 'GitHub Token', regex: /ghp_[a-zA-Z0-9]{36}/ },
+    { name: 'OpenAI Key', regex: /sk-[a-zA-Z0-9]{48}/ },
+    { name: 'Google API Key', regex: /AIza[0-9A-Za-z\-_]{35}/ },
 ];
 
 export class LLMAnalyzer {
@@ -42,6 +42,7 @@ export class LLMAnalyzer {
     private readonly serviceUrl = 'https://python-llm-production.up.railway.app';
     private sharedSecret: string | undefined;
     private readonly secrets: vscode.SecretStorage;
+    private readonly extensionMode: vscode.ExtensionMode;
     private isConnected = false;
     private failureCount = 0;
     private readonly MAX_FAILURES = 3;
@@ -52,6 +53,7 @@ export class LLMAnalyzer {
 
     private constructor(context: vscode.ExtensionContext) {
         this.secrets = context.secrets;
+        this.extensionMode = context.extensionMode;
     }
 
     public static async initialize(context: vscode.ExtensionContext): Promise<LLMAnalyzer> {
@@ -59,7 +61,7 @@ export class LLMAnalyzer {
             LLMAnalyzer.instance = new LLMAnalyzer(context);
         }
         await LLMAnalyzer.instance.loadSecret();
-        await LLMAnalyzer.instance.syncBlacklist().catch(() => {});
+        await LLMAnalyzer.instance.syncBlacklist().catch(() => { });
         return LLMAnalyzer.instance;
     }
 
@@ -73,21 +75,25 @@ export class LLMAnalyzer {
     private async loadSecret(): Promise<void> {
         // 1. Try SecretStorage (User manually set it)
         this.sharedSecret = await this.secrets.get(SECRET_STORAGE_KEY);
-
-        // 2. Fallback to embedded secret (Substituted at build time by scripts/build-with-env.js)
-        if (!this.sharedSecret) {
-            // @ts-ignore - process.env is handled by our custom build script substitution
-            const embeddedSecret = process.env.EXTENSION_SHARED_SECRET || 'REPLACE_AT_BUILD_TIME';
-            if (embeddedSecret !== 'REPLACE_AT_BUILD_TIME') {
-                this.sharedSecret = embeddedSecret;
-                logger.info('[DotEnvy] ✅ Shared secret loaded from build configuration.', 'LLMAnalyzer');
-            }
+        if (this.sharedSecret) {
+            logger.info('[DotEnvy] ✅ Shared secret loaded from SecretStorage.', 'LLMAnalyzer');
+            return;
         }
 
-        if (!this.sharedSecret) {
+        // 2. Fallback to embedded secret (Substituted at build time)
+        const embeddedSecret = process.env.EXTENSION_SHARED_SECRET || 'REPLACE_AT_BUILD_TIME';
+        if (embeddedSecret !== 'REPLACE_AT_BUILD_TIME') {
+            this.sharedSecret = embeddedSecret;
+            logger.info('[DotEnvy] ✅ Shared secret loaded from build configuration.', 'LLMAnalyzer');
+            return;
+        }
+
+        // 3. No secret found
+        if (this.extensionMode === vscode.ExtensionMode.Development) {
+            logger.info('[DotEnvy] ℹ️ Shared secret not found. (Skipping warning in Development mode)', 'LLMAnalyzer');
+            logger.info('[DotEnvy] 💡 Tip: Use "DotEnvy: Setup LLM Secret" to test LLM features locally.', 'LLMAnalyzer');
+        } else {
             logger.warn('[DotEnvy] ⚠️ Shared secret not found in SecretStorage or build config.', 'LLMAnalyzer');
-        } else if (!this.sharedSecret.includes('from build configuration')) {
-            logger.info('[DotEnvy] ✅ Shared secret loaded from SecretStorage.', 'LLMAnalyzer');
         }
     }
 
@@ -162,7 +168,7 @@ export class LLMAnalyzer {
         const regexHit = KNOWN_SECRET_PATTERNS.find(p => p.regex.test(secretValue));
         if (regexHit) {
             logger.info(`[DotEnvy] Regex match: ${regexHit.name}`, 'LLMAnalyzer');
-            if (variableName) { this.syncHashToServer(variableName, secretValue).catch(() => {}); }
+            if (variableName) { this.syncHashToServer(variableName, secretValue).catch(() => { }); }
             return 'high';
         }
 
@@ -177,7 +183,7 @@ export class LLMAnalyzer {
 
         // L3 — Entropy gate (skip LLM entirely for low-entropy values)
         const features = this.extractFeatures(secretValue, context, variableName);
-        const entropy  = features[7] * 8.0;   // f[7] = entropy/8
+        const entropy = features[7] * 8.0;   // f[7] = entropy/8
         if (entropy < 3.5) { return 'low'; }
 
         // L4 — LLM (The brain)
@@ -208,7 +214,7 @@ export class LLMAnalyzer {
 
                 // If LLM says "high", sync to server to help the community
                 if (result === 'high' && variableName) {
-                    this.syncHashToServer(variableName, secretValue).catch(() => {});
+                    this.syncHashToServer(variableName, secretValue).catch(() => { });
                 }
                 return result;
             }
@@ -217,7 +223,7 @@ export class LLMAnalyzer {
             logger.warn(
                 `LLM failed, using fallback: ${error instanceof Error ? error.message : 'Unknown'}`,
                 'LLMAnalyzer');
-            }   
+        }
 
         return this.fallbackAnalysis(secretValue, context, variableName);
     }
@@ -254,7 +260,7 @@ export class LLMAnalyzer {
         if (!this.sharedSecret) { return; }
         const hash = this.hashEntry(variableName, value);
         try {
-            const res = await this.makeSignedRequest('/extension/blacklist/report_fp', { hash }) as any;
+            const res = await this.makeSignedRequest('/extension/blacklist/report_fp', { hash }) as { status?: string };
             if (res && res.status === 'removed') {
                 this.communityBlacklist.delete(hash);
                 logger.info('[DotEnvy] 🚀 False positive threshold met. Hash removed from blacklist.', 'LLMAnalyzer');
@@ -372,20 +378,20 @@ export class LLMAnalyzer {
     }
 
     private fallbackAnalysis(
-        secretValue: string, 
+        secretValue: string,
         context: string,
         variableName?: string
     ): string {
-        const features    = FeatureExtractor.extract(secretValue, context, variableName);
-        const entropy     = features[7] * 8.0;   // f[7] = entropy/8
+        const features = FeatureExtractor.extract(secretValue, context, variableName);
+        const entropy = features[7] * 8.0;   // f[7] = entropy/8
         const patternScore = features[14];         // f[14] = pattern match score
-        const ctxHighRisk    = features[20];          // f[20] = high-risk context
-        const varHighRisk  = features[25];          // f[25] = variable name high-risk score
+        const ctxHighRisk = features[20];          // f[20] = high-risk context
+        const varHighRisk = features[25];          // f[25] = variable name high-risk score
 
-        if (patternScore >= 1.0 && entropy > 4.0)                    { return 'high'; }
-        if (entropy > 4.5 && (ctxHighRisk > 0 || varHighRisk > 0))   { return 'high'; }
-        if (entropy > 3.8 && (ctxHighRisk > 0 || varHighRisk > 0))   { return 'medium'; }
-        if (entropy > 3.5)                                            { return 'medium'; }
+        if (patternScore >= 1.0 && entropy > 4.0) { return 'high'; }
+        if (entropy > 4.5 && (ctxHighRisk > 0 || varHighRisk > 0)) { return 'high'; }
+        if (entropy > 3.8 && (ctxHighRisk > 0 || varHighRisk > 0)) { return 'medium'; }
+        if (entropy > 3.5) { return 'medium'; }
         return 'low';
     }
 

@@ -3,20 +3,27 @@ import { EncryptedVarsManager } from '../utils/encryptedVars';
 import { MIN_PASSWORD_LENGTH } from '../constants';
 
 export class SetMasterPasswordCommand implements vscode.Disposable {
-	constructor(private readonly context: vscode.ExtensionContext) {}
+	private commandDisposable: vscode.Disposable;
+
+	constructor(private readonly context: vscode.ExtensionContext) {
+		this.commandDisposable = vscode.commands.registerCommand('dotenvy.setMasterPassword', () => {
+			this.execute();
+		});
+	}
 
 	public async execute(): Promise<void> {
-		// Check if workspace has existing encrypted variables
+		const hasKeyInVault = await EncryptedVarsManager.hasMasterKey(this.context);
+		const hasPasswordInVault = await EncryptedVarsManager.hasMasterPassword(this.context);
 		const hasEncryptedVars = await EncryptedVarsManager.workspaceHasEncryptedVars();
 
 		let oldPassword: string | undefined;
 
-		if (hasEncryptedVars) {
-			// If there are encrypted variables, we need the old password first for migration
+		// Path 1: User previously set a password AND there are encrypted variables to migrate
+		if (hasEncryptedVars && hasPasswordInVault) {
 			oldPassword = await vscode.window.showInputBox({
-				prompt: 'Enter your current master password',
+				prompt: '⚠️ Update Existing Password: Enter current master password',
 				password: true,
-				placeHolder: 'Current password to decrypt existing variables',
+				placeHolder: 'Current master password to decrypt existing variables',
 				validateInput: (value) => {
 					if (!value) {
 						return 'Current password is required to migrate encrypted variables';
@@ -32,9 +39,17 @@ export class SetMasterPasswordCommand implements vscode.Disposable {
 
 		// Ask for new password
 		const newPassword = await vscode.window.showInputBox({
-			prompt: 'Enter new master password for encrypting environment variables',
+			prompt: hasPasswordInVault 
+				? '🔒 Change existing master password for encryption' 
+				: (hasKeyInVault 
+					? '🔐 Convert auto-generated master key to a master password' 
+					: 'Enter new master password for encrypting environment variables'),
 			password: true,
-			placeHolder: 'Strong password for variable encryption',
+			placeHolder: hasPasswordInVault 
+				? 'Enter NEW password (this will replace your current master password)' 
+				: (hasKeyInVault 
+					? 'Enter master password (existing encrypted variables will be migrated)' 
+					: 'Strong password for variable encryption'),
 			validateInput: (value) => {
 				if (!value || value.length < MIN_PASSWORD_LENGTH) {
 					return `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`;
@@ -65,8 +80,8 @@ export class SetMasterPasswordCommand implements vscode.Disposable {
 		}
 
 		try {
-			if (hasEncryptedVars && oldPassword) {
-				// Use changeMasterPassword for migration
+			if (hasEncryptedVars && hasPasswordInVault && oldPassword) {
+				// Path 1: Password-to-Password migration
 				const result = await EncryptedVarsManager.changeMasterPassword(oldPassword, newPassword, this.context);
 
 				if (result.success) {
@@ -80,8 +95,23 @@ export class SetMasterPasswordCommand implements vscode.Disposable {
 				} else {
 					vscode.window.showErrorMessage(`Failed to change master password: ${result.error}`);
 				}
+			} else if (hasEncryptedVars && !hasPasswordInVault && hasKeyInVault) {
+				// Path 2: Auto-Key to Password migration (no old password required)
+				const result = await EncryptedVarsManager.migrateFromAutoKeyToPassword(newPassword, this.context);
+
+				if (result.success) {
+					if (result.migratedCount > 0) {
+						vscode.window.showInformationMessage(
+							`Master password set successfully! Migrated ${result.migratedCount} encrypted variable(s) from auto-generated key.`
+						);
+					} else {
+						vscode.window.showInformationMessage('Master password set successfully!');
+					}
+				} else {
+					vscode.window.showErrorMessage(`Failed to migrate to master password: ${result.error}`);
+				}
 			} else {
-				// No existing encrypted variables, use simple set
+				// Path 3: Fresh set
 				await EncryptedVarsManager.setMasterPassword(newPassword, this.context);
 			}
 		} catch (error) {
@@ -90,6 +120,6 @@ export class SetMasterPasswordCommand implements vscode.Disposable {
 	}
 
 	public dispose() {
-		// Commands are disposed via vscode subscriptions
+		this.commandDisposable?.dispose();
 	}
 }

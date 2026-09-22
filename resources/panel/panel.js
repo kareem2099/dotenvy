@@ -142,12 +142,12 @@ function updateEnvironmentsGrid(data) {
     const container = document.getElementById('environments-list');
 
     if (!data.hasWorkspace) {
-        container.innerHTML = `<div class="welcome-message"><h3>Welcome to DotEnvy!</h3><p>Open a workspace to get started.</p><button class="btn btn-primary" onclick="openWorkspace()">Open Workspace</button></div>`;
+        container.innerHTML = `<div class="welcome-message"><h3>Welcome to DotEnvy!</h3><p>Open a workspace to get started.</p><button class="btn btn-primary" data-action="openWorkspace">Open Workspace</button></div>`;
         return;
     }
 
     if (!data.environments || data.environments.length === 0) {
-        container.innerHTML = `<div class="welcome-message"><p>No .env files found.</p><button class="btn btn-primary" onclick="createEnvFile()">Create New</button></div>`;
+        container.innerHTML = `<div class="welcome-message"><p>No .env files found.</p><button class="btn btn-primary" data-action="createEnvFile">Create New</button></div>`;
         return;
     }
 
@@ -164,9 +164,9 @@ function updateEnvironmentsGrid(data) {
                 <div class="env-card-stats"><span>${env.variableCount || 0} vars</span><span>${formatFileSize(env.fileSize || 0)}</span></div>
             </div>
             <div class="env-card-actions">
-                <button class="btn btn-primary btn-sm" onclick="switchTo('${env.name}')">Switch</button>
-                <button class="btn btn-secondary btn-sm" onclick="diffWithCurrent('${env.name}')">Compare</button>
-                <button class="btn-secondary btn-sm" onclick="openVariableManager('${env.fileName}')">Edit</button>
+                <button class="btn btn-primary btn-sm" data-action="switchTo" data-env="${env.name}">Switch</button>
+                <button class="btn btn-secondary btn-sm" data-action="diffWithCurrent" data-env="${env.name}">Compare</button>
+                <button class="btn-secondary btn-sm" data-action="openVariableManager" data-env="${env.fileName}">Edit</button>
             </div>
         `;
         container.appendChild(card);
@@ -277,4 +277,29 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         vscode.postMessage({ type: 'refresh' });
     }, 100);
+});
+
+// ── Delegated action handler (replaces all inline onclick in HTML/dynamic HTML) ──
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) { return; }
+    const action = btn.getAttribute('data-action');
+    const env    = btn.getAttribute('data-env');
+    switch (action) {
+        case 'openHistoryPanel':    actions.openHistoryPanel();           break;
+        case 'openAnalyticsPanel':  actions.openAnalyticsPanel();         break;
+        case 'openTrashBin':        actions.openTrashBin();               break;
+        case 'scanSecrets':         actions.scanSecrets();                break;
+        case 'pullFromCloud':       actions.pullFromCloud();              break;
+        case 'pushToCloud':         actions.pushToCloud();                break;
+        case 'manageGitHook':       actions.manageGitHook();              break;
+        case 'validateEnvironments':actions.validateEnvironments();       break;
+        case 'installHook':         actions.installHook();                break;
+        case 'removeHook':          actions.removeHook();                 break;
+        case 'createEnvFile':       actions.createEnvFile();              break;
+        case 'openWorkspace':       actions.openWorkspace();              break;
+        case 'switchTo':            if (env) { actions.switchTo(env); }           break;
+        case 'diffWithCurrent':     if (env) { actions.diffWithCurrent(env); }    break;
+        case 'openVariableManager': if (env) { actions.openVariableManager(env); } break;
+    }
 });

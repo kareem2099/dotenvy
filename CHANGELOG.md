@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-09-22
+
+### **Aegis** — L1-L4 AI Secrets Guard + OS-Level SecretStorage Migration + Master Key Architecture & Auto-Authorized Backups
+
+#### **L1–L4 Multi-Layer AI Secrets Scanner**
+- **L1 (Regex Engine)**: Instant, zero-latency detection for high-confidence provider tokens (AWS, Stripe, GitHub, OpenAI, Google).
+- **L2 (Community Blacklist Sync)**: In-memory O(1) matching against known leaked secrets with periodic background synchronization with Railway backend and community consensus false-positive reporting.
+- **L3 (Entropy Gate)**: Shannon entropy threshold calculation (< 3.5 entropy bypasses LLM), saving API calls, compute, and latency.
+- **L4 (LLM Deep Analysis)**: Ephemeral, zero-retention deep contextual intelligence via secure Railway backend.
+
+#### **OS-Level SecretStorage & Master Key Overhaul**
+- **Auto-Generated Master Key**: Automatically creates and stores a cryptographically secure 256-bit AES master key (`crypto.randomBytes(32)`) in the OS Keychain/Credential Manager on initial use.
+- **Keychain Migration Engine**: Seamless automatic migration of existing workspace keys and salts from legacy `workspaceState` into VS Code's OS-encrypted `SecretStorage`.
+- **`DotEnvy: Set Master Password` Command**: Interactive password setup with smart migration paths:
+  - Preserves existing variables by smoothly re-encrypting them from auto-generated master key to user password without asking for a non-existent previous password.
+  - Full key rotation verification and automatic PBKDF2 salt derivation.
+- **Decryption Resilience**: Gracefully preserves ciphertext when key mismatches occur and alerts the user with a direct 1-click resolution action.
+
+#### **Auto-Authorized Backups & Native Restoration**
+- **Master Key Backups (`.master.enc`)**: Automatically encrypts project backups with the workspace Master Key, bypassing redundant manual prompts.
+- **Unified Backup Architecture**: Synchronized backup and restore mechanisms between the compact Sidebar and the full Variable Manager tab.
+- **Seamless Restore**: Direct detection and decryption of `.master.enc` files using the project Master Key without manual password entry.
+
+---
+
 ## [2.0.0] - 2026-04-11
 
 ### **Nexus** — Architecture Overhaul + Modular Webviews + High-Density UI + Session Trash Bin

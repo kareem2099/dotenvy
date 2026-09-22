@@ -2,7 +2,7 @@
   "name": "dotenvy",
   "displayName": "DotEnvy – VS Code Environment Manager",
   "description": "Effortlessly manage, secure, and sync .env files directly inside VS Code with enterprise-grade encryption.",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "icon": "resources/icons/icon.png",
   "publisher": "FreeRave",
   "author": "Kareem Ehab",
@@ -30,6 +30,10 @@
     "workspaceContains:**/.env.*"
   ],
   "main": "./out/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kareem2099/dotenvy"
+  },
   "bin": {
     "dotenvy-hook": "./out/git-hook.js"
   },
@@ -40,7 +44,7 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run substitute-env && npm run lint",
     "lint": "eslint src/**/*.ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "node test/run-all-tests.js"
   },
   "contributes": {
     "languages": [
@@ -229,6 +233,11 @@
         "command": "dotenvy.openTrashBin",
         "title": "DotEnvy: Open Session Trash Bin",
         "icon": "$(trash)"
+      },
+      {
+        "command": "dotenvy.setMasterPassword",
+        "title": "DotEnvy: Set Master Password",
+        "icon": "$(lock)"
       }
     ],
     "viewsContainers": {
@@ -257,6 +266,12 @@
       ]
     },
     "menus": {
+      "commandPalette": [
+        {
+          "command": "dotenvy.setupLLMSecret",
+          "when": "false"
+        }
+      ],
       "view/title": [
         {
           "command": "dotenvy.openVariableManager",

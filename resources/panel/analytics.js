@@ -54,7 +54,7 @@
                     <div class="empty-icon">📊</div>
                     <h3>No Analytics Data Yet</h3>
                     <p>Make some environment changes and come back to see detailed insights!</p>
-                    <button class="btn btn-primary" onclick="loadData()">🔄 Try Again</button>
+                    <button class="btn btn-primary" data-action="retry">🔄 Try Again</button>
                 </div>`;
             return;
         }
@@ -290,5 +290,12 @@
     document.addEventListener('DOMContentLoaded', () => {
         const btn = document.getElementById('refresh-btn');
         if (btn) { btn.addEventListener('click', loadData); }
+    });
+
+    // Delegated handler for dynamically injected buttons (e.g. "Try Again")
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) { return; }
+        if (btn.getAttribute('data-action') === 'retry') { loadData(); }
     });
 })();
