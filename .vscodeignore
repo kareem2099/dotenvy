@@ -11,9 +11,11 @@ yarn.lock
 .vscode/**
 !.vscode/extensions.json
 
-# 2. Prevent metadata and todo list files (internal work)
+# 2. Prevent metadata, articles and drafts (internal work)
 todo_list*.json
+articles/**
 *.md
+**/*.md
 !README.md
 !CHANGELOG.md
 !LICENSE
