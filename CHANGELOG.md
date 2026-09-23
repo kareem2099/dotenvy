@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.2] - 2026-09-23
+
+### **Aegis** — Dynamic Per-Installation Credential Handshake & Zero Client Secrets
+
+#### **Security Architecture**
+- **Zero Client Secrets**: Completely eliminated embedded build-time secrets (`embeddedSecret`) from compiled extension bundles.
+- **Dynamic Handshake**: Extension now performs a dynamic, idempotent registration on first installation (`POST /extension/register`) and receives a per-installation credential.
+- **SecretStorage Isolation**: Credentials are saved exclusively in VS Code's OS-encrypted `SecretStorage`.
+- **Pre-publish Validation**: Automated security check (`scripts/build-with-env.js`) guarantees 0 high-entropy secrets in packaged `.vsix` bundles.
+- **Packaging Hygiene**: Excluded development configuration files (`eslint.config.mjs`) from published artifacts in `.vscodeignore`.
+
+---
+
 ## [2.1.1] - 2026-09-23
 
 ### **Aegis** — Maintenance & Dependency Hygiene

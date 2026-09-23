@@ -8,6 +8,7 @@ yarn-error.log*
 out/
 dist/
 *.vsix
+extracted-vsix/
 
 # IDE files
 .vscode/settings.json

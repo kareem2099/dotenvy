@@ -73,28 +73,81 @@ export class LLMAnalyzer {
     }
 
     private async loadSecret(): Promise<void> {
-        // 1. Try SecretStorage (User manually set it)
+        // 1. Try SecretStorage (Device-specific credential already stored)
         this.sharedSecret = await this.secrets.get(SECRET_STORAGE_KEY);
         if (this.sharedSecret) {
-            logger.info('[DotEnvy] ✅ Shared secret loaded from SecretStorage.', 'LLMAnalyzer');
+            logger.info('[DotEnvy] ✅ Device credentials loaded from SecretStorage.', 'LLMAnalyzer');
             return;
         }
 
-        // 2. Fallback to embedded secret (Substituted at build time)
-        const embeddedSecret = process.env.EXTENSION_SHARED_SECRET || 'REPLACE_AT_BUILD_TIME';
-        if (embeddedSecret !== 'REPLACE_AT_BUILD_TIME') {
-            this.sharedSecret = embeddedSecret;
-            logger.info('[DotEnvy] ✅ Shared secret loaded from build configuration.', 'LLMAnalyzer');
-            return;
+        // 2. First run: Perform secure dynamic device registration with backend
+        try {
+            logger.info('[DotEnvy] 🔑 Initiating secure device handshake with backend...', 'LLMAnalyzer');
+            await this.registerWithBackend();
+        } catch (err) {
+            logger.info(`[DotEnvy] ℹ️ Handshake deferred (offline or service unreachable): ${err}`, 'LLMAnalyzer');
         }
+    }
 
-        // 3. No secret found
-        if (this.extensionMode === vscode.ExtensionMode.Development) {
-            logger.info('[DotEnvy] ℹ️ Shared secret not found. (Skipping warning in Development mode)', 'LLMAnalyzer');
-            logger.info('[DotEnvy] 💡 Tip: Use "DotEnvy: Setup LLM Secret" to test LLM features locally.', 'LLMAnalyzer');
-        } else {
-            logger.warn('[DotEnvy] ⚠️ Shared secret not found in SecretStorage or build config.', 'LLMAnalyzer');
-        }
+    public async registerWithBackend(): Promise<boolean> {
+        return new Promise((resolve) => {
+            const machineId = this.getMachineId();
+            const payload = JSON.stringify({
+                machine_id: machineId,
+                vscode_version: vscode.version || '',
+                extension_version: '2.1.2'
+            });
+
+            const url = new URL('/extension/register', this.serviceUrl);
+            const client = url.protocol === 'https:' ? https : http;
+
+            const req = client.request({
+                hostname: url.hostname,
+                port: url.port || (url.protocol === 'https:' ? 443 : 80),
+                path: url.pathname,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(payload),
+                    'User-Agent': 'DotEnvy-Extension/2.1'
+                }
+            }, (res) => {
+                let data = '';
+                res.on('data', (chunk) => { data += chunk.toString(); });
+                res.on('end', async () => {
+                    try {
+                        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                            const parsed = JSON.parse(data);
+                            if (parsed.client_secret) {
+                                await this.setSharedSecret(parsed.client_secret);
+                                logger.info('[DotEnvy] 🔑 Device handshake completed successfully.', 'LLMAnalyzer');
+                                resolve(true);
+                                return;
+                            }
+                        }
+                        logger.info(`[DotEnvy] ℹ️ Device registration deferred: status ${res.statusCode}`, 'LLMAnalyzer');
+                        resolve(false);
+                    } catch (e) {
+                        logger.info(`[DotEnvy] ℹ️ Device registration parse error: ${e}`, 'LLMAnalyzer');
+                        resolve(false);
+                    }
+                });
+            });
+
+            req.on('error', (err) => {
+                logger.info(`[DotEnvy] ℹ️ Device registration offline: ${err.message}`, 'LLMAnalyzer');
+                resolve(false);
+            });
+
+            req.setTimeout(5000, () => {
+                req.destroy();
+                logger.info('[DotEnvy] ℹ️ Device registration timeout (will retry next session)', 'LLMAnalyzer');
+                resolve(false);
+            });
+
+            req.write(payload);
+            req.end();
+        });
     }
 
     public async setSharedSecret(secret: string): Promise<void> {
