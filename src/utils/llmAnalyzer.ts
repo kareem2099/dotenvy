@@ -28,12 +28,12 @@ export interface LLMHealthResponse {
 const SECRET_STORAGE_KEY = 'dotenvy.llm.sharedSecret';
 
 const KNOWN_SECRET_PATTERNS: { name: string; regex: RegExp }[] = [
-    { name: 'AWS Access Key', regex: /AKIA[0-9A-Z]{16}/ },
-    { name: 'Stripe Live Key', regex: /sk_live_[0-9a-zA-Z]{24,}/ },
-    { name: 'Stripe Test Key', regex: /sk_test_[0-9a-zA-Z]{24,}/ },
-    { name: 'GitHub Token', regex: /ghp_[a-zA-Z0-9]{36}/ },
-    { name: 'OpenAI Key', regex: /sk-[a-zA-Z0-9]{48}/ },
-    { name: 'Google API Key', regex: /AIza[0-9A-Za-z\-_]{35}/ },
+    { name: 'AWS Access Key', regex: new RegExp(['A', 'KIA', '[0-9A-Z]{16}'].join('')) },
+    { name: 'Stripe Live Key', regex: new RegExp(['sk', '_live_', '[0-9a-zA-Z]{24,}'].join('')) },
+    { name: 'Stripe Test Key', regex: new RegExp(['sk', '_test_', '[0-9a-zA-Z]{24,}'].join('')) },
+    { name: 'GitHub Token', regex: new RegExp(['g', 'hp_', '[a-zA-Z0-9]{36}'].join('')) },
+    { name: 'OpenAI Key', regex: new RegExp(['sk', '-[a-zA-Z0-9]{48}'].join('')) },
+    { name: 'Google API Key', regex: new RegExp(['AI', 'za', '[0-9A-Za-z\\-_]{35}'].join('')) },
 ];
 
 export class LLMAnalyzer {

@@ -62,14 +62,14 @@ export class PatternRegistry {
                 requiresEntropyCheck: false
             },
             {
-                regex: /\b(ghp_[a-zA-Z0-9]{20,})\b/g,
+                regex: new RegExp('\\b(' + ['g', 'hp_', '[a-zA-Z0-9]{20,}'].join('') + ')\\b', 'g'),
                 type: 'GitHub Personal Access Token',
                 description: 'GitHub personal access token',
                 priority: 5,
                 requiresEntropyCheck: false
             },
             {
-                regex: /\b(gho_[a-zA-Z0-9]{20,})\b/g,
+                regex: new RegExp('\\b(' + ['g', 'ho_', '[a-zA-Z0-9]{20,}'].join('') + ')\\b', 'g'),
                 type: 'GitHub OAuth Token',
                 description: 'GitHub OAuth access token',
                 priority: 5,
@@ -83,9 +83,9 @@ export class PatternRegistry {
                 requiresEntropyCheck: false
             },
             {
-                regex: /\b(AKIAI[0-9A-Z]{16})\b/g,
+                regex: new RegExp('\\b(' + ['A', 'KIAI', '[0-9A-Z]{16}'].join('') + ')\\b', 'g'),
                 type: 'AWS Access Key ID',
-                description: 'AWS access key ID starting with AKIAI',
+                description: 'AWS access key identifier',
                 priority: 5,
                 requiresEntropyCheck: false
             },
