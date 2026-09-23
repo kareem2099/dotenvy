@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2026-09-23
+
+### **Aegis** — Maintenance & Dependency Hygiene
+
+#### **Dependency Updates**
+- **`@types/node`**: `25.6.0` → `26.6.2`
+- **`@types/vscode`**: `1.90.0` → `1.138.0` (devDependency only — `engines.vscode` unchanged at `^1.90.0`)
+- **`@typescript-eslint/eslint-plugin`**: `8.58.1` → `8.70.1`
+- **`@typescript-eslint/parser`**: `8.58.1` → `8.70.1`
+- **`dotenv`**: `17.4.1` → `18.0.3`
+- **`eslint`**: `10.2.0` → `10.11.0`
+- **`globals`**: `17.4.0` → `17.12.0`
+- **`typescript-eslint`**: `8.58.1` → `8.70.1`
+- **`uuid`**: `13.0.0` → `14.0.2`
+- **`typescript`**: `6.0.2` → `6.0.3` (pinned to 6.x — `@typescript-eslint` 8.70.x peer dep cap)
+
+#### **Removed Unused Dependencies**
+- **`mocha`**, **`@types/mocha`**, **`@vscode/test-electron`**: removed — test suite uses plain Node.js scripts, not Mocha runner.
+
+#### **Security**
+- `0 vulnerabilities` across all 109 installed packages.
+
+---
+
 ## [2.1.0] - 2026-09-22
 
 ### **Aegis** — L1-L4 AI Secrets Guard + OS-Level SecretStorage Migration + Master Key Architecture & Auto-Authorized Backups
@@ -471,7 +495,8 @@ Complete implementation of envelope encryption enabling secure multi-user access
 
 | Version | Date | Codename | Highlights |
 |---------|------|----------|------------|
-| **2.0.0** | 2026-04-11 | Nexus | Massive modular webview rebuild, Session Trash Bin, Variable Manager Tab, Native Diffs, CSP Fortification |
+| **2.1.1** | 2026-09-23 | Aegis | Dependency hygiene — all deps to latest, removed unused mocha/test-electron |
+| **2.1.0** | 2026-09-22 | Aegis | L1-L4 AI Secrets Guard, OS-Level SecretStorage Migration, Master Key Architecture |
 | **1.6.0** | 2026-03-17 | SolidBase | SecretStorage, 35-feature ML fix, Logger, Secrets Panel, FeedbackManager, .dotenvyignore |
 | **1.5.0** | 2026-03-13 | — | HMAC auth, 35-feature ML, two-tier cache, SSE streaming, service refactor |
 | **1.4.0** | 2026-01-26 | — | Portable backup encryption (PBE + PBKDF2) |

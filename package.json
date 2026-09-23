@@ -2,7 +2,7 @@
   "name": "dotenvy",
   "displayName": "DotEnvy – VS Code Environment Manager",
   "description": "Effortlessly manage, secure, and sync .env files directly inside VS Code with enterprise-grade encryption.",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "icon": "resources/icons/icon.png",
   "publisher": "FreeRave",
   "author": "Kareem Ehab",
@@ -297,31 +297,24 @@
       ]
     }
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/kareem2099/dotenvy"
-  },
   "homepage": "https://github.com/kareem2099/dotenvy",
   "bugs": {
     "url": "https://github.com/kareem2099/dotenvy/issues"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/mocha": "^10.0.10",
-    "@types/node": "^25.6.0",
+    "@types/node": "^26.6.2",
     "@types/vscode": "^1.90.0",
-    "@typescript-eslint/eslint-plugin": "^8.58.1",
-    "@typescript-eslint/parser": "^8.58.1",
-    "@vscode/test-electron": "^2.3.0",
-    "dotenv": "^17.3.1",
-    "eslint": "^10.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.70.1",
+    "@typescript-eslint/parser": "^8.70.1",
+    "dotenv": "^18.0.3",
+    "eslint": "^10.11.0",
     "glob": "^13.0.6",
-    "globals": "^17.4.0",
-    "mocha": "^11.3.0",
-    "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.1"
+    "globals": "^17.12.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.1"
   },
   "dependencies": {
-    "uuid": "^13.0.0"
+    "uuid": "^14.0.2"
   }
 }
