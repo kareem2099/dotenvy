@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-09-24
+
+### 🌐 Full Arabic (`ar`) & Russian (`ru`) Localization + Factory Function Decoupling
+
+- **Full Arabic Localization (`ar`)**: Complete Arabic translation across all commands, notifications, trees, dialogs, progress bars, and all 6 secondary panels with native RTL layout support.
+- **Full Russian Localization (`ru`)**: Complete Russian translation across all commands, notifications, trees, dialogs, and secondary panels.
+- **Dynamic 4-Language Switcher**: Sidebar language dropdown now supports instant live switching between English, Italian, Arabic, and Russian.
+- **VS Code Manifest Localization**: Added `package.nls.ar.json` and `package.nls.ru.json`.
+- **Cloud Sync Factory Decoupling**: Exported top-level `createCloudSyncManager` factory function to ensure seamless TypeScript language server static resolution.
+- **Progress Report Localization**: Localized all cloud pull and push step messages (`readingConfig`, `connectingCloud`, `downloading`, `uploading`, `writingFiles`).
+
 ## [2.2.0] - 2026-09-24
 
 ### **Aegis** — Internationalization (Italian & English) + Sidebar UX Redesign + Advanced Cloud Sync & Monorepo Git Hooks

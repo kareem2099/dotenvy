@@ -92,7 +92,7 @@ export class LLMAnalyzer {
     public async registerWithBackend(): Promise<boolean> {
         return new Promise((resolve) => {
             const machineId = this.getMachineId();
-            const extVersion = vscode.extensions.getExtension('FreeRave.dotenvy')?.packageJSON?.version || '2.2.0';
+            const extVersion = vscode.extensions.getExtension('FreeRave.dotenvy')?.packageJSON?.version || '2.2.1';
             const payload = JSON.stringify({
                 machine_id: machineId,
                 vscode_version: vscode.version || '',

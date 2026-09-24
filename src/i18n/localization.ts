@@ -1,15 +1,27 @@
 import * as vscode from 'vscode';
 import { en } from './en';
 import { it } from './it';
+import { ar } from './ar';
+import { ru } from './ru';
 import type { Locale, TranslationParams } from './types';
 
 export type TranslationKey = keyof typeof en;
 
-const LOCALES: Record<Locale, Record<string, string>> = { en, it };
+const LOCALES: Record<Locale, Record<string, string>> = { en, it, ar, ru };
 const LOCALE_STORAGE_KEY = 'dotenvy.locale';
 
 export function resolveDefaultLocale(): Locale {
-	return vscode.env.language.toLowerCase().startsWith('it') ? 'it' : 'en';
+	const lang = vscode.env.language.toLowerCase();
+	if (lang.startsWith('ar')) {
+		return 'ar';
+	}
+	if (lang.startsWith('ru')) {
+		return 'ru';
+	}
+	if (lang.startsWith('it')) {
+		return 'it';
+	}
+	return 'en';
 }
 
 export class LocalizationService {
@@ -37,12 +49,12 @@ export class LocalizationService {
 	}
 
 	async setLocale(locale: string): Promise<void> {
-		if (locale !== 'en' && locale !== 'it') {
+		if (locale !== 'en' && locale !== 'it' && locale !== 'ar' && locale !== 'ru') {
 			return;
 		}
-		this.locale = locale;
+		this.locale = locale as Locale;
 		await this.context?.globalState.update(LOCALE_STORAGE_KEY, locale);
-		this.onDidChangeLocaleEmitter.fire(locale);
+		this.onDidChangeLocaleEmitter.fire(this.locale);
 	}
 
 	t(key: TranslationKey | string, params?: TranslationParams): string {

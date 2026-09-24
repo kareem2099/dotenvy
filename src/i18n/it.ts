@@ -30,6 +30,8 @@ export const it: Record<keyof typeof en, string> = {
 	'panel.language.label': 'Lingua',
 	'panel.language.en': 'English',
 	'panel.language.it': 'Italiano',
+	'panel.language.ar': 'العربية',
+	'panel.language.ru': 'Русский',
 	'panel.cloud.title': 'Cloud Sync',
 	'panel.cloud.connected': 'Connesso',
 	'panel.cloud.notConnected': 'Non connesso',

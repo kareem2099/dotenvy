@@ -29,6 +29,8 @@ export const en = {
 	'panel.language.label': 'Language',
 	'panel.language.en': 'English',
 	'panel.language.it': 'Italiano',
+	'panel.language.ar': 'العربية',
+	'panel.language.ru': 'Русский',
 	'panel.cloud.title': 'Cloud Sync',
 	'panel.cloud.connected': 'Connected',
 	'panel.cloud.notConnected': 'Not Connected',

@@ -1,7 +1,7 @@
 # dotenvy – VS Code Environment Manager
 
-[![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
-[![Codename](https://img.shields.io/badge/codename-Aegis-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.2.0)
+[![Version](https://img.shields.io/badge/version-2.2.1-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Codename](https://img.shields.io/badge/codename-Aegis-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.2.1)
 [![Publisher](https://img.shields.io/badge/publisher-FreeRave-red.svg)](https://marketplace.visualstudio.com/publishers/FreeRave)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![VS Code Marketplace](https://img.shields.io/badge/vscode-marketplace-007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
@@ -21,8 +21,8 @@
 ### 🔄 **Environment Switching**
 Effortlessly switch between `.env.development`, `.env.staging`, `.env.production`, or any custom `.env.*` file with a single click.
 
-### 🌐 **Full Deep Internationalization (New in v2.2.0!)**
-Native support for both **English** and **Italian (`it`)**, with a seamless sidebar dropdown to switch languages instantly across all dialogs, dashboards, and panels (Variable Manager, Trash Bin, History, Timeline, Analytics, and Secrets Scanner).
+### 🌐 **Full Deep Internationalization (New in v2.2.1!)**
+Native support for **English**, **Italian (`it`)**, **Arabic (`ar`)** (with full RTL support), and **Russian (`ru`)**, with a seamless sidebar dropdown to switch languages instantly across all dialogs, dashboards, and panels (Variable Manager, Trash Bin, History, Timeline, Analytics, and Secrets Scanner).
 
 ### 🎨 **Compact Sidebar & Onboarding Banner (New!)**
 A modern, space-efficient sidebar design tailored for narrow split screens, complete with an interactive onboarding setup banner for newly opened repositories.
