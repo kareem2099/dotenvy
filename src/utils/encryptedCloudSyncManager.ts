@@ -219,24 +219,7 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
         config: CloudSyncConfig,
         context: vscode.ExtensionContext
     ): Promise<CloudSyncManager> {
-        const enableEncryption = !(config.encryptCloudSync === false);
-
-        if (enableEncryption) {
-            try {
-                return await EncryptedCloudSyncManager.createEncryptedManager(config, context, true);
-            } catch {
-                // Fall back to standard sync
-            }
-        }
-
-        switch (config.provider) {
-            case 'doppler': {
-                const { DopplerSyncManager } = await import('./dopplerSyncManager');
-                return new DopplerSyncManager(config);
-            }
-            default:
-                throw new Error(`Unsupported cloud provider: ${config.provider}`);
-        }
+        return createCloudSyncManager(config, context);
     }
 
     /**
@@ -301,3 +284,31 @@ export class CloudEncryptionUtils {
         };
     }
 }
+
+/**
+ * Factory function to create a CloudSyncManager instance, wrapping with encryption if configured
+ */
+export async function createCloudSyncManager(
+    config: CloudSyncConfig,
+    context: vscode.ExtensionContext
+): Promise<CloudSyncManager> {
+    const enableEncryption = !(config.encryptCloudSync === false);
+
+    if (enableEncryption) {
+        try {
+            return await EncryptedCloudSyncManager.createEncryptedManager(config, context, true);
+        } catch {
+            // Fall back to standard sync
+        }
+    }
+
+    switch (config.provider) {
+        case 'doppler': {
+            const { DopplerSyncManager } = await import('./dopplerSyncManager');
+            return new DopplerSyncManager(config);
+        }
+        default:
+            throw new Error(`Unsupported cloud provider: ${config.provider}`);
+    }
+}
+

@@ -7,7 +7,7 @@ import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { FileUtils } from '../utils/fileUtils';
 import { EnvSyncUtils } from '../utils/envSyncUtils';
 import { extensionContext } from '../extension';
-import { EncryptedCloudSyncManager } from '../utils/encryptedCloudSyncManager';
+import { createCloudSyncManager } from '../utils/encryptedCloudSyncManager';
 import { showActionStart, showSyncToast } from '../utils/panelNotification';
 import { t } from '../i18n';
 
@@ -39,7 +39,7 @@ export class PushToCloudCommand implements vscode.Disposable {
 			return;
 		}
 
-		progress.report({ message: 'Lettura configurazione...' });
+		progress.report({ message: t('push.progress.readingConfig') });
 		const config = await ConfigUtils.readQuickEnvConfig(rootPath);
 
 		if (!config?.cloudSync || !config.cloudSync.project || !config.cloudSync.config || !config.cloudSync.token) {
@@ -61,9 +61,9 @@ export class PushToCloudCommand implements vscode.Disposable {
 			let cloudManager: CloudSyncManager;
 			const enableEncryption = !(syncConfig.encryptCloudSync === false);
 
-			progress.report({ message: 'Connessione al provider cloud...' });
+			progress.report({ message: t('push.progress.connectingCloud') });
 			try {
-				cloudManager = await EncryptedCloudSyncManager.createManager(syncConfig, extensionContext);
+				cloudManager = await createCloudSyncManager(syncConfig, extensionContext);
 				if (enableEncryption) {
 					showSyncToast(t('push.encryptionEnabled'), 'info');
 				}
@@ -86,7 +86,7 @@ export class PushToCloudCommand implements vscode.Disposable {
 				}
 
 				syncConfig = updatedSyncConfig;
-				cloudManager = await EncryptedCloudSyncManager.createManager(syncConfig, extensionContext);
+				cloudManager = await createCloudSyncManager(syncConfig, extensionContext);
 				const retryResult = await cloudManager.testConnection();
 				if (!retryResult.success) {
 					showSyncToast(
@@ -156,7 +156,7 @@ export class PushToCloudCommand implements vscode.Disposable {
 				return;
 			}
 
-			progress.report({ message: 'Preparazione secrets...' });
+			progress.report({ message: t('push.progress.preparingSecrets') });
 			const merged = EnvSyncUtils.mergeTargetsSecretsForCloud(rootPath, syncTargets);
 			if (merged.duplicateKeys.length > 0) {
 				const continueLabel = t('common.continue');
@@ -209,7 +209,7 @@ export class PushToCloudCommand implements vscode.Disposable {
 
 			let keysToDelete: string[] = [];
 			if (pushMode === 'replace') {
-				progress.report({ message: 'Confronto con secrets remoti...' });
+				progress.report({ message: t('push.progress.comparingRemote') });
 				const remotePreview = await cloudManager.fetchSecrets(extensionContext);
 				if (remotePreview.success && remotePreview.secrets) {
 					const remoteFiltered = DopplerSyncManager.filterSyncableSecrets(remotePreview.secrets);
@@ -235,7 +235,7 @@ export class PushToCloudCommand implements vscode.Disposable {
 				}
 			}
 
-			progress.report({ message: `Upload su ${syncConfig.provider}...` });
+			progress.report({ message: t('push.progress.uploading', { provider: syncConfig.provider }) });
 			const result = pushMode === 'replace'
 				? await cloudManager.replaceSecrets(filteredSecrets, extensionContext)
 				: await cloudManager.pushSecrets(filteredSecrets, extensionContext);

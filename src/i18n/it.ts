@@ -126,6 +126,10 @@ export const it: Record<keyof typeof en, string> = {
 
 	'pull.actionStart': 'Pull dal cloud avviato...',
 	'pull.progress.title': 'DotEnvy — Pull dal cloud',
+	'pull.progress.readingConfig': 'Lettura configurazione...',
+	'pull.progress.connectingCloud': 'Connessione al provider cloud...',
+	'pull.progress.downloading': 'Download da {provider}...',
+	'pull.progress.writingFiles': 'Scrittura file locali...',
 	'pull.cancelledNoWorkspace': 'Pull annullato: nessun workspace selezionato.',
 	'pull.configCreated': 'Configurazione creata. Aggiungi il token Doppler in .dotenvy.json e riprova.',
 	'pull.cloudSyncNotConfigured': 'Cloud sync non configurato in .dotenvy.json.',
@@ -145,6 +149,11 @@ export const it: Record<keyof typeof en, string> = {
 
 	'push.actionStart': 'Push al cloud avviato...',
 	'push.progress.title': 'DotEnvy — Push al cloud',
+	'push.progress.readingConfig': 'Lettura configurazione...',
+	'push.progress.connectingCloud': 'Connessione al provider cloud...',
+	'push.progress.preparingSecrets': 'Preparazione secrets...',
+	'push.progress.comparingRemote': 'Confronto con secrets remoti...',
+	'push.progress.uploading': 'Upload su {provider}...',
 	'push.cancelledNoWorkspace': 'Push annullato: nessun workspace selezionato.',
 	'push.configCreated': 'Configurazione creata. Aggiungi il token Doppler in .dotenvy.json e riprova.',
 	'push.cloudSyncNotConfigured': 'Cloud sync non configurato in .dotenvy.json.',

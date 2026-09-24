@@ -6,7 +6,7 @@ import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { EnvSyncUtils } from '../utils/envSyncUtils';
 import { StatusBarProvider } from '../providers/statusBarProvider';
 import { extensionContext } from '../extension';
-import { EncryptedCloudSyncManager } from '../utils/encryptedCloudSyncManager';
+import { createCloudSyncManager } from '../utils/encryptedCloudSyncManager';
 import { showActionStart, showSyncToast } from '../utils/panelNotification';
 import { t } from '../i18n';
 
@@ -41,7 +41,7 @@ export class PullFromCloudCommand implements vscode.Disposable {
 		const workspaceContext = WorkspaceManager.getInstance().getWorkspace(rootPath);
 		const statusBarProvider: StatusBarProvider | undefined = workspaceContext?.statusBarProvider;
 
-		progress.report({ message: 'Lettura configurazione...' });
+		progress.report({ message: t('pull.progress.readingConfig') });
 		const config = await ConfigUtils.readQuickEnvConfig(rootPath);
 
 		if (!config?.cloudSync || !config.cloudSync.project || !config.cloudSync.config || !config.cloudSync.token) {
@@ -62,9 +62,9 @@ export class PullFromCloudCommand implements vscode.Disposable {
 
 			let cloudManager: CloudSyncManager;
 
-			progress.report({ message: 'Connessione al provider cloud...' });
+			progress.report({ message: t('pull.progress.connectingCloud') });
 			try {
-				cloudManager = await EncryptedCloudSyncManager.createManager(syncConfig, extensionContext);
+				cloudManager = await createCloudSyncManager(syncConfig, extensionContext);
 			} catch (error) {
 				showSyncToast(t('pull.initFailed', { message: (error as Error).message }), 'error');
 				return;
@@ -84,7 +84,7 @@ export class PullFromCloudCommand implements vscode.Disposable {
 				}
 
 				syncConfig = updatedSyncConfig;
-				cloudManager = await EncryptedCloudSyncManager.createManager(syncConfig, extensionContext);
+				cloudManager = await createCloudSyncManager(syncConfig, extensionContext);
 				const retryResult = await cloudManager.testConnection();
 				if (!retryResult.success) {
 					showSyncToast(
@@ -95,7 +95,7 @@ export class PullFromCloudCommand implements vscode.Disposable {
 				}
 			}
 
-			progress.report({ message: `Download da ${syncConfig.provider}...` });
+			progress.report({ message: t('pull.progress.downloading', { provider: syncConfig.provider }) });
 			const result = await cloudManager.fetchSecrets(extensionContext);
 
 			if (!result.success || !result.secrets) {
@@ -213,7 +213,7 @@ export class PullFromCloudCommand implements vscode.Disposable {
 				}
 			}
 
-			progress.report({ message: 'Scrittura file locali...' });
+			progress.report({ message: t('pull.progress.writingFiles') });
 			const writtenFiles = await EnvSyncUtils.writeSecretsToTargets(syncTargets, secrets);
 
 			if (statusBarProvider) {

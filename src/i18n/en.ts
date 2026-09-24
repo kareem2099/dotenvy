@@ -130,6 +130,10 @@ export const en = {
 	// ── Pull / Push ──────────────────────────────────────────────────────
 	'pull.actionStart': 'Pull from cloud started...',
 	'pull.progress.title': 'DotEnvy — Pull from cloud',
+	'pull.progress.readingConfig': 'Reading configuration...',
+	'pull.progress.connectingCloud': 'Connecting to cloud provider...',
+	'pull.progress.downloading': 'Downloading from {provider}...',
+	'pull.progress.writingFiles': 'Writing local files...',
 	'pull.cancelledNoWorkspace': 'Pull cancelled: no workspace selected.',
 	'pull.configCreated': 'Configuration created. Add the Doppler token in .dotenvy.json and try again.',
 	'pull.cloudSyncNotConfigured': 'Cloud sync not configured in .dotenvy.json.',
@@ -149,6 +153,11 @@ export const en = {
 
 	'push.actionStart': 'Push to cloud started...',
 	'push.progress.title': 'DotEnvy — Push to cloud',
+	'push.progress.readingConfig': 'Reading configuration...',
+	'push.progress.connectingCloud': 'Connecting to cloud provider...',
+	'push.progress.preparingSecrets': 'Preparing secrets...',
+	'push.progress.comparingRemote': 'Comparing with remote secrets...',
+	'push.progress.uploading': 'Uploading to {provider}...',
 	'push.cancelledNoWorkspace': 'Push cancelled: no workspace selected.',
 	'push.configCreated': 'Configuration created. Add the Doppler token in .dotenvy.json and try again.',
 	'push.cloudSyncNotConfigured': 'Cloud sync not configured in .dotenvy.json.',
