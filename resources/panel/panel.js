@@ -346,12 +346,12 @@ function updateEnvironmentsGrid(data) {
     const container = document.getElementById('environments-list');
 
     if (!data.hasWorkspace) {
-        container.innerHTML = `<div class="welcome-message"><h3>${tr('panel.environments.welcome')}</h3><p>${tr('panel.environments.welcomeDesc')}</p><button class="btn btn-primary" onclick="openWorkspace()">${tr('panel.setup.openWorkspace')}</button></div>`;
+        container.innerHTML = `<div class="welcome-message"><h3>${tr('panel.environments.welcome')}</h3><p>${tr('panel.environments.welcomeDesc')}</p><button class="btn btn-primary" data-action="openWorkspace">${tr('panel.setup.openWorkspace')}</button></div>`;
         return;
     }
 
     if (!data.environments || data.environments.length === 0) {
-        container.innerHTML = `<div class="welcome-message"><p>${tr('panel.environments.noFiles')}</p><button class="btn btn-primary" onclick="createEnvFile()">${tr('panel.environments.createNew')}</button></div>`;
+        container.innerHTML = `<div class="welcome-message"><p>${tr('panel.environments.noFiles')}</p><button class="btn btn-primary" data-action="createEnvFile">${tr('panel.environments.createNew')}</button></div>`;
         return;
     }
 
@@ -368,9 +368,9 @@ function updateEnvironmentsGrid(data) {
                 <div class="env-card-stats"><span>${tr('panel.environments.vars', { count: env.variableCount || 0 })}</span><span>${formatFileSize(env.fileSize || 0)}</span></div>
             </div>
             <div class="env-card-actions">
-                <button class="btn btn-primary btn-sm" onclick="switchTo('${env.name}')">${tr('panel.environments.switch')}</button>
-                <button class="btn btn-secondary btn-sm" onclick="diffWithCurrent('${env.name}')">${tr('panel.environments.compare')}</button>
-                <button class="btn-secondary btn-sm" onclick="openVariableManager('${env.fileName}')">${tr('panel.environments.edit')}</button>
+                <button class="btn btn-primary btn-sm" data-action="switchTo" data-env="${env.name}">${tr('panel.environments.switch')}</button>
+                <button class="btn btn-secondary btn-sm" data-action="diffWithCurrent" data-env="${env.name}">${tr('panel.environments.compare')}</button>
+                <button class="btn-secondary btn-sm" data-action="openVariableManager" data-env="${env.fileName}">${tr('panel.environments.edit')}</button>
             </div>
         `;
         container.appendChild(card);
@@ -488,4 +488,30 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         vscode.postMessage({ type: 'refresh' });
     }, 100);
+});
+
+// ── Delegated action handler (replaces all inline onclick in HTML/dynamic HTML) ──
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) { return; }
+    const action = btn.getAttribute('data-action');
+    const env    = btn.getAttribute('data-env');
+    switch (action) {
+        case 'openHistoryPanel':    actions.openHistoryPanel();           break;
+        case 'openDopplerDashboard': actions.openDopplerDashboard();      break;
+        case 'openAnalyticsPanel':  actions.openAnalyticsPanel();         break;
+        case 'openTrashBin':        actions.openTrashBin();               break;
+        case 'scanSecrets':         actions.scanSecrets();                break;
+        case 'pullFromCloud':       actions.pullFromCloud();              break;
+        case 'pushToCloud':         actions.pushToCloud();                break;
+        case 'manageGitHook':       actions.manageGitHook();              break;
+        case 'validateEnvironments':actions.validateEnvironments();       break;
+        case 'installHook':         actions.installHook();                break;
+        case 'removeHook':          actions.removeHook();                 break;
+        case 'createEnvFile':       actions.createEnvFile();              break;
+        case 'openWorkspace':       actions.openWorkspace();              break;
+        case 'switchTo':            if (env) { actions.switchTo(env); }           break;
+        case 'diffWithCurrent':     if (env) { actions.diffWithCurrent(env); }    break;
+        case 'openVariableManager': if (env) { actions.openVariableManager(env); } break;
+    }
 });

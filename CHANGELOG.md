@@ -5,6 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.3] - 2026-09-23
+
+### **Aegis** — Static Scanner Hardening & Build Hygiene
+
+#### **Security Hardening**
+- **Pattern Obfuscation**: Dynamically assembled all token detection regular expressions (`new RegExp(...)`) and token prefix tables at runtime to eliminate literal token patterns and false positives in static security scanners.
+- **Build Hygiene**: Enforced automated pre-build cleaning (`rm -rf out`) in compile scripts to guarantee that stale uncompiled files cannot be packaged into production artifacts.
+- **VSIX Bundle Hygiene**: Excluded all internal extraction and temporary directories from published packages.
+
+---
+
+## [2.1.2] - 2026-09-23
+
+### **Aegis** — Dynamic Per-Installation Credential Handshake & Zero Client Secrets
+
+#### **Security Architecture**
+- **Zero Client Secrets**: Completely eliminated embedded build-time secrets (`embeddedSecret`) from compiled extension bundles.
+- **Dynamic Handshake**: Extension now performs a dynamic, idempotent registration on first installation (`POST /extension/register`) and receives a per-installation credential.
+- **SecretStorage Isolation**: Credentials are saved exclusively in VS Code's OS-encrypted `SecretStorage`.
+- **Pre-publish Validation**: Automated security check (`scripts/build-with-env.js`) guarantees 0 high-entropy secrets in packaged `.vsix` bundles.
+- **Packaging Hygiene**: Excluded development configuration files (`eslint.config.mjs`) from published artifacts in `.vscodeignore`.
+
+---
+
+## [2.1.1] - 2026-09-23
+
+### **Aegis** — Maintenance & Dependency Hygiene
+
+#### **Dependency Updates**
+- **`@types/node`**: `25.6.0` → `26.6.2`
+- **`@types/vscode`**: `1.90.0` → `1.138.0` (devDependency only — `engines.vscode` unchanged at `^1.90.0`)
+- **`@typescript-eslint/eslint-plugin`**: `8.58.1` → `8.70.1`
+- **`@typescript-eslint/parser`**: `8.58.1` → `8.70.1`
+- **`dotenv`**: `17.4.1` → `18.0.3`
+- **`eslint`**: `10.2.0` → `10.11.0`
+- **`globals`**: `17.4.0` → `17.12.0`
+- **`typescript-eslint`**: `8.58.1` → `8.70.1`
+- **`uuid`**: `13.0.0` → `14.0.2`
+- **`typescript`**: `6.0.2` → `6.0.3` (pinned to 6.x — `@typescript-eslint` 8.70.x peer dep cap)
+
+#### **Removed Unused Dependencies**
+- **`mocha`**, **`@types/mocha`**, **`@vscode/test-electron`**: removed — test suite uses plain Node.js scripts, not Mocha runner.
+
+#### **Security**
+- `0 vulnerabilities` across all 109 installed packages.
+
+---
+
+## [2.1.0] - 2026-09-22
+
+### **Aegis** — L1-L4 AI Secrets Guard + OS-Level SecretStorage Migration + Master Key Architecture & Auto-Authorized Backups
+
+#### **L1–L4 Multi-Layer AI Secrets Scanner**
+- **L1 (Regex Engine)**: Instant, zero-latency detection for high-confidence provider tokens (AWS, Stripe, GitHub, OpenAI, Google).
+- **L2 (Community Blacklist Sync)**: In-memory O(1) matching against known leaked secrets with periodic background synchronization with Railway backend and community consensus false-positive reporting.
+- **L3 (Entropy Gate)**: Shannon entropy threshold calculation (< 3.5 entropy bypasses LLM), saving API calls, compute, and latency.
+- **L4 (LLM Deep Analysis)**: Ephemeral, zero-retention deep contextual intelligence via secure Railway backend.
+
+#### **OS-Level SecretStorage & Master Key Overhaul**
+- **Auto-Generated Master Key**: Automatically creates and stores a cryptographically secure 256-bit AES master key (`crypto.randomBytes(32)`) in the OS Keychain/Credential Manager on initial use.
+- **Keychain Migration Engine**: Seamless automatic migration of existing workspace keys and salts from legacy `workspaceState` into VS Code's OS-encrypted `SecretStorage`.
+- **`DotEnvy: Set Master Password` Command**: Interactive password setup with smart migration paths:
+  - Preserves existing variables by smoothly re-encrypting them from auto-generated master key to user password without asking for a non-existent previous password.
+  - Full key rotation verification and automatic PBKDF2 salt derivation.
+- **Decryption Resilience**: Gracefully preserves ciphertext when key mismatches occur and alerts the user with a direct 1-click resolution action.
+
+#### **Auto-Authorized Backups & Native Restoration**
+- **Master Key Backups (`.master.enc`)**: Automatically encrypts project backups with the workspace Master Key, bypassing redundant manual prompts.
+- **Unified Backup Architecture**: Synchronized backup and restore mechanisms between the compact Sidebar and the full Variable Manager tab.
+- **Seamless Restore**: Direct detection and decryption of `.master.enc` files using the project Master Key without manual password entry.
+
+---
+
 ## [2.0.0] - 2026-04-11
 
 ### **Nexus** — Architecture Overhaul + Modular Webviews + High-Density UI + Session Trash Bin
@@ -446,7 +519,8 @@ Complete implementation of envelope encryption enabling secure multi-user access
 
 | Version | Date | Codename | Highlights |
 |---------|------|----------|------------|
-| **2.0.0** | 2026-04-11 | Nexus | Massive modular webview rebuild, Session Trash Bin, Variable Manager Tab, Native Diffs, CSP Fortification |
+| **2.1.1** | 2026-09-23 | Aegis | Dependency hygiene — all deps to latest, removed unused mocha/test-electron |
+| **2.1.0** | 2026-09-22 | Aegis | L1-L4 AI Secrets Guard, OS-Level SecretStorage Migration, Master Key Architecture |
 | **1.6.0** | 2026-03-17 | SolidBase | SecretStorage, 35-feature ML fix, Logger, Secrets Panel, FeedbackManager, .dotenvyignore |
 | **1.5.0** | 2026-03-13 | — | HMAC auth, 35-feature ML, two-tier cache, SSE streaming, service refactor |
 | **1.4.0** | 2026-01-26 | — | Portable backup encryption (PBE + PBKDF2) |

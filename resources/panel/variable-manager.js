@@ -361,7 +361,7 @@
             <div class="vm-error-state">
                 <div class="vm-error-icon">⚠️</div>
                 <p>${escHtml(msg)}</p>
-                <button class="btn btn-secondary" onclick="this.closest('.vm-error-state').parentElement && vscode.postMessage({type:'refresh',fileName:'${currentFile}'})">Retry</button>
+                <button class="btn btn-secondary" data-action="retry-load">Retry</button>
             </div>`;
     }
 
@@ -392,6 +392,15 @@
     });
     if (setLocationBtn) setLocationBtn.addEventListener('click', () => {
         vscode.postMessage({ type: 'chooseBackupLocation' });
+    });
+
+    // Delegated handler for dynamically injected buttons (e.g. error-state Retry)
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) { return; }
+        if (btn.getAttribute('data-action') === 'retry-load') {
+            vscode.postMessage({ type: 'refresh', fileName: currentFile });
+        }
     });
 
 })();

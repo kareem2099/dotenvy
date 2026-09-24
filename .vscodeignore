@@ -3,6 +3,7 @@ src/**
 tsconfig.json
 tsconfig.tsbuildinfo
 .eslintrc.json
+eslint.config.mjs
 vsc-extension-quickstart.md
 node_modules/**
 package-lock.json
@@ -11,9 +12,11 @@ yarn.lock
 .vscode/**
 !.vscode/extensions.json
 
-# 2. Prevent metadata and todo list files (internal work)
+# 2. Prevent metadata, articles and drafts (internal work)
 todo_list*.json
+articles/**
 *.md
+**/*.md
 !README.md
 !CHANGELOG.md
 !LICENSE
@@ -55,6 +58,7 @@ Thumbs.db
 .idea/**
 .git/**
 .vscode-test/**
+extracted-vsix/**
 coverage/**
 .nyc_output/**
 

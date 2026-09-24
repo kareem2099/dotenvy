@@ -8,6 +8,7 @@ yarn-error.log*
 out/
 dist/
 *.vsix
+extracted-vsix/
 
 # IDE files
 .vscode/settings.json
@@ -132,3 +133,10 @@ RAILWAY-DEPLOYMENT.md
 .dotenvy/history
 
 test/**
+!test/run-all-tests.js
+!test/e2e-master-key-and-backup.js
+!test/e2e-llm-logic.js
+!test/encryption-test-standalone.js
+
+# --- Articles (local drafts, not published) ---
+articles/

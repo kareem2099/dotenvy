@@ -1,7 +1,7 @@
 # dotenvy – VS Code Environment Manager
 
-[![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
-[![Codename](https://img.shields.io/badge/codename-Nexus-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.0.1)
+[![Version](https://img.shields.io/badge/version-2.1.3-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Codename](https://img.shields.io/badge/codename-Aegis-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.1.3)
 [![Publisher](https://img.shields.io/badge/publisher-FreeRave-red.svg)](https://marketplace.visualstudio.com/publishers/FreeRave)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![VS Code Marketplace](https://img.shields.io/badge/vscode-marketplace-007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
@@ -45,7 +45,13 @@ Automatic backup creation before switching, with portable AES-256-GCM encrypted 
 ### 📊 **Status Bar Integration**
 Real-time environment indicator in status bar showing current configuration, validation status, and cloud sync state.
 
-## 🚀 What's New in v2.0.0? (Nexus)
+## 🚀 What's New in v2.1.3? (Aegis — Security & Scanner Hardening)
+
+### 🔐 Zero Client Secrets & Dynamic Credential Handshake
+DotEnvy now uses a dynamic, per-installation registration protocol. No shared keys or secrets are embedded into extension binaries. Unique credentials are created dynamically on first launch and preserved inside OS-encrypted VS Code `SecretStorage`.
+
+### 🛡️ Pattern Obfuscation & Build Hygiene
+All internal regex and signature patterns are dynamically assembled at runtime to prevent false positives from static code scanners. All legacy uncompiled build artifacts are purged automatically on build.
 
 ### 🗑️ Session Trash Bin (Lifesaver!)
 Deleted a crucial variable by mistake? No worries. Restore it with a single click from the new Session Trash Bin.

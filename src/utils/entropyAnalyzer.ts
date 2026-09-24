@@ -56,13 +56,25 @@ export class EntropyAnalyzer {
      * Check if a string is likely a secret based on entropy and patterns
      */
     static isLikelySecret(text: string): boolean {
-        if (!text || text.length < 8) return false;
+        if (!text || text.length < 10) return false;
+
+        // Reject pure camelCase / PascalCase identifiers (only letters, no digits or specials)
+        // e.g. "utilManager", "SecretDetector", "changePassword" → not secrets
+        if (/^[a-zA-Z]+$/.test(text)) return false;
+
+        // Reject ALL_CAPS_NAMES without digits — these are env var *names*, not values
+        // e.g. "SECRET_STORAGE_KEY", "GIT_HOOK_SECRET" → not secrets
+        if (/^[A-Z_]+$/.test(text)) return false;
+
+        // Reject obvious code identifiers: camelCase with only letters and digits
+        // but no special chars and shorter than 20 chars (likely just a variable name)
+        if (text.length < 20 && /^[a-zA-Z][a-zA-Z0-9]+$/.test(text)) return false;
 
         const entropy = this.calculateEntropy(text);
         const hasVariety = this.hasCharacterVariety(text);
 
-        // Must have reasonable entropy and character variety
-        return entropy >= 2.5 && hasVariety;
+        // Require higher entropy (3.0) and character variety to reduce false positives
+        return entropy >= 3.0 && hasVariety;
     }
 
     /**

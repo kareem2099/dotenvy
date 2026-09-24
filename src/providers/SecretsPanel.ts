@@ -158,9 +158,9 @@ export class SecretsPanel {
                     <div class="secret-env">→ <strong>${this._e(s.suggestedEnvVar)}</strong></div>
                 </div>
                 <div class="secret-actions">
-                    <button class="btn-view"   onclick="viewLocation(${i})">📍 View</button>
-                    <button class="btn-move"   onclick="moveToEnv(${i})">📥 Move to .env</button>
-                    <button class="btn-ignore" onclick="ignore(${i})" title="Mark as false positive — trains the AI">👁️ Not a Secret</button>
+                    <button class="btn-view"   data-action="view"   data-index="${i}">📍 View</button>
+                    <button class="btn-move"   data-action="move"   data-index="${i}">📥 Move to .env</button>
+                    <button class="btn-ignore" data-action="ignore" data-index="${i}" title="Mark as false positive — trains the AI">👁️ Not a Secret</button>
                 </div>
             </div>`;
         }).join('');

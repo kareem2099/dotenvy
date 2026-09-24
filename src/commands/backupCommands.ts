@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { logger } from '../utils/logger';
 import { BackupManager } from '../utils/backupManager';
+import { EncryptedVarsManager } from '../utils/encryptedVars';
 
 export class BackupCommands {
     
@@ -28,16 +29,28 @@ export class BackupCommands {
             return;
         }
 
-        const encryptionOptions = [
-            { label: '🔐 Password Protection (Recommended)', detail: 'Portable across devices - works anywhere with your password', value: 'password' },
-            { label: '🔒 Legacy Encryption', detail: 'Uses VSCode SecretStorage (may become inaccessible)', value: 'legacy' },
-            { label: '📄 No Encryption', detail: 'Plain text backup', value: 'none' }
-        ];
+        // Check for Project Master Key (Auto-Authorization)
+        const hasMasterKey = await EncryptedVarsManager.hasMasterKey(context);
+        let encryptionChoice: { label: string; detail: string; value: string } | undefined;
 
-        const encryptionChoice = await vscode.window.showQuickPick(encryptionOptions, {
-            placeHolder: 'How would you like to encrypt your backup?',
-            ignoreFocusOut: true
-        });
+        if (hasMasterKey) {
+            encryptionChoice = {
+                label: '🔐 Master Key (Auto-Authorized)',
+                detail: 'Using project master key',
+                value: 'master-key'
+            };
+        } else {
+            const encryptionOptions = [
+                { label: '🔐 Password Protection (Recommended)', detail: 'Portable across devices - works anywhere with your password', value: 'password' },
+                { label: '🔒 Legacy Encryption', detail: 'Uses VSCode SecretStorage (may become inaccessible)', value: 'legacy' },
+                { label: '📄 No Encryption', detail: 'Plain text backup', value: 'none' }
+            ];
+
+            encryptionChoice = await vscode.window.showQuickPick(encryptionOptions, {
+                placeHolder: 'How would you like to encrypt your backup?',
+                ignoreFocusOut: true
+            });
+        }
 
         if (!encryptionChoice) return;
 
@@ -61,7 +74,16 @@ export class BackupCommands {
         let backupPathOut: string;
 
         try {
-            if (encryptionChoice.value === 'password') {
+            if (encryptionChoice.value === 'master-key') {
+                const key = await EncryptedVarsManager.ensureMasterKey(context);
+                const packaged = BackupManager.encryptWithKey(content, key);
+
+                filename = `env.backup.${timestamp}.master.enc`;
+                backupPathOut = path.join(backupDir, filename);
+                fs.writeFileSync(backupPathOut, packaged, 'utf8');
+                vscode.window.showInformationMessage(`✅ Backup secured with Project Master Key!\n📁 ${filename}`);
+
+            } else if (encryptionChoice.value === 'password') {
                 const password = await vscode.window.showInputBox({
                     prompt: 'Enter a password to encrypt your backup',
                     password: true,
@@ -151,10 +173,20 @@ export class BackupCommands {
             allBackupFiles.map(file => {
                 let type = '📄 Plain text';
                 if (file.endsWith('.enc')) {
-                    type = file.includes('.legacy.') ? '🔒 Legacy encrypted' : '🔐 Password protected';
+                    if (file.includes('.master.')) {
+                        type = '🔐 Project Master Key';
+                    } else if (file.includes('.legacy.')) {
+                        type = '🔒 Legacy encrypted';
+                    } else {
+                        type = '🔐 Password protected';
+                    }
                 }
                 return {
-                    label: file.replace('env.backup.', '').replace('.enc', '').replace('.legacy', '').replace('.txt', ''),
+                    label: file.replace('env.backup.', '')
+                        .replace('.master.enc', '')
+                        .replace('.legacy.enc', '')
+                        .replace('.enc', '')
+                        .replace('.txt', ''),
                     description: type,
                     detail: file,
                     file: file
@@ -174,35 +206,46 @@ export class BackupCommands {
             let decryptedContent: string;
 
             if (selectedFile.file.endsWith('.enc')) {
-                const salt = BackupManager.getSaltFromBackup(fileContent);
-                if (salt) {
-                    const password = await vscode.window.showInputBox({
-                        prompt: 'Enter the password used to encrypt this backup',
-                        password: true,
-                        placeHolder: 'Enter password',
-                        ignoreFocusOut: true
-                    });
-
-                    if (!password) {
-                        vscode.window.showInformationMessage('Restore cancelled.');
-                        return;
-                    }
-
+                if (selectedFile.file.includes('.master.')) {
+                    // Project Master Key backup
                     try {
-                        const key = await BackupManager.deriveKeyFromPassword(password, salt);
+                        const key = await EncryptedVarsManager.ensureMasterKey(context);
                         decryptedContent = BackupManager.decryptWithKey(fileContent, key);
                     } catch (error) {
-                        vscode.window.showErrorMessage('❌ Incorrect password or corrupted backup file.');
+                        vscode.window.showErrorMessage('❌ Failed to decrypt backup. Project Master Key could not decrypt this file.');
                         return;
                     }
                 } else {
-                    vscode.window.showInformationMessage('📦 Legacy encrypted backup detected. Using VSCode SecretStorage...');
-                    try {
-                        const key = await BackupManager.ensureAndGetStoredKey(context);
-                        decryptedContent = BackupManager.decryptWithKey(fileContent, key);
-                    } catch (error) {
-                        vscode.window.showErrorMessage('❌ Failed to decrypt legacy backup. VSCode SecretStorage key may be missing.');
-                        return;
+                    const salt = BackupManager.getSaltFromBackup(fileContent);
+                    if (salt) {
+                        const password = await vscode.window.showInputBox({
+                            prompt: 'Enter the password used to encrypt this backup',
+                            password: true,
+                            placeHolder: 'Enter password',
+                            ignoreFocusOut: true
+                        });
+
+                        if (!password) {
+                            vscode.window.showInformationMessage('Restore cancelled.');
+                            return;
+                        }
+
+                        try {
+                            const key = await BackupManager.deriveKeyFromPassword(password, salt);
+                            decryptedContent = BackupManager.decryptWithKey(fileContent, key);
+                        } catch (error) {
+                            vscode.window.showErrorMessage('❌ Incorrect password or corrupted backup file.');
+                            return;
+                        }
+                    } else {
+                        vscode.window.showInformationMessage('📦 Legacy encrypted backup detected. Using VSCode SecretStorage...');
+                        try {
+                            const key = await BackupManager.ensureAndGetStoredKey(context);
+                            decryptedContent = BackupManager.decryptWithKey(fileContent, key);
+                        } catch (error) {
+                            vscode.window.showErrorMessage('❌ Failed to decrypt legacy backup. VSCode SecretStorage key may be missing.');
+                            return;
+                        }
                     }
                 }
             } else {

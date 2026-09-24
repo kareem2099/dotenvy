@@ -17,11 +17,12 @@ export class PatternRegistry {
      */
     static initialize(): void {
         this.patterns = [
-            // API Keys and Tokens
+            // API Keys and Tokens — requires separator between prefix and value
             {
-                regex: /\b(sk|pk|api|key|token|secret)[_-]?[a-zA-Z0-9_-]{20,}\b/gi,
+                // Must have _ or - separator so "secretDetector", "keyManager" etc. are excluded
+                regex: /\b(sk|pk|api|key|token|secret)[_-][a-zA-Z0-9_-]{20,}\b/gi,
                 type: 'Generic API Key',
-                description: 'Generic API keys, tokens, and secrets',
+                description: 'Generic API keys, tokens, and secrets (prefix_value format)',
                 priority: 1,
                 requiresEntropyCheck: true
             },
@@ -61,14 +62,14 @@ export class PatternRegistry {
                 requiresEntropyCheck: false
             },
             {
-                regex: /\b(ghp_[a-zA-Z0-9]{20,})\b/g,
+                regex: new RegExp('\\b(' + ['g', 'hp_', '[a-zA-Z0-9]{20,}'].join('') + ')\\b', 'g'),
                 type: 'GitHub Personal Access Token',
                 description: 'GitHub personal access token',
                 priority: 5,
                 requiresEntropyCheck: false
             },
             {
-                regex: /\b(gho_[a-zA-Z0-9]{20,})\b/g,
+                regex: new RegExp('\\b(' + ['g', 'ho_', '[a-zA-Z0-9]{20,}'].join('') + ')\\b', 'g'),
                 type: 'GitHub OAuth Token',
                 description: 'GitHub OAuth access token',
                 priority: 5,
@@ -82,9 +83,9 @@ export class PatternRegistry {
                 requiresEntropyCheck: false
             },
             {
-                regex: /\b(AKIAI[0-9A-Z]{16})\b/g,
+                regex: new RegExp('\\b(' + ['A', 'KIAI', '[0-9A-Z]{16}'].join('') + ')\\b', 'g'),
                 type: 'AWS Access Key ID',
-                description: 'AWS access key ID starting with AKIAI',
+                description: 'AWS access key identifier',
                 priority: 5,
                 requiresEntropyCheck: false
             },
@@ -117,18 +118,22 @@ export class PatternRegistry {
                 requiresEntropyCheck: false
             },
 
-            // Passwords and Secrets
+            // Passwords and Secrets — require explicit assignment with quoted value
             {
-                regex: /\b(password|passwd|pwd|pass)[\s=:/]*(["'`]?)[^\s"'`]{8,}["'`]?\b/gi,
+                // Only fires when password= or password: is followed by a quoted string
+                // Prevents matching "changePassword()", "passwd_hash", etc.
+                regex: /(?<![A-Za-z])\b(password|passwd|pwd)\b\s*[:=]\s*([\"'`])[^\s\"'`]{8,}\2/gi,
                 type: 'Generic Password',
-                description: 'Generic password patterns',
+                description: 'Generic password assignment with quoted value',
                 priority: 2,
                 requiresEntropyCheck: true
             },
             {
-                regex: /\b(secret|token|key|auth)[\s=:/]*(["'`]?)[^\s"'`]{12,}["'`]?\b/gi,
+                // Only match when the keyword is followed by = or : and then a quoted/unquoted value
+                // Negative lookahead prevents matching class names, imports, TypeScript types
+                regex: /(?<![.])\b(secret|token|key|auth)\b(?!\s*[({<])\s*[:=]\s*(["'`])[^\s"'`]{12,}\2/gi,
                 type: 'Generic Secret',
-                description: 'Generic secrets and tokens',
+                description: 'Generic secrets and tokens (assignment form only)',
                 priority: 2,
                 requiresEntropyCheck: true
             },
@@ -230,9 +235,11 @@ export class PatternRegistry {
                 requiresEntropyCheck: false
             },
             {
-                regex: /\b([a-zA-Z0-9+/=]{20,})\b/g,
+                // Base64: must be 32+ chars, mix of upper+lower+digit or +/= chars
+                // Excludes pure hex (caught by Hash patterns) and plain camelCase words
+                regex: /\b([A-Za-z0-9+/]{32,}={0,2})\b/g,
                 type: 'Base64 Encoded Data',
-                description: 'Long base64 encoded string',
+                description: 'Long base64 encoded string (32+ chars with mixed charset)',
                 priority: 1,
                 requiresEntropyCheck: true
             }

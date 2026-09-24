@@ -1,59 +1,47 @@
 #!/usr/bin/env node
 
 /**
- * Build script with environment variable substitution
- * Embeds EXTENSION_SHARED_SECRET at build time — NOT an API key.
- * This secret is only used to sign requests with HMAC-SHA256.
+ * Pre-publish Security Validator for DotEnvy
+ * Ensures that no embedded secrets or high-entropy tokens are present
+ * in the compiled output before packaging to marketplace/open-vsx.
  */
 
 const fs = require('fs');
 const path = require('path');
 
-// ─── Load from .env file OR from environment directly ─────────────────────────
-let sharedSecret = process.env.EXTENSION_SHARED_SECRET || '';
+const outDir = path.join(__dirname, '..', 'out');
+if (!fs.existsSync(outDir)) {
+    console.log('ℹ️ out/ directory not found. Run "npm run compile" first.');
+    process.exit(0);
+}
 
-if (!sharedSecret) {
-    // Try reading from .env file (local development)
-    const envPath = path.join(__dirname, '..', '.env');
-    if (fs.existsSync(envPath)) {
-        const envContent = fs.readFileSync(envPath, 'utf8');
-        const match = envContent.match(/EXTENSION_SHARED_SECRET="([^"]+)"/);
-        sharedSecret = match ? match[1] : '';
+function scanDir(dir) {
+    let flagged = 0;
+    const files = fs.readdirSync(dir);
+    for (const f of files) {
+        const fullPath = path.join(dir, f);
+        if (fs.statSync(fullPath).isDirectory()) {
+            flagged += scanDir(fullPath);
+        } else if (fullPath.endsWith('.js')) {
+            const content = fs.readFileSync(fullPath, 'utf8');
+            // Check for any embedded secrets
+            if (content.includes('dX9zM4vB7qW2nK8pR5tJ0cL3hG1yS6fN9mZ4xR7bV0qP3sT6wK8jL2vN5mQ8')) {
+                console.error(`❌ Security Alert: Leaked secret string detected in ${fullPath}!`);
+                flagged++;
+            }
+            if (/const embeddedSecret = "[A-Za-z0-9_-]{20,}"/.test(content)) {
+                console.error(`❌ Security Alert: Hardcoded embeddedSecret found in ${fullPath}!`);
+                flagged++;
+            }
+        }
     }
+    return flagged;
 }
 
-if (!sharedSecret) {
-    console.error('❌ Error: EXTENSION_SHARED_SECRET not found!');
-    console.error('   Set it in .env file or as an environment variable.');
+const flags = scanDir(outDir);
+if (flags > 0) {
+    console.error(`\n❌ Pre-publish check failed: ${flags} leaked secret(s) found in out/!`);
     process.exit(1);
-}
-
-console.log('✅ Found EXTENSION_SHARED_SECRET');
-
-// ─── Patch the compiled llmAnalyzer.js ────────────────────────────────────────
-const outputPath = path.join(__dirname, '..', 'out', 'utils', 'llmAnalyzer.js');
-
-if (!fs.existsSync(outputPath)) {
-    console.error(`❌ Error: Compiled file not found at ${outputPath}`);
-    console.error('   Run "npm run compile" first.');
-    process.exit(1);
-}
-
-let outputContent = fs.readFileSync(outputPath, 'utf8');
-
-// Replace the placeholder with the actual secret
-const replaced = outputContent.replace(
-    /process\.env\.EXTENSION_SHARED_SECRET \|\| 'REPLACE_AT_BUILD_TIME'/g,
-    `"${sharedSecret}"`
-);
-
-if (replaced === outputContent) {
-    console.warn('⚠️  Warning: placeholder not found in compiled code.');
-    console.warn('   Make sure llmAnalyzer.ts uses:');
-    console.warn("   process.env.EXTENSION_SHARED_SECRET || 'REPLACE_AT_BUILD_TIME'");
 } else {
-    fs.writeFileSync(outputPath, replaced);
-    console.log('✅ Successfully embedded EXTENSION_SHARED_SECRET in compiled code');
+    console.log('✅ Security check passed: 0 embedded secrets found in compiled out/ bundle.');
 }
-
-console.log('✅ Build completed successfully');

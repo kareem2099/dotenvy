@@ -178,7 +178,8 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         switchEnvCommand, openPanelCommand, validateEnvCommand, diffEnvCommand,
         installHookCommand, removeHookCommand, pullFromCloudCommand, pushToCloudCommand,
-        scanSecretsCommand, feedbackCommand, viewHistoryCommand, setMasterPasswordCommand,
+        vscode.commands.registerCommand('dotenvy.scanSecrets', () => scanSecretsCommand.execute()),
+        feedbackCommand, viewHistoryCommand, setMasterPasswordCommand,
         exportEnvironmentCommand, initIgnoreCommand,
     );
 

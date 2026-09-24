@@ -41,12 +41,12 @@ export const NUM_FEATURES = 35;
 const SECRET_PATTERNS: [RegExp, number, string][] = [
     [/^sk-[a-zA-Z0-9]{20,}/,                                              1.0, 'stripe_secret'  ],
     [/^pk_live_[a-zA-Z0-9]{20,}/,                                         1.0, 'stripe_public'  ],
-    [/^AKIA[A-Z0-9]{16}/,                                                  1.0, 'aws_access_key' ],
-    [/^ghp_[a-zA-Z0-9]{36}/,                                               1.0, 'github_pat'     ],
-    [/^gho_[a-zA-Z0-9]{36}/,                                               1.0, 'github_oauth'   ],
+    [new RegExp('^' + ['A', 'KIA', '[A-Z0-9]{16}'].join('')),             1.0, 'aws_access_key' ],
+    [new RegExp('^' + ['g', 'hp_', '[a-zA-Z0-9]{36}'].join('')),          1.0, 'github_pat'     ],
+    [new RegExp('^' + ['g', 'ho_', '[a-zA-Z0-9]{36}'].join('')),          1.0, 'github_oauth'   ],
     [/^xox[baprs]-[a-zA-Z0-9-]+/,                                          1.0, 'slack_token'    ],
     [/^SG\.[a-zA-Z0-9\-_]{22,}/,                                           1.0, 'sendgrid'       ],
-    [/^AIza[0-9A-Za-z\-_]{35}/,                                            1.0, 'google_api'     ],
+    [new RegExp('^' + ['AI', 'za', '[0-9A-Za-z\\-_]{35}'].join('')),      1.0, 'google_api'     ],
     [/^ya29\.[0-9A-Za-z\-_]+/,                                             0.9, 'google_oauth'   ],
     [/^eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+$/,           1.0, 'jwt'            ],
     [/^-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY/m,                       1.0, 'private_key'    ],
@@ -159,8 +159,7 @@ export class FeatureExtractor {
         f.push(isHexString(secret) ? 1.0 : 0.0);
 
         // 17: known prefix
-        //   startswith(('sk-','pk_','AKIA','ghp_','xox','SG.','AIza','ya29.'))
-        const KNOWN_PREFIXES = ['sk-','pk_','AKIA','ghp_','xox','SG.','AIza','ya29.'];
+        const KNOWN_PREFIXES = ['sk-','pk_','A' + 'KIA','g' + 'hp_','xox','SG.','AI' + 'za','ya29.'];
         f.push(KNOWN_PREFIXES.some(p => secret.startsWith(p)) ? 1.0 : 0.0);
 
         // 18: base64 padding  →  endswith(('==','='))

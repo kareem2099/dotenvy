@@ -11,8 +11,6 @@ import { QuickEnvConfig } from '../types/environment';
 import { CloudSyncResult } from '../utils/cloudSyncManager';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
-import * as os from 'os';
 import { logger } from '../utils/logger';
 import { TrashBinManager } from '../utils/trashBinManager';
 import { UserManager } from '../utils/userManager';
@@ -63,13 +61,7 @@ interface ValidationStatus {
     warnings?: number;
     lastValidated?: Date;
 }
-interface BackupPackage {
-    v: number;
-    iv: string;
-    ct: string;
-    tag: string;
-    s?: string; // optional salt for version 2 (password-based)
-}
+
 
 interface BackupSettings {
     path: string;
@@ -138,13 +130,6 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private environmentProvider?: EnvironmentProvider;
     private cachedDashboardData: DashboardData | null = null;
-
-    // SecretStorage key for the randomly generated backup encryption key
-    private static readonly SECRET_STORAGE_KEY = 'dotenvy.backup.key.v1';
-    private static readonly FORMAT_VERSION = 1;
-    private static readonly KEY_LENGTH = 32; // 256 bits
-    private static readonly IV_LENGTH = 12; // 96 bits for GCM
-    private static readonly ALGO = 'aes-256-gcm';
 
     constructor(private readonly context: vscode.ExtensionContext) { }
 
@@ -447,124 +432,6 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    // ------------------------
-    // Helper: Key management
-    // ------------------------
-    // Ensures there is a stored random key in SecretStorage and returns it as Buffer
-    private async ensureAndGetStoredKey(): Promise<Buffer> {
-        const secret = await this.context.secrets.get(EnvironmentWebviewProvider.SECRET_STORAGE_KEY);
-        if (secret) {
-            return Buffer.from(secret, 'base64');
-        }
-        const key = crypto.randomBytes(EnvironmentWebviewProvider.KEY_LENGTH);
-        await this.context.secrets.store(EnvironmentWebviewProvider.SECRET_STORAGE_KEY, key.toString('base64'));
-        return key;
-    }
-
-    // ------------------------
-    // Helper: Password-Based Key Derivation (PBKDF2)
-    // OWASP 2025 compliant with 310,000 iterations
-    // ------------------------
-    private async deriveKeyFromPassword(password: string, salt: Buffer): Promise<Buffer> {
-        return new Promise((resolve, reject) => {
-            crypto.pbkdf2(password, salt, 310000, EnvironmentWebviewProvider.KEY_LENGTH, 'sha256', (err, derivedKey) => {
-                if (err) {
-                    reject(new Error(`Failed to derive key from password: ${err.message}`));
-                } else {
-                    resolve(derivedKey);
-                }
-            });
-        });
-    }
-
-    // Generate a random 16-byte salt for password-based encryption
-    private generateSalt(): Buffer {
-        return crypto.randomBytes(16);
-    }
-
-    // Extract salt from encrypted backup payload (for password-based decryption)
-    // Returns null if payload doesn't contain salt (legacy format)
-    private getSaltFromBackup(payloadB64: string): Buffer | null {
-        try {
-            const raw = Buffer.from(payloadB64, 'base64').toString('utf8');
-            const pack = JSON.parse(raw);
-
-            // Check if this is version 2 format with salt
-            if (pack.v === 2 && pack.s) {
-                return Buffer.from(pack.s, 'base64');
-            }
-
-            return null; // Version 1 or no salt
-        } catch (e) {
-            return null;
-        }
-    }
-
-
-    // ------------------------
-    // Helper: Encrypt / Decrypt (AES-256-GCM)
-    // Returns base64(JSON) package with { v, iv, ct, tag } for v1 or { v, iv, ct, tag, s } for v2
-    // ------------------------
-    private encryptWithKey(plaintext: string, key: Buffer, salt?: Buffer): string {
-        if (key.length !== EnvironmentWebviewProvider.KEY_LENGTH) {
-            throw new Error('Invalid key length for encryption');
-        }
-        const iv = crypto.randomBytes(EnvironmentWebviewProvider.IV_LENGTH);
-        const cipher = crypto.createCipheriv(EnvironmentWebviewProvider.ALGO, key, iv, { authTagLength: 16 });
-        const ciphertext = Buffer.concat([cipher.update(Buffer.from(plaintext, 'utf8')), cipher.final()]);
-        const tag = cipher.getAuthTag();
-
-        // Version 2: Password-based with salt
-        // Version 1: Legacy SecretStorage-based
-        const pack: BackupPackage = {
-            v: salt ? 2 : EnvironmentWebviewProvider.FORMAT_VERSION,
-            iv: iv.toString('base64'),
-            ct: ciphertext.toString('base64'),
-            tag: tag.toString('base64')
-        };
-
-        // Include salt in version 2 format
-        if (salt) {
-            pack.s = salt.toString('base64');
-        }
-
-        return Buffer.from(JSON.stringify(pack)).toString('base64');
-    }
-
-    private decryptWithKey(payloadB64: string, key: Buffer): string {
-        if (key.length !== EnvironmentWebviewProvider.KEY_LENGTH) {
-            throw new Error('Invalid key length for decryption');
-        }
-
-        let raw: string;
-        try {
-            raw = Buffer.from(payloadB64, 'base64').toString('utf8');
-        } catch (e) {
-            throw new Error('Invalid encrypted payload', { cause: e });
-        }
-
-        let pack: { v: number; iv: string; ct: string; tag: string; s?: string };
-        try {
-            pack = JSON.parse(raw);
-        } catch (e) {
-            throw new Error('Invalid encrypted payload format', { cause: e });
-        }
-
-        // Support both version 1 (legacy) and version 2 (password-based)
-        if (pack.v !== EnvironmentWebviewProvider.FORMAT_VERSION && pack.v !== 2) {
-            throw new Error(`Unsupported backup format version: ${pack.v}`);
-        }
-
-        const iv = Buffer.from(pack.iv, 'base64');
-        const ct = Buffer.from(pack.ct, 'base64');
-        const tag = Buffer.from(pack.tag, 'base64');
-
-        const decipher = crypto.createDecipheriv(EnvironmentWebviewProvider.ALGO, key, iv, { authTagLength: 16 });
-        decipher.setAuthTag(tag);
-        const out = Buffer.concat([decipher.update(ct), decipher.final()]);
-        return out.toString('utf8');
-    }
-
     private async handleMessage(message: WebviewMessage): Promise<void> {
         if (!this.environmentProvider) return;
 
@@ -767,161 +634,20 @@ DEBUG=false
                 break;
 
             // Validation actions
-            case 'backupCurrentEnv':
-                showActionStart(t('webview.backup.actionStart'));
-                if (!fs.existsSync(path.join(rootPath, '.env'))) {
-                    showSyncToast(t('webview.backup.noEnv'), 'error');
-                    return;
-                }
-
-                // Prompt user for encryption method
-                const encryptionOptions = [
-                    {
-                        label: '🔐 Password Protection (Recommended)',
-                        detail: 'Portable across devices - works anywhere with your password',
-                        value: 'password'
-                    },
-                    {
-                        label: '🔒 Legacy Encryption',
-                        detail: 'Uses VSCode SecretStorage (may become inaccessible)',
-                        value: 'legacy'
-                    },
-                    {
-                        label: '📄 No Encryption',
-                        detail: 'Plain text backup',
-                        value: 'none'
-                    }
-                ];
-
-                const encryptionChoice = await vscode.window.showQuickPick(encryptionOptions, {
-                    placeHolder: 'How would you like to encrypt your backup?',
-                    ignoreFocusOut: true
-                });
-
-                if (!encryptionChoice) {
-                    return; // User cancelled
-                }
-
-                // Get backup configuration
-                const config = vscode.workspace.getConfiguration('dotenvy');
-                const customBackupPath = config.get<string>('backupPath', '');
-
-                // Determine backup directory
-                let backupDir = customBackupPath;
-                if (!backupDir || backupDir.trim() === '') {
-                    const homeDir = os.homedir();
-                    const workspaceName = vscode.workspace.name || 'default';
-                    backupDir = path.join(homeDir, '.dotenvy-backups', workspaceName);
-                }
-
-                // Ensure backup directory exists
-                if (!fs.existsSync(backupDir)) {
-                    fs.mkdirSync(backupDir, { recursive: true });
-                }
-
-                // Read environment file content
-                const content = fs.readFileSync(path.join(rootPath, '.env'), 'utf8');
-
-                // Create timestamped backup filename
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-                let filename: string;
-                let backupPath: string;
-
-                try {
-                    if (encryptionChoice.value === 'password') {
-                        // Password-based encryption
-                        const password = await vscode.window.showInputBox({
-                            prompt: 'Enter a password to encrypt your backup',
-                            password: true,
-                            placeHolder: 'Enter password (min 8 characters recommended)',
-                            ignoreFocusOut: true,
-                            validateInput: (value: string) => {
-                                if (!value || value.length === 0) {
-                                    return 'Password cannot be empty';
-                                }
-                                if (value.length < 8) {
-                                    return 'Warning: Password is short. Minimum 8 characters recommended.';
-                                }
-                                return null;
-                            }
-                        });
-
-                        if (!password) {
-                            showSyncToast(t('webview.backup.cancelled'), 'info');
-                            return;
-                        }
-
-                        const passwordConfirm = await vscode.window.showInputBox({
-                            prompt: 'Confirm your password',
-                            password: true,
-                            placeHolder: 'Re-enter password',
-                            ignoreFocusOut: true
-                        });
-
-                        if (password !== passwordConfirm) {
-                            showSyncToast(t('webview.backup.passwordMismatch'), 'error');
-                            return;
-                        }
-
-                        // Generate salt and derive key from password
-                        const salt = this.generateSalt();
-                        const key = await this.deriveKeyFromPassword(password, salt);
-
-                        // Encrypt with salt included (version 2 format)
-                        const packaged = this.encryptWithKey(content, key, salt);
-
-                        filename = `env.backup.${timestamp}.enc`;
-                        backupPath = path.join(backupDir, filename);
-                        fs.writeFileSync(backupPath, packaged, 'utf8');
-
-                        showSyncToast(t('webview.backup.passwordProtected', { filename }), 'success');
-
-                    } else if (encryptionChoice.value === 'legacy') {
-                        // Legacy SecretStorage-based encryption (version 1)
-                        const key = await this.ensureAndGetStoredKey();
-                        const packaged = this.encryptWithKey(content, key); // No salt = version 1
-
-                        filename = `env.backup.${timestamp}.legacy.enc`;
-                        backupPath = path.join(backupDir, filename);
-                        fs.writeFileSync(backupPath, packaged, 'utf8');
-
-                        showSyncToast(t('webview.backup.legacyCreated', { filename }), 'success');
-                        showSyncToast(t('webview.backup.legacyWarning'), 'warning');
-
-                    } else {
-                        // No encryption
-                        filename = `env.backup.${timestamp}.txt`;
-                        backupPath = path.join(backupDir, filename);
-                        fs.writeFileSync(backupPath, content, 'utf8');
-
-                        showSyncToast(t('webview.backup.plainCreated', { filename }), 'warning');
-                    }
-
-                } catch (error) {
-                    logger.error('Failed to create backup:', error, 'environmentWebviewProvider');
-                    showSyncToast(t('webview.backup.failed', { message: (error as Error).message }), 'error');
-                    return;
-                }
-
+            case 'backupCurrentEnv': {
+                const { BackupCommands } = await import('../commands/backupCommands');
+                const targetFilePath = path.join(rootPath, '.env');
+                await BackupCommands.backupEnv(this.context, targetFilePath);
                 await this.refreshEnvironments();
                 break;
+            }
 
-            case 'chooseBackupLocation':
-                // Show folder picker for backup location
-                const folderUri = await vscode.window.showOpenDialog({
-                    canSelectFolders: true,
-                    canSelectFiles: false,
-                    canSelectMany: false,
-                    openLabel: 'Select Backup Folder'
-                });
-
-                if (folderUri && folderUri[0]) {
-                    const config = vscode.workspace.getConfiguration('dotenvy');
-                    await config.update('backupPath', folderUri[0].fsPath, vscode.ConfigurationTarget.Global);
-                    showSyncToast(t('webview.backup.locationSet', { path: folderUri[0].fsPath }), 'success');
-                    await this.refreshEnvironments();
-                }
+            case 'chooseBackupLocation': {
+                const { BackupCommands } = await import('../commands/backupCommands');
+                await BackupCommands.chooseBackupLocation();
+                await this.refreshEnvironments();
                 break;
+            }
 
             case 'scanSecrets':
                 const { ScanSecretsCommand } = await import('../commands/scanSecrets');
@@ -990,9 +716,9 @@ DEBUG=false
                 const envFilePath = path.join(rootPath, '.env');
 
                 try {
-                    const cryptoKey  = await EncryptedVarsManager.ensureMasterKey(this.context);
+                    const cryptoKey = await EncryptedVarsManager.ensureMasterKey(this.context);
                     const currentVars = await EncryptedEnvironmentFile.parseEnvFile(envFilePath, this.context, cryptoKey);
-                    
+
                     const varData = currentVars.get(targetKey);
                     if (!varData) {
                         showSyncToast(t('webview.var.notFound', { key: targetKey }), 'error');
@@ -1034,9 +760,9 @@ DEBUG=false
                 const envFilePath = path.join(rootPath, '.env');
 
                 try {
-                    const cryptoKey  = await EncryptedVarsManager.ensureMasterKey(this.context);
+                    const cryptoKey = await EncryptedVarsManager.ensureMasterKey(this.context);
                     const currentVars = await EncryptedEnvironmentFile.parseEnvFile(envFilePath, this.context, cryptoKey);
-                    
+
                     const varData = currentVars.get(targetKey);
                     if (!varData) return;
 
@@ -1065,138 +791,12 @@ DEBUG=false
                 break;
             }
 
-            case 'restoreFromBackup':
-                showActionStart(t('webview.restore.actionStart'));
-                // Get backup configuration
-                const restoreConfig = vscode.workspace.getConfiguration('dotenvy');
-                const restoreBackupPath = restoreConfig.get<string>('backupPath', '');
-                let restoreBackupDir = restoreBackupPath;
-                if (!restoreBackupDir || restoreBackupDir.trim() === '') {
-                    const homeDir = os.homedir();
-                    const workspaceName = vscode.workspace.name || 'default';
-                    restoreBackupDir = path.join(homeDir, '.dotenvy-backups', workspaceName);
-                }
-
-                if (!fs.existsSync(restoreBackupDir)) {
-                    showSyncToast(t('webview.restore.noDir'), 'error');
-                    return;
-                }
-
-                // List all backup files (encrypted and plain text)
-                const allBackupFiles = fs.readdirSync(restoreBackupDir)
-                    .filter(file => file.startsWith('env.backup.'))
-                    .sort()
-                    .reverse(); // Most recent first
-
-                if (allBackupFiles.length === 0) {
-                    showSyncToast(t('webview.restore.noneFound'), 'info');
-                    return;
-                }
-
-                // Let user select backup with type indication
-                const selectedFile = await vscode.window.showQuickPick(
-                    allBackupFiles.map(file => {
-                        let type = '📄 Plain text';
-                        if (file.endsWith('.enc')) {
-                            type = file.includes('.legacy.') ? '🔒 Legacy encrypted' : '🔐 Password protected';
-                        }
-                        return {
-                            label: file.replace('env.backup.', '').replace('.enc', '').replace('.legacy', '').replace('.txt', ''),
-                            description: type,
-                            detail: file,
-                            file: file
-                        };
-                    }),
-                    {
-                        placeHolder: 'Select backup to restore',
-                        ignoreFocusOut: true
-                    }
-                );
-
-                if (!selectedFile) return;
-
-                try {
-                    const backupPath = path.join(restoreBackupDir, selectedFile.file);
-                    const fileContent = fs.readFileSync(backupPath, 'utf8');
-                    let decryptedContent: string;
-
-                    // Check if file is encrypted
-                    if (selectedFile.file.endsWith('.enc')) {
-                        // Auto-detect format version
-                        const salt = this.getSaltFromBackup(fileContent);
-
-                        if (salt) {
-                            // Version 2: Password-based encryption
-                            const password = await vscode.window.showInputBox({
-                                prompt: 'Enter the password used to encrypt this backup',
-                                password: true,
-                                placeHolder: 'Enter password',
-                                ignoreFocusOut: true
-                            });
-
-                            if (!password) {
-                                showSyncToast(t('webview.restore.cancelled'), 'info');
-                                return;
-                            }
-
-                            try {
-                                // Derive key from password and salt
-                                const key = await this.deriveKeyFromPassword(password, salt);
-                                decryptedContent = this.decryptWithKey(fileContent, key);
-                            } catch (error) {
-                                showSyncToast(t('webview.restore.badPassword'), 'error');
-                                return;
-                            }
-
-                        } else {
-                            showSyncToast(t('webview.restore.legacyDetected'), 'info');
-
-                            try {
-                                const key = await this.ensureAndGetStoredKey();
-                                decryptedContent = this.decryptWithKey(fileContent, key);
-                            } catch (error) {
-                                showSyncToast(t('webview.restore.legacyFailed'), 'error');
-                                return;
-                            }
-                        }
-                    } else {
-                        // Plain text backup
-                        decryptedContent = fileContent;
-                    }
-
-                    // Ask where to restore
-                    const restoreOptions = [
-                        { label: 'Overwrite .env', detail: 'Replace current environment file' },
-                        { label: 'Create new file', detail: 'Save as .env.restored' }
-                    ];
-
-                    const restoreChoice = await vscode.window.showQuickPick(restoreOptions, {
-                        placeHolder: 'How to restore the backup?',
-                        ignoreFocusOut: true
-                    });
-
-                    if (!restoreChoice) return;
-
-                    let targetPath: string;
-                    if (restoreChoice.label === 'Overwrite .env') {
-                        targetPath = path.join(rootPath, '.env');
-                    } else {
-                        targetPath = path.join(rootPath, '.env.restored');
-                    }
-
-                    fs.writeFileSync(targetPath, decryptedContent, 'utf8');
-                    showSyncToast(t('webview.restore.success', { fileName: path.basename(targetPath) }), 'success');
-
-                    // Open the restored file
-                    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(targetPath));
-                    await vscode.window.showTextDocument(doc);
-
-                    await this.refreshEnvironments();
-
-                } catch (error) {
-                    showSyncToast(t('webview.restore.failed', { message: (error as Error).message }), 'error');
-                }
+            case 'restoreFromBackup': {
+                const { BackupCommands } = await import('../commands/backupCommands');
+                await BackupCommands.restoreFromBackup(this.context, rootPath);
+                await this.refreshEnvironments();
                 break;
+            }
         }
     }
 }
