@@ -39,8 +39,8 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "rm -rf out && tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "compile": "node -e \"require('fs').rmSync('out',{recursive:true,force:true})\" && node ./node_modules/typescript/lib/tsc.js -p ./",
+    "watch": "node ./node_modules/typescript/lib/tsc.js --watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src/**/*.ts",
     "test": "node test/run-all-tests.js"
