@@ -5,113 +5,113 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https:; font-src 'self' data: https:; style-src {{CSP_SOURCE}} 'unsafe-inline'; script-src 'nonce-{{NONCE}}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="{{STYLE_URI}}" rel="stylesheet">
-    <title>Environment History</title>
+    <title data-i18n="history.title">Environment History</title>
 </head>
 <body>
     <div class="history-container">
         <div class="history-header">
             <div class="header-left">
-                <h3>📋 Environment History</h3>
+                <h3 data-i18n="history.title">📋 Environment History</h3>
                 <div class="history-stats" id="stats"></div>
             </div>
             <div class="header-actions">
-                <button id="view-timeline-btn" class="btn-icon-pill" title="Open Timeline View">📊 Timeline</button>
+                <button id="view-timeline-btn" class="btn-icon-pill" title="Open Timeline View" data-i18n="history.timelineBtn">📊 Timeline</button>
                 <button id="refresh-btn" class="btn-icon-pill" title="Refresh">🔄</button>
-                <button id="advanced-filters-btn" class="btn-icon-pill" title="Advanced Filters">🔍 Filters</button>
+                <button id="advanced-filters-btn" class="btn-icon-pill" title="Advanced Filters" data-i18n="history.filtersBtn">🔍 Filters</button>
             </div>
         </div>
 
         <div class="history-search-bar">
-            <input type="text" id="search-input" placeholder="Quick search…" class="search-input-inline">
+            <input type="text" id="search-input" placeholder="Quick search…" data-i18n-placeholder="history.quickSearch" class="search-input-inline">
             <select id="filter-select" class="filter-select-inline">
-                <option value="all">All actions</option>
-                <option value="switch">Switch</option>
-                <option value="rollback">Rollback</option>
-                <option value="manual_edit">Edit</option>
-                <option value="import">Import</option>
-                <option value="initial">Initial</option>
+                <option value="all" data-i18n="history.allActions">All actions</option>
+                <option value="switch" data-i18n="history.actionSwitch">Switch</option>
+                <option value="rollback" data-i18n="history.actionRollback">Rollback</option>
+                <option value="manual_edit" data-i18n="history.actionEdit">Edit</option>
+                <option value="import" data-i18n="history.actionImport">Import</option>
+                <option value="initial" data-i18n="history.actionInitial">Initial</option>
             </select>
         </div>
 
         <div class="advanced-filters-backdrop" id="advanced-filters-backdrop"></div>
         <div class="advanced-filters-panel" id="advanced-filters-panel">
             <div class="filters-header">
-                <h4>🔍 Advanced Filters</h4>
+                <h4 data-i18n="history.advancedFilters">🔍 Advanced Filters</h4>
                 <button id="close-filters-btn-icon" class="btn-icon-close" title="Close">&times;</button>
             </div>
             <div class="drawer-content">
                 <div class="filters-section">
-                    <h4>🔍 Search</h4>
+                    <h4 data-i18n="history.searchHeading">🔍 Search</h4>
                     <div class="filter-row">
                         <div class="filter-group">
-                            <label for="advanced-search-input">Query:</label>
-                            <input type="text" id="advanced-search-input" placeholder="Search…" class="filter-input">
+                            <label for="advanced-search-input" data-i18n="history.queryLabel">Query:</label>
+                            <input type="text" id="advanced-search-input" placeholder="Search…" data-i18n-placeholder="history.queryPlaceholder" class="filter-input">
                             <div class="filter-options">
-                                <label><input type="checkbox" id="regex-toggle"> Regex</label>
+                                <label><input type="checkbox" id="regex-toggle"> <span data-i18n="history.regexToggle">Regex</span></label>
                                 <select id="search-scope-select" class="filter-select-small">
-                                    <option value="all">All</option>
-                                    <option value="environments">Environments</option>
-                                    <option value="variables">Variables</option>
-                                    <option value="values">Values</option>
+                                    <option value="all" data-i18n="history.scopeAll">All</option>
+                                    <option value="environments" data-i18n="history.scopeEnvs">Environments</option>
+                                    <option value="variables" data-i18n="history.scopeVars">Variables</option>
+                                    <option value="values" data-i18n="history.scopeVals">Values</option>
                                 </select>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="filters-section">
-                    <h4>📅 Date Range</h4>
+                    <h4 data-i18n="history.dateRangeHeading">📅 Date Range</h4>
                     <div class="filter-row">
                         <div class="filter-group">
-                            <label>Preset:</label>
-                            <select id="date-preset-select" class="filter-select-small"><option value="">Custom</option></select>
+                            <label data-i18n="history.presetLabel">Preset:</label>
+                            <select id="date-preset-select" class="filter-select-small"><option value="" data-i18n="history.presetCustom">Custom</option></select>
                         </div>
                         <div class="filter-group">
-                            <label for="date-from-input">From:</label>
+                            <label for="date-from-input" data-i18n="history.fromLabel">From:</label>
                             <input type="date" id="date-from-input" class="filter-input">
                         </div>
                         <div class="filter-group">
-                            <label for="date-to-input">To:</label>
+                            <label for="date-to-input" data-i18n="history.toLabel">To:</label>
                             <input type="date" id="date-to-input" class="filter-input">
                         </div>
                     </div>
                 </div>
                 <div class="filters-section">
-                    <h4>👥 Users &amp; Actions</h4>
+                    <h4 data-i18n="history.usersHeading">👥 Users &amp; Actions</h4>
                     <div class="filter-row">
                         <div class="filter-group">
-                            <label>Users:</label>
+                            <label data-i18n="history.usersLabel">Users:</label>
                             <select id="user-filter-select" multiple class="filter-select-multi"><option value="">Loading…</option></select>
                         </div>
                         <div class="filter-group">
-                            <label>Actions:</label>
+                            <label data-i18n="history.actionsLabel">Actions:</label>
                             <select id="action-filter-select" multiple class="filter-select-multi">
-                                <option value="switch">Switch</option>
-                                <option value="rollback">Rollback</option>
-                                <option value="manual_edit">Manual Edit</option>
-                                <option value="import">Import</option>
-                                <option value="initial">Initial</option>
+                                <option value="switch" data-i18n="history.actionSwitch">Switch</option>
+                                <option value="rollback" data-i18n="history.actionRollback">Rollback</option>
+                                <option value="manual_edit" data-i18n="history.actionEdit">Edit</option>
+                                <option value="import" data-i18n="history.actionImport">Import</option>
+                                <option value="initial" data-i18n="history.actionInitial">Initial</option>
                             </select>
                         </div>
                     </div>
                 </div>
                 <div class="filters-section">
-                    <h4>🏷️ Environments &amp; Variables</h4>
+                    <h4 data-i18n="history.envsHeading">🏷️ Environments &amp; Variables</h4>
                     <div class="filter-row">
                         <div class="filter-group">
-                            <label>Environments:</label>
+                            <label data-i18n="history.envsLabel">Environments:</label>
                             <select id="environment-filter-select" multiple class="filter-select-multi"><option value="">Loading…</option></select>
                         </div>
                         <div class="filter-group">
-                            <label>Variables:</label>
+                            <label data-i18n="history.varsLabel">Variables:</label>
                             <select id="variable-filter-select" multiple class="filter-select-multi"><option value="">Loading…</option></select>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="filters-actions">
-                <button id="apply-filters-btn" class="btn-primary">Apply</button>
-                <button id="clear-filters-btn" class="btn-secondary">Clear All</button>
-                <button id="close-filters-btn" class="btn-secondary">Close</button>
+                <button id="apply-filters-btn" class="btn-primary" data-i18n="history.applyBtn">Apply</button>
+                <button id="clear-filters-btn" class="btn-secondary" data-i18n="history.clearBtn">Clear All</button>
+                <button id="close-filters-btn" class="btn-secondary" data-i18n="history.closeBtn">Close</button>
                 <div class="filter-stats" id="filter-stats"></div>
             </div>
         </div>
@@ -120,19 +120,20 @@
             <table class="history-table" id="history-list">
                 <thead>
                     <tr>
-                        <th>Date &amp; Time</th>
-                        <th>Environment</th>
-                        <th>Action</th>
-                        <th>Note</th>
-                        <th class="col-actions">Actions</th>
+                        <th data-i18n="history.thDateTime">Date &amp; Time</th>
+                        <th data-i18n="history.thEnvironment">Environment</th>
+                        <th data-i18n="history.thAction">Action</th>
+                        <th data-i18n="history.thNote">Note</th>
+                        <th class="col-actions" data-i18n="history.thActions">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="history-body">
-                    <tr><td colspan="5" class="loading">Loading history…</td></tr>
+                    <tr><td colspan="5" class="loading" data-i18n="history.loading">Loading history…</td></tr>
                 </tbody>
             </table>
         </div>
     </div>
+    <script nonce="{{NONCE}}" src="{{I18N_SCRIPT_URI}}"></script>
     <script nonce="{{NONCE}}" src="{{SCRIPT_URI}}"></script>
 </body>
 </html>

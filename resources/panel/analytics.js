@@ -4,6 +4,15 @@
     const vscode = acquireVsCodeApi();
     let currentWorkspace = null;
 
+    let currentAnalytics = null;
+
+    function tr(key, params, fallback) {
+        if (window.dotenvyI18n && typeof window.dotenvyI18n.tr === 'function') {
+            return window.dotenvyI18n.tr(key, params, fallback);
+        }
+        return fallback !== undefined ? fallback : key;
+    }
+
     // ──────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────
@@ -52,9 +61,9 @@
             container.innerHTML = `
                 <div class="empty-panel">
                     <div class="empty-icon">📊</div>
-                    <h3>No Analytics Data Yet</h3>
-                    <p>Make some environment changes and come back to see detailed insights!</p>
-                    <button class="btn btn-primary" data-action="retry">🔄 Try Again</button>
+                    <h3>${tr('analytics.noData', {}, 'No Analytics Data Yet')}</h3>
+                    <p>${tr('analytics.noDataDesc', {}, 'Make some environment changes and come back to see detailed insights!')}</p>
+                    <button class="btn btn-primary" data-action="retry">${tr('analytics.tryAgain', {}, '🔄 Try Again')}</button>
                 </div>`;
             return;
         }
@@ -78,25 +87,25 @@
         <div class="overview-strip">
             <div class="overview-card">
                 <div class="ov-value">${totalEntries}</div>
-                <div class="ov-label">Total Entries</div>
+                <div class="ov-label">${tr('analytics.totalEntries', {}, 'Total Entries')}</div>
             </div>
             <div class="overview-card">
                 <div class="ov-value">${envFreq.length}</div>
-                <div class="ov-label">Environments</div>
+                <div class="ov-label">${tr('analytics.environments', {}, 'Environments')}</div>
             </div>
             <div class="overview-card">
                 <div class="ov-value">${totalVars}</div>
-                <div class="ov-label">Unique Variables</div>
+                <div class="ov-label">${tr('analytics.uniqueVariables', {}, 'Unique Variables')}</div>
             </div>
             <div class="overview-card">
                 <div class="ov-value">${peakHours.length > 0 ? formatHour(parseInt(peakHours[0][0])) : 'N/A'}</div>
-                <div class="ov-label">Peak Hour</div>
+                <div class="ov-label">${tr('analytics.peakHour', {}, 'Peak Hour')}</div>
             </div>
         </div>
 
         <!-- ── USAGE PATTERNS ───────────────────────────────── -->
         <section class="a-section">
-            <h2 class="section-title">📊 Usage Patterns</h2>
+            <h2 class="section-title">${tr('analytics.usagePatterns', {}, '📊 Usage Patterns')}</h2>
             <div class="card-grid">
                 <div class="a-card">
                     <div class="a-card-title">Most Used Environments</div>
@@ -145,7 +154,7 @@
 
         <!-- ── STABILITY METRICS ────────────────────────────── -->
         <section class="a-section">
-            <h2 class="section-title">📈 Stability Metrics</h2>
+            <h2 class="section-title">${tr('analytics.stabilityMetrics', {}, '📈 Stability Metrics')}</h2>
             <div class="card-grid">
                 <div class="a-card">
                     <div class="a-card-title">Environment Stability</div>
@@ -191,7 +200,7 @@
 
         <!-- ── VARIABLE ANALYTICS ───────────────────────────── -->
         <section class="a-section">
-            <h2 class="section-title">🔄 Variable Change Frequency</h2>
+            <h2 class="section-title">${tr('analytics.variableChangeFreq', {}, '🔄 Variable Change Frequency')}</h2>
             <div class="a-card full-width">
                 <div class="a-card-title">Most Frequently Changed Variables (Top 15)</div>
                 <div class="var-table">
@@ -273,7 +282,13 @@
         switch (msg.type) {
             case 'analyticsLoaded':
                 if (msg.workspacePath) { currentWorkspace = msg.workspacePath; }
-                displayAnalytics(msg.analytics);
+                currentAnalytics = msg.analytics;
+                displayAnalytics(currentAnalytics);
+                break;
+            case 'localeChanged':
+                if (currentAnalytics) {
+                    displayAnalytics(currentAnalytics);
+                }
                 break;
             case 'error':
                 const root = document.getElementById('analytics-root');

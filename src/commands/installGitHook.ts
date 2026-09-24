@@ -2,61 +2,60 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { GitHookManager } from '../utils/gitHookManager';
-import { GitUtils } from '../utils/gitUtils';
-import { WorkspaceManager } from '../providers/workspaceManager';
 import { GitCommitHookConfig } from '../types/environment';
+import { WorkspaceManager } from '../providers/workspaceManager';
+import { showActionStart, showSyncToast } from '../utils/panelNotification';
+import { t } from '../i18n';
 
 interface GitHookFileConfig {
-    gitCommitHook?: GitCommitHookConfig;
+	gitCommitHook?: GitCommitHookConfig;
 }
 
 export class InstallGitHookCommand implements vscode.Disposable {
-	public async execute(): Promise<void> {
-		const workspaceManager = WorkspaceManager.getInstance();
-		const allWorkspaces = workspaceManager.getAllWorkspaces();
+	public async execute(preferredWorkspacePath?: string): Promise<void> {
+		showActionStart(t('gitHook.install.actionStart'));
 
-		if (allWorkspaces.length === 0) {
-			vscode.window.showErrorMessage('No workspace folder open.');
+		const workspacePath = await WorkspaceManager.resolveWorkspacePath(
+			preferredWorkspacePath,
+			t('common.selectWorkspace')
+		);
+
+		if (!workspacePath) {
+			showSyncToast(t('gitHook.install.cancelledNoWorkspace'), 'info');
 			return;
 		}
 
-		// If multiple workspaces, let user choose which one
-		let selectedWorkspace;
-		if (allWorkspaces.length === 1) {
-			selectedWorkspace = allWorkspaces[0];
-		} else {
-			const workspaceItems = workspaceManager.getWorkspaceQuickPickItems();
-			const selectedItem = await vscode.window.showQuickPick(workspaceItems, {
-				placeHolder: 'Select workspace to install Git hook in'
-			});
-
-			if (!selectedItem) return;
-
-			selectedWorkspace = allWorkspaces.find(
-				ws => ws.workspace.name === selectedItem.label && ws.workspace.uri.fsPath === selectedItem.description
-			);
-		}
-
-		if (!selectedWorkspace) return;
-
-		const workspace = selectedWorkspace.workspace;
-		const workspacePath = workspace.uri.fsPath;
-
-		// Check if it's a Git repository
-		if (!await GitUtils.isGitRepository(workspacePath)) {
-			vscode.window.showErrorMessage('This workspace is not a Git repository.');
+		const gitRoot = GitHookManager.resolveGitRoot(workspacePath);
+		if (!gitRoot) {
+			showSyncToast(t('common.notGitRepo'), 'error');
 			return;
 		}
 
-		// Check if hook is already installed
+		const cancelLabel = t('common.cancel');
 		if (GitHookManager.isHookInstalled(workspacePath)) {
+			const yesLabel = t('common.yes');
 			const overwrite = await vscode.window.showWarningMessage(
-				'Git hook is already installed. Overwrite?',
-				'Yes',
-				'Cancel'
+				t('gitHook.install.alreadyInstalled'),
+				{ modal: true },
+				yesLabel,
+				cancelLabel
 			);
 
-			if (overwrite !== 'Yes') {
+			if (overwrite !== yesLabel) {
+				showSyncToast(t('gitHook.install.cancelled'), 'info');
+				return;
+			}
+		} else if (GitHookManager.hasPreCommitHook(workspacePath)) {
+			const overwriteLabel = t('common.overwrite');
+			const overwrite = await vscode.window.showWarningMessage(
+				t('gitHook.install.existingHook'),
+				{ modal: true },
+				overwriteLabel,
+				cancelLabel
+			);
+
+			if (overwrite !== overwriteLabel) {
+				showSyncToast(t('gitHook.install.cancelled'), 'info');
 				return;
 			}
 		}
@@ -64,7 +63,6 @@ export class InstallGitHookCommand implements vscode.Disposable {
 		try {
 			await GitHookManager.installHook(workspacePath);
 
-			// Auto-configure the gitCommitHook settings in .dotenvy.json
 			const configPath = path.join(workspacePath, '.dotenvyGit.json');
 			let config: GitHookFileConfig = {};
 			try {
@@ -72,29 +70,28 @@ export class InstallGitHookCommand implements vscode.Disposable {
 					const content = fs.readFileSync(configPath, 'utf8');
 					config = JSON.parse(content);
 				}
-			} catch (error) {
-				// If error reading, proceed with empty config
+			} catch {
+				// proceed with empty config
 			}
 
 			if (!config.gitCommitHook) {
 				config.gitCommitHook = {
-					"blockEnvFiles": true,
-					"blockSecrets": true,
-					"blockValidationErrors": true,
-					"customMessage": "Commit blocked due to security concerns"
+					blockEnvFiles: true,
+					blockSecrets: true,
+					blockValidationErrors: true,
+					customMessage: 'Commit blocked due to security concerns'
 				};
 				fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 			}
 
-			// Auto-add config files to .gitignore
 			const gitignorePath = path.join(workspacePath, '.gitignore');
 			let gitignoreContent = '';
 			try {
 				if (fs.existsSync(gitignorePath)) {
 					gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
 				}
-			} catch (error) {
-				// Ignore
+			} catch {
+				// ignore
 			}
 
 			const ignoreEntries = ['.dotenvy.json', '.dotenvyGit.json'];
@@ -110,16 +107,12 @@ export class InstallGitHookCommand implements vscode.Disposable {
 				fs.writeFileSync(gitignorePath, gitignoreContent);
 			}
 
-			// Show information about what the hook does
-			vscode.window.showInformationMessage(
-				'Git commit hook installed! It will scan staged files for:\n\n' +
-				'• .env files (blocks by default)\n' +
-				'• Secrets in any file (API keys, passwords, etc.)\n' +
-				'• Environment validation errors'
+			showSyncToast(
+				t('gitHook.install.success'),
+				'success'
 			);
-
 		} catch (error) {
-			vscode.window.showErrorMessage(`Failed to install Git hook: ${(error as Error).message}`);
+			showSyncToast(t('gitHook.install.failed', { message: (error as Error).message }), 'error');
 		}
 	}
 

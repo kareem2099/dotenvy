@@ -5,6 +5,15 @@
     const countEl = document.getElementById('trash-count');
     const clearBtn = document.getElementById('clear-all-btn');
 
+    let currentEntries = [];
+
+    function tr(key, params, fallback) {
+        if (window.dotenvyI18n && typeof window.dotenvyI18n.tr === 'function') {
+            return window.dotenvyI18n.tr(key, params, fallback);
+        }
+        return fallback !== undefined ? fallback : key;
+    }
+
     if (clearBtn) clearBtn.addEventListener('click', () => {
         vscode.postMessage({ type: 'clearAll' });
     });
@@ -13,7 +22,12 @@
 
     window.addEventListener('message', event => {
         const msg = event.data;
-        if (msg.type === 'refresh') renderEntries(msg.entries);
+        if (msg.type === 'refresh') {
+            currentEntries = msg.entries || [];
+            renderEntries(currentEntries);
+        } else if (msg.type === 'localeChanged') {
+            renderEntries(currentEntries);
+        }
     });
 
     function renderEntries(entries) {
@@ -22,13 +36,13 @@
         if (countEl) countEl.textContent = entries.length;
 
         if (!entries || entries.length === 0) {
-            listEl.innerHTML = '<div class="trash-empty">🎉 Nothing in the bin — your variables are safe!</div>';
+            listEl.innerHTML = `<div class="trash-empty" data-i18n="trash.empty">${tr('trash.empty', {}, '🎉 Nothing in the bin — your variables are safe!')}</div>`;
             return;
         }
 
         listEl.innerHTML = entries.map(e => {
             const valueHtml = e.type === 'deleted'
-                ? `<span class="trash-old-val">${escHtml(maskValue(e.oldValue))}</span> <span style="font-size:0.72rem;opacity:0.5;">(deleted)</span>`
+                ? `<span class="trash-old-val">${escHtml(maskValue(e.oldValue))}</span> <span style="font-size:0.72rem;opacity:0.5;">${tr('trash.deleted', {}, '(deleted)')}</span>`
                 : `<span class="trash-old-val">${escHtml(maskValue(e.oldValue))}</span>
                    <span class="trash-arrow">→</span>
                    <span class="trash-new-val">${escHtml(maskValue(e.newValue || ''))}</span>`;
@@ -41,7 +55,7 @@
                     <span class="trash-value-row">${valueHtml}</span>
                     <span class="trash-meta">${e.environmentFile} · ${formatAgo(e.timestamp)}</span>
                 </div>
-                <button class="btn-restore" data-id="${e.id}">↩ Restore</button>
+                <button class="btn-restore" data-id="${e.id}">${tr('trash.restore', {}, '↩ Restore')}</button>
             </div>`;
         }).join('');
 
@@ -54,7 +68,7 @@
     }
 
     function maskValue(val) {
-        if (!val) return '(empty)';
+        if (!val) return tr('trash.emptyValue', {}, '(empty)');
         // Mask secrets — if it looks like a token/password, show only first 4 chars
         if (val.length > 12 && /[A-Z0-9]{8,}/i.test(val)) {
             return val.slice(0, 4) + '••••••••';
@@ -65,10 +79,11 @@
     function formatAgo(timestamp) {
         const diff = Date.now() - new Date(timestamp).getTime();
         const s = Math.floor(diff / 1000);
-        if (s < 60) return `${s}s ago`;
+        if (s < 60) return tr('trash.agoSec', { s }, `${s}s ago`);
         const m = Math.floor(s / 60);
-        if (m < 60) return `${m}m ago`;
-        return `${Math.floor(m / 60)}h ago`;
+        if (m < 60) return tr('trash.agoMin', { m }, `${m}m ago`);
+        const h = Math.floor(m / 60);
+        return tr('trash.agoHour', { h }, `${h}h ago`);
     }
 
     function escHtml(str) {

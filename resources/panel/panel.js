@@ -71,12 +71,171 @@ const buttonEffects = {
 };
 
 // ============================
-// 2. MAIN DASHBOARD LOGIC
+// 2. I18N
+// ============================
+
+let currentStrings = {};
+let currentLocale = 'en';
+
+function tr(key, params = {}) {
+    let text = currentStrings[key] || key;
+    for (const [k, v] of Object.entries(params)) {
+        text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+    }
+    return text;
+}
+
+function applyTranslations() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (key) {
+            el.textContent = tr(key);
+        }
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        if (key) {
+            el.title = tr(key);
+        }
+    });
+    syncLocaleDropdown();
+}
+
+function syncLocaleDropdown() {
+    const menu = document.getElementById('locale-dropdown-menu');
+    const valueEl = document.getElementById('locale-dropdown-value');
+    if (!menu || !valueEl || !currentLocale) {
+        return;
+    }
+
+    menu.querySelectorAll('.locale-dropdown-option').forEach((opt) => {
+        const isSelected = opt.dataset.locale === currentLocale;
+        opt.classList.toggle('is-selected', isSelected);
+        opt.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+    });
+
+    const selectedOpt = menu.querySelector(`[data-locale="${currentLocale}"]`);
+    if (selectedOpt) {
+        const key = selectedOpt.getAttribute('data-i18n');
+        valueEl.textContent = key ? tr(key) : selectedOpt.textContent;
+    }
+}
+
+let localeDropdownScrollHandler = null;
+
+function positionLocaleDropdownMenu() {
+    const trigger = document.getElementById('locale-dropdown-trigger');
+    const menu = document.getElementById('locale-dropdown-menu');
+    if (!trigger || !menu) {
+        return;
+    }
+    const rect = trigger.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.style.left = `${rect.left}px`;
+    menu.style.width = `${rect.width}px`;
+}
+
+function closeLocaleDropdown() {
+    const dropdown = document.getElementById('locale-dropdown');
+    const trigger = document.getElementById('locale-dropdown-trigger');
+    const menu = document.getElementById('locale-dropdown-menu');
+    if (!dropdown || !trigger || !menu) {
+        return;
+    }
+    dropdown.classList.remove('is-open');
+    trigger.setAttribute('aria-expanded', 'false');
+    menu.hidden = true;
+    if (localeDropdownScrollHandler) {
+        window.removeEventListener('scroll', localeDropdownScrollHandler, true);
+        window.removeEventListener('resize', localeDropdownScrollHandler);
+        localeDropdownScrollHandler = null;
+    }
+}
+
+function openLocaleDropdown() {
+    const dropdown = document.getElementById('locale-dropdown');
+    const trigger = document.getElementById('locale-dropdown-trigger');
+    const menu = document.getElementById('locale-dropdown-menu');
+    if (!dropdown || !trigger || !menu) {
+        return;
+    }
+    dropdown.classList.add('is-open');
+    trigger.setAttribute('aria-expanded', 'true');
+    menu.hidden = false;
+    positionLocaleDropdownMenu();
+    localeDropdownScrollHandler = () => closeLocaleDropdown();
+    window.addEventListener('scroll', localeDropdownScrollHandler, true);
+    window.addEventListener('resize', localeDropdownScrollHandler);
+}
+
+function toggleLocaleDropdown() {
+    const dropdown = document.getElementById('locale-dropdown');
+    if (!dropdown) {
+        return;
+    }
+    if (dropdown.classList.contains('is-open')) {
+        closeLocaleDropdown();
+    } else {
+        openLocaleDropdown();
+    }
+}
+
+function initLocaleDropdown() {
+    const dropdown = document.getElementById('locale-dropdown');
+    const trigger = document.getElementById('locale-dropdown-trigger');
+    const menu = document.getElementById('locale-dropdown-menu');
+    if (!dropdown || !trigger || !menu) {
+        return;
+    }
+
+    trigger.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleLocaleDropdown();
+    });
+
+    menu.querySelectorAll('.locale-dropdown-option').forEach((opt) => {
+        opt.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const locale = opt.dataset.locale;
+            if (locale && locale !== currentLocale) {
+                setLocale(locale);
+            }
+            closeLocaleDropdown();
+        });
+    });
+
+    menu.addEventListener('click', (event) => {
+        event.stopPropagation();
+    });
+
+    document.addEventListener('click', () => closeLocaleDropdown());
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            closeLocaleDropdown();
+        }
+    });
+}
+
+function setLocale(value) {
+    vscode.postMessage({ type: 'setLocale', locale: value });
+}
+window.setLocale = setLocale;
+
+// ============================
+// 3. MAIN DASHBOARD LOGIC
 // ============================
 
 function updateDashboard(data) {
+    if (data.strings) {
+        currentStrings = data.strings;
+    }
+    if (data.locale) {
+        currentLocale = data.locale;
+    }
+    applyTranslations();
     console.log('📊 Updating dashboard...', data);
 
+    updateSetupSection(data);
     updateCloudCard(data);
     updateGitHookCard(data);
     updateValidationCard(data);
@@ -93,21 +252,64 @@ function updateDashboard(data) {
     }, 50);
 }
 
+function updateSetupSection(data) {
+    const section = document.getElementById('setup-section');
+    const title = document.getElementById('setup-title');
+    const description = document.getElementById('setup-description');
+    const actions = document.getElementById('setup-actions');
+    const dashboard = document.getElementById('dashboard');
+    const header = document.querySelector('.header');
+
+    if (!section || !title || !description || !actions) {
+        return;
+    }
+
+    if (data.secureProjectInitialized) {
+        section.hidden = true;
+        if (dashboard) dashboard.hidden = false;
+        if (header) header.hidden = false;
+        return;
+    }
+
+    section.hidden = false;
+    if (dashboard) dashboard.hidden = true;
+    if (header) header.hidden = true;
+
+    if (!data.hasWorkspace) {
+        title.textContent = tr('panel.setup.welcome');
+        description.textContent = tr('panel.setup.openWorkspaceDesc');
+        actions.innerHTML = `<button class="btn btn-primary btn-sm" onclick="openWorkspace()">${tr('panel.setup.openWorkspace')}</button>`;
+        return;
+    }
+
+    title.textContent = tr('panel.setup.initTitle');
+    description.textContent = tr('panel.setup.initDesc');
+    actions.innerHTML = `
+        <button class="btn btn-primary btn-sm" onclick="initSecureProject()">${tr('panel.setup.initSecure')}</button>
+        <button class="btn btn-secondary btn-sm" onclick="initDotenvyIgnore()">${tr('panel.setup.initIgnore')}</button>
+    `;
+}
+
 function updateCloudCard(data) {
     const el = document.getElementById('cloud-status');
     const syncEl = document.getElementById('last-sync');
     if (el && syncEl) {
         const connected = data.cloudSync?.connected || false;
-        el.innerHTML = `<span class="status-indicator ${connected ? 'status-connected' : 'status-disconnected'}">${connected ? 'Connected' : 'Not Connected'}</span>`;
-        syncEl.innerHTML = `<span class="sync-time">Last: ${data.cloudSync?.lastSync ? formatTimeDiff(data.cloudSync.lastSync) : 'Never'}</span>`;
+        el.className = `status-indicator ${connected ? 'status-connected' : 'status-disconnected'}`;
+        el.textContent = connected ? tr('panel.cloud.connected') : tr('panel.cloud.notConnected');
+        syncEl.textContent = tr('panel.cloud.last', {
+            time: data.cloudSync?.lastSync ? formatTimeDiff(data.cloudSync.lastSync) : tr('panel.cloud.never')
+        });
     }
 }
 
 function updateGitHookCard(data) {
     const el = document.getElementById('hook-status');
     if (el) {
-        const installed = data.gitHook?.installed || false;
-        el.innerHTML = `<span class="status-indicator ${installed ? 'status-active' : 'status-warning'}">${installed ? 'Installed' : 'Not Installed'}</span>`;
+        const hookStatus = data.gitHook || data.gitHookStatus || {};
+        const installed = hookStatus.installed || false;
+        el.className = `status-indicator ${installed ? 'status-active' : 'status-warning'}`;
+        el.textContent = installed ? tr('panel.git.installed') : tr('panel.git.notInstalled');
     }
 }
 
@@ -117,14 +319,16 @@ function updateValidationCard(data) {
     if (statusEl && errorsEl) {
         const valid = data.validation?.valid ?? true;
         const errors = data.validation?.errors || 0;
-        statusEl.innerHTML = `<span class="status-indicator ${valid ? 'status-valid' : 'status-invalid'}">${valid ? 'Valid' : 'Invalid'}</span>`;
-        errorsEl.innerHTML = errors > 0 ? `<span class="error-count">${errors} errors</span>` : '';
+        statusEl.className = `status-indicator ${valid ? 'status-valid' : 'status-invalid'}`;
+        statusEl.textContent = valid ? tr('panel.validation.valid') : tr('panel.validation.invalid');
+        errorsEl.innerHTML = errors > 0 ? `<span class="error-count">${tr('panel.validation.errors', { count: errors })}</span>` : '';
         errorsEl.style.display = errors > 0 ? 'block' : 'none';
     }
 }
 
 function updateBackupSettings(data) {
-    setText('backup-path-display', data.backupSettings?.path?.trim() || '~/.dotenvy-backups/default');
+    const displayPath = data.backupSettings?.path?.trim() || tr('panel.backup.defaultPath');
+    setText('backup-path-display', displayPath);
     const checkbox = document.getElementById('encrypt-backups-checkbox');
     if (checkbox) checkbox.checked = data.backupSettings?.encrypt || false;
 }
@@ -142,12 +346,12 @@ function updateEnvironmentsGrid(data) {
     const container = document.getElementById('environments-list');
 
     if (!data.hasWorkspace) {
-        container.innerHTML = `<div class="welcome-message"><h3>Welcome to DotEnvy!</h3><p>Open a workspace to get started.</p><button class="btn btn-primary" data-action="openWorkspace">Open Workspace</button></div>`;
+        container.innerHTML = `<div class="welcome-message"><h3>${tr('panel.environments.welcome')}</h3><p>${tr('panel.environments.welcomeDesc')}</p><button class="btn btn-primary" onclick="openWorkspace()">${tr('panel.setup.openWorkspace')}</button></div>`;
         return;
     }
 
     if (!data.environments || data.environments.length === 0) {
-        container.innerHTML = `<div class="welcome-message"><p>No .env files found.</p><button class="btn btn-primary" data-action="createEnvFile">Create New</button></div>`;
+        container.innerHTML = `<div class="welcome-message"><p>${tr('panel.environments.noFiles')}</p><button class="btn btn-primary" onclick="createEnvFile()">${tr('panel.environments.createNew')}</button></div>`;
         return;
     }
 
@@ -161,12 +365,12 @@ function updateEnvironmentsGrid(data) {
                     <span class="env-card-icon">${env.isActive ? '🔵' : '⚪'}</span>
                     <h4 class="env-name">${env.name}</h4>
                 </div>
-                <div class="env-card-stats"><span>${env.variableCount || 0} vars</span><span>${formatFileSize(env.fileSize || 0)}</span></div>
+                <div class="env-card-stats"><span>${tr('panel.environments.vars', { count: env.variableCount || 0 })}</span><span>${formatFileSize(env.fileSize || 0)}</span></div>
             </div>
             <div class="env-card-actions">
-                <button class="btn btn-primary btn-sm" data-action="switchTo" data-env="${env.name}">Switch</button>
-                <button class="btn btn-secondary btn-sm" data-action="diffWithCurrent" data-env="${env.name}">Compare</button>
-                <button class="btn-secondary btn-sm" data-action="openVariableManager" data-env="${env.fileName}">Edit</button>
+                <button class="btn btn-primary btn-sm" onclick="switchTo('${env.name}')">${tr('panel.environments.switch')}</button>
+                <button class="btn btn-secondary btn-sm" onclick="diffWithCurrent('${env.name}')">${tr('panel.environments.compare')}</button>
+                <button class="btn-secondary btn-sm" onclick="openVariableManager('${env.fileName}')">${tr('panel.environments.edit')}</button>
             </div>
         `;
         container.appendChild(card);
@@ -211,6 +415,9 @@ const actions = {
     chooseBackupLocation: () => vscode.postMessage({ type: 'chooseBackupLocation' }),
     restoreFromBackup: () => vscode.postMessage({ type: 'restoreFromBackup' }),
     openWorkspace: () => vscode.postMessage({ type: 'openWorkspace' }),
+    initSecureProject: () => vscode.postMessage({ type: 'initSecureProject' }),
+    initDotenvyIgnore: () => vscode.postMessage({ type: 'initDotenvyIgnore' }),
+    openDopplerDashboard: () => vscode.postMessage({ type: 'openDopplerDashboard' }),
     openHistoryPanel: () => vscode.postMessage({ type: 'openHistoryPanel' }),
     openAnalyticsPanel: () => vscode.postMessage({ type: 'openAnalyticsPanel' }),
     openTrashBin: () => vscode.postMessage({ type: 'openTrashBin' }),
@@ -224,7 +431,7 @@ function formatTimeDiff(date) {
     const diff = Date.now() - new Date(date).getTime();
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
-    return hours > 0 ? `${hours}h ago` : (minutes > 0 ? `${minutes}m ago` : 'Just now');
+    return hours > 0 ? tr('panel.time.hoursAgo', { hours }) : (minutes > 0 ? tr('panel.time.minutesAgo', { minutes }) : tr('panel.time.justNow'));
 }
 
 function formatFileSize(bytes) {
@@ -237,9 +444,12 @@ const showNotification = (msg, type = 'info') => {
     const note = document.createElement('div');
     note.className = `notification ${type}`;
     note.textContent = msg;
-    note.style.cssText = `position:fixed; bottom:20px; right:20px; padding:10px 20px; background:var(--vscode-notifications-background); color:var(--vscode-notifications-foreground); border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.2); z-index:1000; animation:slideIn 0.3s ease;`;
     document.body.appendChild(note);
-    setTimeout(() => { note.style.opacity = '0'; setTimeout(() => note.remove(), 300); }, 3000);
+    setTimeout(() => {
+        note.style.opacity = '0';
+        note.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => note.remove(), 300);
+    }, 4000);
 };
 
 // ============================
@@ -253,7 +463,7 @@ window.addEventListener('message', event => {
             updateDashboard(message);
             break;
         case 'scanComplete':
-            showNotification('Secret scan completed!', 'success');
+            showNotification(message.message ?? 'Scansione secret completata!', message.notificationType ?? 'success');
             break;
         case 'showNotification':
             showNotification(message.message, message.notificationType);
@@ -268,6 +478,7 @@ window.addEventListener('message', event => {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 DotEnvy UI Initialized');
     addAnimationStyles();
+    initLocaleDropdown();
 
     document.querySelectorAll('.btn').forEach(btn => {
         btn.addEventListener('click', buttonEffects.addRipple);
@@ -277,29 +488,4 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         vscode.postMessage({ type: 'refresh' });
     }, 100);
-});
-
-// ── Delegated action handler (replaces all inline onclick in HTML/dynamic HTML) ──
-document.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-action]');
-    if (!btn) { return; }
-    const action = btn.getAttribute('data-action');
-    const env    = btn.getAttribute('data-env');
-    switch (action) {
-        case 'openHistoryPanel':    actions.openHistoryPanel();           break;
-        case 'openAnalyticsPanel':  actions.openAnalyticsPanel();         break;
-        case 'openTrashBin':        actions.openTrashBin();               break;
-        case 'scanSecrets':         actions.scanSecrets();                break;
-        case 'pullFromCloud':       actions.pullFromCloud();              break;
-        case 'pushToCloud':         actions.pushToCloud();                break;
-        case 'manageGitHook':       actions.manageGitHook();              break;
-        case 'validateEnvironments':actions.validateEnvironments();       break;
-        case 'installHook':         actions.installHook();                break;
-        case 'removeHook':          actions.removeHook();                 break;
-        case 'createEnvFile':       actions.createEnvFile();              break;
-        case 'openWorkspace':       actions.openWorkspace();              break;
-        case 'switchTo':            if (env) { actions.switchTo(env); }           break;
-        case 'diffWithCurrent':     if (env) { actions.diffWithCurrent(env); }    break;
-        case 'openVariableManager': if (env) { actions.openVariableManager(env); } break;
-    }
 });

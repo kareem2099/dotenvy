@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { EnvironmentProvider } from './environmentProvider';
 import { StatusBarProvider } from './statusBarProvider';
 import { GitBranchWatcher } from './gitBranchWatcher';
-import { EnvironmentTreeProvider } from './environmentTreeProvider';
 import { logger } from '../utils/logger';
 
 export interface WorkspaceContext {
@@ -10,7 +9,6 @@ export interface WorkspaceContext {
 	environmentProvider: EnvironmentProvider;
 	statusBarProvider: StatusBarProvider;
 	gitBranchWatcher: GitBranchWatcher | null;
-	treeProvider: EnvironmentTreeProvider;
 	workspaceDisposables?: vscode.Disposable[];
 }
 
@@ -57,7 +55,6 @@ export class WorkspaceManager {
 		// Create providers for this workspace
 		const environmentProvider = new EnvironmentProvider(workspacePath);
 		const statusBarProvider = new StatusBarProvider();
-		const treeProvider = new EnvironmentTreeProvider(workspacePath);
 
 		// Initialize status bar
 		statusBarProvider.setWorkspace(workspacePath);
@@ -88,13 +85,10 @@ export class WorkspaceManager {
 			environmentProvider,
 			statusBarProvider,
 			gitBranchWatcher,
-			treeProvider,
 			workspaceDisposables
 		};
 
 		this.workspaces.set(workspacePath, context);
-
-		// Note: Tree providers are registered in package.json and work for the active workspace
 	}
 
 	/**
@@ -174,5 +168,39 @@ export class WorkspaceManager {
 			description: context.workspace.uri.fsPath,
 			detail: `${context.workspace.name} workspace`
 		}));
+	}
+
+	/**
+	 * Resolve workspace path for extension commands.
+	 * Falls back to VS Code workspace folders when the manager is empty.
+	 */
+	static async resolveWorkspacePath(preferredPath?: string, placeHolder = 'Select workspace'): Promise<string | null> {
+		if (preferredPath) {
+			return preferredPath;
+		}
+
+		const workspaceManager = WorkspaceManager.getInstance();
+		const allWorkspaces = workspaceManager.getAllWorkspaces();
+
+		if (allWorkspaces.length === 1) {
+			return allWorkspaces[0].workspace.uri.fsPath;
+		}
+
+		if (allWorkspaces.length > 1) {
+			const workspaceItems = workspaceManager.getWorkspaceQuickPickItems();
+			const selectedItem = await vscode.window.showQuickPick(workspaceItems, { placeHolder });
+
+			if (!selectedItem) {
+				return null;
+			}
+
+			const selectedWorkspace = allWorkspaces.find(
+				ws => ws.workspace.name === selectedItem.label && ws.workspace.uri.fsPath === selectedItem.description
+			);
+
+			return selectedWorkspace?.workspace.uri.fsPath ?? null;
+		}
+
+		return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
 	}
 }

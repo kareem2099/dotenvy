@@ -3,21 +3,28 @@ import * as path from 'path';
 import { UserManager } from '../utils/userManager';
 import { UserCredentials } from '../types/user';
 import { MIN_PASSWORD_LENGTH } from '../constants';
+import { ConfigUtils } from '../utils/configUtils';
 import { logger } from '../utils/logger';
+import { showActionStart, showSyncToast } from '../utils/panelNotification';
+import { t } from '../i18n';
 
 export class InitSecureProjectCommand implements vscode.Disposable {
 
     public async execute(): Promise<void> {
+        showActionStart(t('initSecure.actionStart'));
+
         try {
             // Check if already initialized
             if (await UserManager.isSecureProjectInitialized()) {
+                const reinitLabel = t('initSecure.reinitConfirm');
                 const choice = await vscode.window.showWarningMessage(
-                    '⚠️ Project is already initialized. Re-initializing will DELETE all existing keys and users! Continue?',
+                    t('initSecure.reinitWarning'),
                     { modal: true },
-                    'Yes, Delete & Re-init'
+                    reinitLabel
                 );
 
-                if (choice !== 'Yes, Delete & Re-init') {
+                if (choice !== reinitLabel) {
+                    showSyncToast(t('initSecure.cancelled'), 'info');
                     return;
                 }
 
@@ -35,21 +42,21 @@ export class InitSecureProjectCommand implements vscode.Disposable {
 
             // Get project name
             const projectName = await vscode.window.showInputBox({
-                prompt: 'Enter project name (optional)',
-                placeHolder: 'My Secure Project',
+                prompt: t('initSecure.projectNamePrompt'),
+                placeHolder: t('initSecure.projectNamePlaceholder'),
                 value: vscode.workspace.workspaceFolders?.[0]?.name || 'Project'
             });
 
             // Get admin username
             const adminUsername = await vscode.window.showInputBox({
-                prompt: 'Enter your username (admin)',
-                placeHolder: 'your_username',
+                prompt: t('initSecure.usernamePrompt'),
+                placeHolder: t('initSecure.usernamePlaceholder'),
                 validateInput: (value) => {
                     if (!value || value.trim().length < 3) {
-                        return 'Username must be at least 3 characters long';
+                        return t('initSecure.usernameMinLength');
                     }
                     if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
-                        return 'Username can only contain letters, numbers, hyphens, and underscores';
+                        return t('initSecure.usernameChars');
                     }
                     return null;
                 }
@@ -61,12 +68,12 @@ export class InitSecureProjectCommand implements vscode.Disposable {
 
             // Get admin password
             const adminPassword = await vscode.window.showInputBox({
-                prompt: 'Enter your password for project encryption',
+                prompt: t('initSecure.passwordPrompt'),
                 password: true,
-                placeHolder: 'Strong password for project access',
+                placeHolder: t('initSecure.passwordPlaceholder'),
                 validateInput: (value) => {
                     if (!value || value.length < MIN_PASSWORD_LENGTH) {
-                        return `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`;
+                        return t('initSecure.passwordMinLength', { min: MIN_PASSWORD_LENGTH });
                     }
                     return null;
                 }
@@ -78,12 +85,12 @@ export class InitSecureProjectCommand implements vscode.Disposable {
 
             // Confirm password
             const confirmPassword = await vscode.window.showInputBox({
-                prompt: 'Confirm your password',
+                prompt: t('initSecure.confirmPasswordPrompt'),
                 password: true,
-                placeHolder: 'Re-enter password',
+                placeHolder: t('initSecure.confirmPasswordPlaceholder'),
                 validateInput: (value) => {
                     if (value !== adminPassword) {
-                        return 'Passwords do not match';
+                        return t('initSecure.passwordMismatch');
                     }
                     return null;
                 }
@@ -93,13 +100,15 @@ export class InitSecureProjectCommand implements vscode.Disposable {
                 return; // User cancelled
             }
 
+            let workspacePath: string | undefined;
+
             // Show progress
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Initializing Secure Project',
+                title: t('initSecure.progress.title'),
                 cancellable: false
             }, async (progress) => {
-                progress.report({ message: 'Generating encryption keys...' });
+                progress.report({ message: t('initSecure.progress.generating') });
 
                 const adminCredentials: UserCredentials = {
                     username: adminUsername.trim(),
@@ -109,15 +118,24 @@ export class InitSecureProjectCommand implements vscode.Disposable {
                 const result = await UserManager.initializeSecureProject(adminCredentials, projectName?.trim());
 
                 if (result.success) {
-                    vscode.window.showInformationMessage(result.message);
-                    progress.report({ message: 'Secure project initialized successfully!' });
+                    workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                    if (workspacePath) {
+                        await ConfigUtils.ensureWorkspaceConfigFile(workspacePath, undefined, false);
+                    }
+
+                    showSyncToast(result.message, 'success');
+                    progress.report({ message: t('initSecure.progress.done') });
                 } else {
-                    vscode.window.showErrorMessage(`Failed to initialize project: ${result.message}`);
+                    showSyncToast(t('initSecure.failed', { message: result.message }), 'error');
                 }
             });
 
+            if (workspacePath) {
+                await ConfigUtils.openWorkspaceConfigEditor(workspacePath);
+            }
+
         } catch (error) {
-            vscode.window.showErrorMessage(`Error initializing secure project: ${(error as Error).message}`);
+            showSyncToast(t('initSecure.error', { message: (error as Error).message }), 'error');
         }
     }
 

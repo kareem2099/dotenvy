@@ -1,301 +1,258 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as path from 'path';
 import { WorkspaceManager } from '../providers/workspaceManager';
 import { ConfigUtils } from '../utils/configUtils';
 import { DopplerSyncManager } from '../utils/dopplerSyncManager';
 import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { FileUtils } from '../utils/fileUtils';
+import { EnvSyncUtils } from '../utils/envSyncUtils';
 import { extensionContext } from '../extension';
 import { EncryptedCloudSyncManager } from '../utils/encryptedCloudSyncManager';
+import { showActionStart, showSyncToast } from '../utils/panelNotification';
+import { t } from '../i18n';
 
 export class PushToCloudCommand implements vscode.Disposable {
-	public async execute(): Promise<void> {
-		const workspaceManager = WorkspaceManager.getInstance();
-		const allWorkspaces = workspaceManager.getAllWorkspaces();
+	public async execute(preferredWorkspacePath?: string): Promise<void> {
+		showActionStart(t('push.actionStart'));
 
-		if (allWorkspaces.length === 0) {
-			vscode.window.showErrorMessage('No workspace folder open.');
+		await vscode.window.withProgress(
+			{
+				location: vscode.ProgressLocation.Notification,
+				title: t('push.progress.title'),
+				cancellable: false
+			},
+			async progress => this.runPush(preferredWorkspacePath, progress)
+		);
+	}
+
+	private async runPush(
+		preferredWorkspacePath: string | undefined,
+		progress: vscode.Progress<{ message?: string }>
+	): Promise<void> {
+		const rootPath = await WorkspaceManager.resolveWorkspacePath(
+			preferredWorkspacePath,
+			t('common.selectWorkspace')
+		);
+
+		if (!rootPath) {
+			showSyncToast(t('push.cancelledNoWorkspace'), 'info');
 			return;
 		}
 
-		// If multiple workspaces, let user choose which one
-		let selectedWorkspace;
-		if (allWorkspaces.length === 1) {
-			selectedWorkspace = allWorkspaces[0];
-		} else {
-			const workspaceItems = workspaceManager.getWorkspaceQuickPickItems();
-			const selectedItem = await vscode.window.showQuickPick(workspaceItems, {
-				placeHolder: 'Select workspace to sync to cloud'
-			});
+		progress.report({ message: 'Lettura configurazione...' });
+		const config = await ConfigUtils.readQuickEnvConfig(rootPath);
 
-			if (!selectedItem) return;
-
-			selectedWorkspace = allWorkspaces.find(
-				ws => ws.workspace.name === selectedItem.label && ws.workspace.uri.fsPath === selectedItem.description
-			);
-		}
-
-		if (!selectedWorkspace) return;
-
-		const workspace = selectedWorkspace.workspace;
-		const rootPath = workspace.uri.fsPath;
-		const configPath = path.join(rootPath, '.dotenvy.json');
-
-		// Check if cloud sync is configured
-		const config = await ConfigUtils.readQuickEnvConfig();
 		if (!config?.cloudSync || !config.cloudSync.project || !config.cloudSync.config || !config.cloudSync.token) {
-			// Create basic configuration file automatically
-			const basicConfig = {
-				environments: {},
-				cloudSync: {
-					provider: 'doppler' as const,
-					project: '',
-					config: 'development',
-					token: ''
-				}
-			};
-
-			// Use FileUtils.backupEnvFile as a pattern for safe file handling (backup config if it exists)
-			if (fs.existsSync(configPath)) {
-				const backupPath = `${configPath}.backup`;
-				await fs.promises.copyFile(configPath, backupPath);
-			}
-
-			// Write config file safely
-			const configJson = JSON.stringify(basicConfig, null, 2);
-			await fs.promises.writeFile(configPath, configJson, 'utf8');
-
-			// Auto-add to gitignore
-			const gitignorePath = path.join(rootPath, '.gitignore');
-			let gitignoreContent = '';
-			try {
-				if (fs.existsSync(gitignorePath)) {
-					gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
-				}
-			} catch (error) {
-				// Ignore
-			}
-
-			if (!gitignoreContent.includes('.dotenvy.json')) {
-				gitignoreContent += '\n.dotenvy.json';
-				fs.writeFileSync(gitignorePath, gitignoreContent);
-			}
-
-			// Store in VSCode storage too
-			await ConfigUtils.saveQuickEnvConfig(basicConfig);
-
-			// Open the file for user to edit
-			const doc = await vscode.workspace.openTextDocument(configPath);
-			await vscode.window.showTextDocument(doc);
-
-			vscode.window.showInformationMessage(
-				'Configuration file created! Fill in your project details and token, then save and try again.'
+			await ConfigUtils.ensureWorkspaceConfigFile(rootPath, undefined, true);
+			showSyncToast(
+				t('push.configCreated'),
+				'warning'
 			);
-
 			return;
 		}
 
 		try {
-			const syncConfig = config.cloudSync;
+			let syncConfig = config.cloudSync;
 			if (!syncConfig) {
-				vscode.window.showErrorMessage('Cloud sync is not configured in .dotenvy.json.');
+				showSyncToast(t('push.cloudSyncNotConfigured'), 'error');
+				return;
 			}
-			let cloudManager: CloudSyncManager | undefined;
 
-			// Check if encrypted cloud sync is enabled (default: enabled)
+			let cloudManager: CloudSyncManager;
 			const enableEncryption = !(syncConfig.encryptCloudSync === false);
 
-			if (enableEncryption) {
-				try {
-					// Use the global extension context from the activated extension
-					cloudManager = await EncryptedCloudSyncManager.createEncryptedManager(syncConfig, extensionContext, true);
-					vscode.window.showInformationMessage('🔐 Encrypted cloud sync enabled');
-				} catch (error) {
-					vscode.window.showWarningMessage(`Encrypted cloud sync failed to initialize: ${(error as Error).message} - falling back to standard sync`);
+			progress.report({ message: 'Connessione al provider cloud...' });
+			try {
+				cloudManager = await EncryptedCloudSyncManager.createManager(syncConfig, extensionContext);
+				if (enableEncryption) {
+					showSyncToast(t('push.encryptionEnabled'), 'info');
 				}
+			} catch (error) {
+				showSyncToast(t('push.initFailed', { message: (error as Error).message }), 'error');
+				return;
 			}
 
-			// Initialize standard cloud provider if encryption not used or failed
-			if (!cloudManager) {
-				switch (syncConfig.provider) {
-					case 'doppler':
-						cloudManager = new DopplerSyncManager(syncConfig);
-						break;
-					default:
-						throw new Error(`Unsupported cloud provider: ${syncConfig.provider}`);
-				}
-			}
-
-			// Test connection
-			vscode.window.showInformationMessage(`🔄 Testing connection to ${syncConfig.provider}...`);
 			const connectionResult = await cloudManager.testConnection();
 			if (!connectionResult.success) {
-				// Offer to reconfigure
-				const errorDetails = connectionResult.error ? `${syncConfig.provider} error: ${connectionResult.error}` : `Cannot connect to ${syncConfig.provider}. Check your configuration.`;
-				const reconfigure = await vscode.window.showErrorMessage(
-					`❌ ${errorDetails}`,
-					'Reconfigure',
-					'Cancel'
+				const updatedSyncConfig = await DopplerSyncManager.handleConnectionFailure(
+					rootPath,
+					syncConfig,
+					connectionResult.error
 				);
 
-				if (reconfigure === 'Reconfigure') {
-					// Ask user for new config file name
-					const configFilename = await vscode.window.showInputBox({
-						prompt: 'Enter config file name (e.g., .dotenvy.json, .env.config.json)',
-						value: '.dotenvy.json',
-						placeHolder: '.dotenvy.json'
-					});
-
-					if (!configFilename) return;
-
-					// Delete existing config and create fresh one with new name
-					try {
-						await fs.promises.unlink(configPath);
-					} catch (error) {
-						// Ignore if file doesn't exist
-					}
-
-					const newConfigPath = path.join(rootPath, configFilename);
-					const basicConfig = {
-						environments: {},
-						cloudSync: {
-							provider: 'doppler' as const,
-							project: '',
-							config: 'development',
-							token: ''
-						}
-					};
-
-					await fs.promises.writeFile(
-						newConfigPath,
-						JSON.stringify(basicConfig, null, 2),
-						'utf8'
-					);
-
-					// Add the new filename to gitignore
-					const gitignorePath = path.join(rootPath, '.gitignore');
-					let gitignoreContent = '';
-					try {
-						if (fs.existsSync(gitignorePath)) {
-							gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
-						}
-					} catch (error) {
-						// Ignore
-					}
-
-					if (!gitignoreContent.includes(configFilename)) {
-						gitignoreContent += '\n' + configFilename;
-						fs.writeFileSync(gitignorePath, gitignoreContent);
-					}
-
-					await ConfigUtils.saveQuickEnvConfig(basicConfig);
-
-					// Open the file for user to edit
-					const doc = await vscode.workspace.openTextDocument(newConfigPath);
-					await vscode.window.showTextDocument(doc);
-
-					vscode.window.showInformationMessage(
-						`${configFilename} created! Fill in your project details and token, then save and try again.`
-					);
+				if (!updatedSyncConfig) {
+					showSyncToast(t('push.cancelled'), 'info');
+					return;
 				}
 
+				syncConfig = updatedSyncConfig;
+				cloudManager = await EncryptedCloudSyncManager.createManager(syncConfig, extensionContext);
+				const retryResult = await cloudManager.testConnection();
+				if (!retryResult.success) {
+					showSyncToast(
+						retryResult.error ?? '',
+						'error'
+					);
+					return;
+				}
+			}
+
+			const syncTargets = await EnvSyncUtils.resolveSyncTargets(rootPath, syncConfig.config, config);
+			if (syncTargets.length === 0) {
+				showSyncToast(
+					t('push.noEnvFiles'),
+					'error'
+				);
 				return;
 			}
 
-			// Confirm sync
+			const targetSummary = syncTargets.map(target => target.file).join(', ');
+			const usesPrefixes = syncTargets.some(target => target.keyPrefix.length > 0);
+			const pushMode = syncConfig.pushMode ?? 'replace';
+
+			const openConfigLabel = t('push.openConfig');
+			if (enableEncryption && usesPrefixes) {
+				const disableEncryption = await vscode.window.showWarningMessage(
+					t('push.encryptionWithPrefixes'),
+					{ modal: true },
+					openConfigLabel,
+					t('push.continueEncrypted')
+				);
+
+				if (disableEncryption === openConfigLabel) {
+					await ConfigUtils.openWorkspaceConfigEditor(rootPath);
+					showSyncToast(t('push.cancelledConfigureEncryption'), 'info');
+					return;
+				}
+			}
+
+			const yesSyncLabel = t('push.yesSync');
+			const cancelLabel = t('common.cancel');
 			const proceed = await vscode.window.showWarningMessage(
-				`This will sync your local .env file to ${syncConfig.provider}.\n\nAre you sure?`,
+				syncTargets.length === 1
+					? t('push.confirmSyncSingle', {
+						targets: targetSummary,
+						provider: syncConfig.provider,
+						project: syncConfig.project,
+						config: syncConfig.config,
+						mode: pushMode
+					})
+					: t('push.confirmSyncMulti', {
+						count: syncTargets.length,
+						provider: syncConfig.provider,
+						project: syncConfig.project,
+						config: syncConfig.config,
+						mode: pushMode,
+						targets: targetSummary,
+						prefixNote: usesPrefixes ? t('push.prefixNote') : ''
+					}),
 				{ modal: true },
-				'Yes, Sync',
-				'Cancel'
+				yesSyncLabel,
+				cancelLabel
 			);
 
-			if (proceed !== 'Yes, Sync') return;
-
-			vscode.window.showInformationMessage('🔄 Pushing environment to cloud...');
-
-			// Read current .env file
-			const envPath = path.join(rootPath, '.env');
-			if (!fs.existsSync(envPath)) {
-				vscode.window.showErrorMessage('No .env file found to sync.');
+			if (proceed !== yesSyncLabel) {
+				showSyncToast(t('push.cancelled'), 'info');
 				return;
 			}
 
-			// Use FileUtils to check for secrets in .env file before sync
-			const secretWarnings = FileUtils.checkForSecrets(envPath);
-			if (secretWarnings.length > 0) {
-				const proceedAnyway = await vscode.window.showWarningMessage(
-					`⚠️ Detected potential secrets in .env file:\n${secretWarnings.map(w => `• ${w}`).join('\n')}\n\nAre you sure you want to sync this to the cloud?`,
+			progress.report({ message: 'Preparazione secrets...' });
+			const merged = EnvSyncUtils.mergeTargetsSecretsForCloud(rootPath, syncTargets);
+			if (merged.duplicateKeys.length > 0) {
+				const continueLabel = t('common.continue');
+				const duplicateWarning = await vscode.window.showWarningMessage(
+					t('push.duplicateKeys', { keys: merged.duplicateKeys.join(', ') }),
 					{ modal: true },
-					'Sync Anyway',
-					'Cancel'
+					continueLabel,
+					cancelLabel
 				);
-
-				if (proceedAnyway !== 'Sync Anyway') {
-					return; // User cancelled due to security concerns
+				if (duplicateWarning !== continueLabel) {
+					showSyncToast(t('push.cancelled'), 'info');
+					return;
 				}
 			}
 
-			// Parse env file into secrets object
-			const envContent = fs.readFileSync(envPath, 'utf8');
-			const secrets: Record<string, string> = {};
+			const syncAnywayLabel = t('push.syncAnyway');
+			for (const target of syncTargets) {
+				if (!fs.existsSync(target.absolutePath)) {
+					continue;
+				}
 
-			for (const line of envContent.split('\n')) {
-				const trimmed = line.trim();
-				if (!trimmed || trimmed.startsWith('#')) continue;
+				const secretWarnings = FileUtils.checkForSecrets(target.absolutePath);
+				if (secretWarnings.length > 0) {
+					const proceedAnyway = await vscode.window.showWarningMessage(
+						t('push.secretsDetected', {
+							file: target.file,
+							warnings: secretWarnings.map(w => `• ${w}`).join('\n')
+						}),
+						{ modal: true },
+						syncAnywayLabel,
+						cancelLabel
+					);
 
-				const equalIndex = trimmed.indexOf('=');
-				if (equalIndex === -1) continue;
-
-				const key = trimmed.substring(0, equalIndex).trim();
-				const value = trimmed.substring(equalIndex + 1);
-
-				if (key) {
-					secrets[key] = value;
+					if (proceedAnyway !== syncAnywayLabel) {
+						showSyncToast(t('push.cancelled'), 'info');
+						return;
+					}
 				}
 			}
 
-			// Filter out reserved Doppler environment variables
-			const dopplerReservedKeys = [
-				'DOPPLER_CONFIG',
-				'DOPPLER_ENVIRONMENT',
-				'DOPPLER_PROJECT',
-				'DOPPLER_ENVIRONMENT_ID',
-				'DOPPLER_PROJECT_ID',
-				'DOPPLER_CONFIG_ID',
-				'DOPPLER_ENVIRONMENT_TOKEN_NAME',
-				'DOPPLER_ENVIRONMENT_TOKEN_ID'
-			];
-
-			const filteredSecrets: Record<string, string> = {};
-			let filteredCount = 0;
-
-			for (const [key, value] of Object.entries(secrets)) {
-				if (dopplerReservedKeys.includes(key)) {
-					filteredCount++;
-				} else {
-					filteredSecrets[key] = value;
-				}
-			}
+			const filteredSecrets = EnvSyncUtils.filterDopplerReservedKeys(merged.secrets);
+			const filteredCount = Object.keys(merged.secrets).length - Object.keys(filteredSecrets).length;
 
 			if (filteredCount > 0) {
-				vscode.window.showInformationMessage(
-					`ℹ️ Filtered out ${filteredCount} reserved Doppler environment variable(s) from sync: ${dopplerReservedKeys.filter(k => secrets.hasOwnProperty(k)).join(', ')}`
+				showSyncToast(
+					t('push.filteredReserved', { count: filteredCount }),
+					'info'
 				);
 			}
 
-			// Push to cloud (using filtered secrets)
-			const result = await cloudManager.pushSecrets(filteredSecrets);
+			let keysToDelete: string[] = [];
+			if (pushMode === 'replace') {
+				progress.report({ message: 'Confronto con secrets remoti...' });
+				const remotePreview = await cloudManager.fetchSecrets(extensionContext);
+				if (remotePreview.success && remotePreview.secrets) {
+					const remoteFiltered = DopplerSyncManager.filterSyncableSecrets(remotePreview.secrets);
+					const localKeys = new Set(Object.keys(filteredSecrets));
+					keysToDelete = Object.keys(remoteFiltered).filter(key => !localKeys.has(key));
+				}
 
-			if (result.success) {
-				vscode.window.showInformationMessage(`✅ Successfully synced environment to ${syncConfig.provider}!`);
-			} else {
-				vscode.window.showErrorMessage(`❌ Failed to sync: ${result.error}`);
+				if (keysToDelete.length > 0) {
+					const deletePreview = keysToDelete.slice(0, 8).join(', ');
+					const deleteSuffix = keysToDelete.length > 8 ? ` (+${keysToDelete.length - 8} more)` : '';
+					const yesReplaceLabel = t('push.yesReplace');
+					const replaceConfirm = await vscode.window.showWarningMessage(
+						t('push.replaceDelete', { count: keysToDelete.length, preview: `${deletePreview}${deleteSuffix}` }),
+						{ modal: true },
+						yesReplaceLabel,
+						cancelLabel
+					);
+
+					if (replaceConfirm !== yesReplaceLabel) {
+						showSyncToast(t('push.cancelled'), 'info');
+						return;
+					}
+				}
 			}
 
+			progress.report({ message: `Upload su ${syncConfig.provider}...` });
+			const result = pushMode === 'replace'
+				? await cloudManager.replaceSecrets(filteredSecrets, extensionContext)
+				: await cloudManager.pushSecrets(filteredSecrets, extensionContext);
+
+			if (result.success) {
+				const deletedMsg = pushMode === 'replace' && keysToDelete.length > 0
+					? t('push.deletedOrphans', { count: keysToDelete.length })
+					: '';
+				showSyncToast(
+					t('push.synced', { provider: syncConfig.provider, deletedMsg }),
+					'success'
+				);
+			} else {
+				showSyncToast(t('push.syncFailed', { error: result.error ?? '' }), 'error');
+			}
 		} catch (error) {
-			vscode.window.showErrorMessage(`Failed to sync to cloud: ${(error as Error).message}`);
+			showSyncToast(t('push.failed', { message: (error as Error).message }), 'error');
 		}
 	}
 

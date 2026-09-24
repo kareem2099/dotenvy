@@ -13,6 +13,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from '../utils/logger';
 import { TrashBinManager } from '../utils/trashBinManager';
+import { UserManager } from '../utils/userManager';
+import { registerPanelNotifier } from '../utils/panelNotification';
+import { LocalizationService } from '../i18n';
+import { getWebviewLocalePayload } from '../i18n/webviewLocale';
 
 // Dashboard data interfaces
 interface EnvironmentData {
@@ -66,6 +70,8 @@ interface BackupSettings {
 
 interface DashboardData {
     type: string;
+    locale?: string;
+    strings?: Record<string, string>;
     environments: EnvironmentData[];
     currentFile: CurrentFileData | null;
     currentEnvironment: string | null;
@@ -73,6 +79,7 @@ interface DashboardData {
     gitHook: GitHookStatus;
     validation: ValidationStatus;
     hasWorkspace: boolean;
+    secureProjectInitialized?: boolean;
     backupSettings: BackupSettings;
 }
 
@@ -170,6 +177,29 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         view.webview.onDidReceiveMessage(async (message) => {
             await this.handleMessage(message);
         }, undefined, this.context.subscriptions);
+
+        const panelNotifier = registerPanelNotifier(message => view.webview.postMessage(message));
+        view.onDidDispose(() => panelNotifier.dispose());
+    }
+
+    async onWorkspaceFoldersChanged(): Promise<void> {
+        const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+        this.environmentProvider = new EnvironmentProvider(rootPath);
+        this.cachedDashboardData = null;
+
+        if (!this._view) {
+            return;
+        }
+
+        this._view.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [
+                vscode.Uri.joinPath(extensionUri, 'resources'),
+                vscode.Uri.file(rootPath)
+            ]
+        };
+
+        await this.refreshEnvironments();
     }
 
     private updateWebviewContent(webview: vscode.Webview): void {
@@ -191,18 +221,19 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         // Replace placeholders with actual URIs
         html = html.replace('{{panelCssUri}}', cssUri.toString());
         html = html.replace('{{panelJsUri}}', jsUri.toString());
+        html = html.replace('<body>', '<body class="sidebar-view">');
 
         return html;
     }
 
-    private async refreshEnvironments(): Promise<void> {
+    async refreshEnvironments(): Promise<void> {
         if (!this._view || !this.environmentProvider) return;
 
         const rootPath = this.environmentProvider['rootPath'];
         const envPath = path.join(rootPath, '.env');
 
         // Gather comprehensive dashboard data
-        const config = await ConfigUtils.readQuickEnvConfig();
+        const config = await ConfigUtils.readQuickEnvConfig(rootPath);
         const environments = await this.environmentProvider.getEnvironments();
         const currentEnvironment = await this.environmentProvider.getCurrentEnvironment();
 
@@ -290,6 +321,12 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         // Validation status
         const validationStatus = await this.getValidationStatus(rootPath, envPath, config);
 
+        const secureProjectInitialized = await UserManager.isSecureProjectInitialized();
+
+        if (secureProjectInitialized) {
+            await ConfigUtils.ensureWorkspaceConfigFile(rootPath);
+        }
+
         // Get backup configuration
         const backupConfig = vscode.workspace.getConfiguration('dotenvy');
         const backupPath = backupConfig.get<string>('backupPath', '');
@@ -302,9 +339,13 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
             currentEnvName = 'local';
         }
 
+        const localePayload = getWebviewLocalePayload('panel.');
+
         // Prepare dashboard data
         const dashboardData = {
             type: 'refresh',
+            locale: localePayload.locale,
+            strings: localePayload.strings,
             environments: enhancedEnvironments,
             currentFile,
             currentEnvironment: currentEnvName,
@@ -312,6 +353,7 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
             gitHook: gitHookStatus,
             validation: validationStatus,
             hasWorkspace: !!vscode.workspace.workspaceFolders,
+            secureProjectInitialized,
             backupSettings: {
                 path: backupPath,
                 encrypt: encryptBackups
@@ -398,6 +440,15 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         const rootPath = this.environmentProvider['rootPath'];
 
         switch (message.type) {
+            case 'setLocale': {
+                const localeMsg = message as { locale?: string };
+                if (localeMsg.locale) {
+                    await LocalizationService.getInstance().setLocale(localeMsg.locale);
+                    await this.refreshEnvironments();
+                }
+                break;
+            }
+
             case 'refresh':
                 await this.refreshEnvironments();
                 break;

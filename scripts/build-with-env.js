@@ -25,12 +25,12 @@ function scanDir(dir) {
         } else if (fullPath.endsWith('.js')) {
             const content = fs.readFileSync(fullPath, 'utf8');
             // Check for any embedded secrets
-            if (content.includes('dX9zM4vB7qW2nK8pR5tJ0cL3hG1yS6fN9mZ4xR7bV0qP3sT6wK8jL2vN5mQ8')) {
-                console.error(`❌ Security Alert: Leaked secret string detected in ${fullPath}!`);
+            if (/const\s+embeddedSecret\s*=\s*["'][A-Za-z0-9_-]{20,}["']/.test(content)) {
+                console.error(`❌ Security Alert: Hardcoded embeddedSecret found in ${fullPath}!`);
                 flagged++;
             }
-            if (/const embeddedSecret = "[A-Za-z0-9_-]{20,}"/.test(content)) {
-                console.error(`❌ Security Alert: Hardcoded embeddedSecret found in ${fullPath}!`);
+            if (/EXTENSION_SHARED_SECRET\s*=\s*["'][A-Za-z0-9_-]{20,}["']/.test(content)) {
+                console.error(`❌ Security Alert: Hardcoded EXTENSION_SHARED_SECRET found in ${fullPath}!`);
                 flagged++;
             }
         }

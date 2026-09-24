@@ -1,4 +1,3 @@
-import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -17,8 +16,7 @@ export class EnvironmentProvider {
 	 * Get all available environments
 	 */
 	public async getEnvironments(): Promise<Environment[]> {
-		// Check for custom config
-		const customEnvs = await ConfigUtils.getCustomEnvironments();
+		const customEnvs = await ConfigUtils.getCustomEnvironments(this.rootPath);
 		if (customEnvs) {
 			return Array.from(customEnvs.entries()).map(([name, fileName]) => ({
 				name,
@@ -27,41 +25,16 @@ export class EnvironmentProvider {
 			}));
 		}
 
-		// Check if we have a workspace
-		if (vscode.workspace.workspaceFolders) {
-			// Use workspace findFiles for better performance
-			const files = await vscode.workspace.findFiles('**/.env.*', '**/node_modules/**', 100);
-			return files
-				.filter(uri => uri.scheme === 'file' && path.dirname(uri.fsPath) === this.rootPath)
-				.map(uri => {
-					const fileName = path.basename(uri.fsPath);
-					const envName = fileName.substring(5); // Remove .env.
-					return {
-						name: envName,
-						fileName,
-						filePath: uri.fsPath
-					};
-				})
-				.filter(env => env.name.length > 0 && ![ 'backup', 'example', 'template' ].includes(env.name.toLowerCase())); // Filter out unwanted
-		} else {
-			// No workspace - use fs to find files in rootPath
-			try {
-				const files = fs.readdirSync(this.rootPath);
-				return files
-					.filter(file => file.startsWith('.env.') && file !== '.env')
-					.map(fileName => {
-						const envName = fileName.substring(5); // Remove .env.
-						return {
-							name: envName,
-							fileName,
-							filePath: path.join(this.rootPath, fileName)
-						};
-					})
-					.filter(env => env.name.length > 0 && ![ 'backup', 'example', 'template' ].includes(env.name.toLowerCase()));
-			} catch (error) {
-				logger.error('Error reading directory for environments:', error, 'EnvironmentProvider');
-				return [];
-			}
+		try {
+			const entries = await ConfigUtils.discoverEnvironmentEntries(this.rootPath);
+			return entries.map(entry => ({
+				name: entry.name,
+				fileName: entry.relativePath,
+				filePath: entry.absolutePath
+			}));
+		} catch (error) {
+			logger.error('Error discovering environments:', error, 'EnvironmentProvider');
+			return [];
 		}
 	}
 

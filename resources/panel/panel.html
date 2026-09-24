@@ -4,60 +4,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>dotenvy - Environment Manager</title>
+    <title data-i18n="panel.title">dotenvy - Environment Manager</title>
     <link rel="stylesheet" href="{{panelCssUri}}">
 </head>
 
 <body>
+    <div class="setup-section" id="setup-section" hidden>
+        <div class="setup-card">
+            <h3 class="setup-title" id="setup-title" data-i18n="panel.setup.getStarted">Get started with DotEnvy</h3>
+            <p class="setup-description" id="setup-description" data-i18n="panel.setup.description">Initialize the extension to start managing your environments.</p>
+            <div class="setup-actions" id="setup-actions"></div>
+        </div>
+    </div>
     <div class="header animate-fade-in">
         <h2>
             <span class="logo-icon">🚀</span>
-            dotenvy Environment Manager
+            <span data-i18n="panel.header.title">dotenvy Environment Manager</span>
         </h2>
         <div class="header-actions">
-            <button class="btn btn-secondary btn-sm" data-action="openHistoryPanel"
-                title="Open full Environment History viewer">
-                <span>🕐</span> History
+            <button class="btn btn-secondary btn-sm" id="btn-doppler" onclick="openDopplerDashboard()"
+                data-i18n-title="panel.actions.dopplerTip">
+                <span>🌐</span> <span data-i18n="panel.actions.doppler">Doppler</span>
             </button>
-            <button class="btn btn-secondary btn-sm" data-action="openAnalyticsPanel" title="Open Environment Analytics">
-                <span>📈</span> Analytics
+            <button class="btn btn-secondary btn-sm" id="btn-history" onclick="openHistoryPanel()"
+                data-i18n-title="panel.actions.historyTip">
+                <span>🕐</span> <span data-i18n="panel.actions.history">History</span>
             </button>
-            <button class="btn btn-secondary btn-sm" data-action="openTrashBin" title="Open Session Trash Bin">
-                <span>🗑️</span> Trash Bin
+            <button class="btn btn-secondary btn-sm" id="btn-analytics" onclick="openAnalyticsPanel()" data-i18n-title="panel.actions.analyticsTip">
+                <span>📈</span> <span data-i18n="panel.actions.analytics">Analytics</span>
             </button>
-            <button class="btn btn-danger btn-sm" data-action="scanSecrets"
-                title="Scan codebase for API keys and secrets">
-                <span class="scan-icon">🔍</span> Scan Secrets
+            <button class="btn btn-secondary btn-sm" id="btn-trash" onclick="openTrashBin()" data-i18n-title="panel.actions.trashTip">
+                <span>🗑️</span> <span data-i18n="panel.actions.trash">Trash Bin</span>
             </button>
-            <button class="btn btn-primary btn-sm" data-action="pullFromCloud">
-                <span class="sync-icon" id="sync-icon">☁️</span> Pull from Cloud
+            <button class="btn btn-danger btn-sm" id="btn-scan" onclick="scanSecrets()"
+                data-i18n-title="panel.actions.scanTip">
+                <span class="scan-icon">🔍</span> <span data-i18n="panel.actions.scan">Scan Secrets</span>
             </button>
-            <button class="btn btn-secondary btn-sm" data-action="pushToCloud">
-                <span class="sync-icon" id="push-icon">⬆️</span> Push to Cloud
+            <button class="btn btn-primary btn-sm" id="btn-pull" onclick="pullFromCloud()">
+                <span class="sync-icon" id="sync-icon">☁️</span> <span data-i18n="panel.actions.pull">Pull from Cloud</span>
             </button>
-            <button class="btn btn-secondary btn-sm" data-action="manageGitHook">
-                <span class="hook-icon" id="hook-icon">🔗</span> Git Hook
+            <button class="btn btn-secondary btn-sm" id="btn-push" onclick="pushToCloud()">
+                <span class="sync-icon" id="push-icon">⬆️</span> <span data-i18n="panel.actions.push">Push to Cloud</span>
             </button>
-            <button class="btn btn-secondary btn-sm" data-action="validateEnvironments">
-                <span class="validate-icon" id="validate-icon">✅</span> Validate
+            <button class="btn btn-secondary btn-sm" id="btn-githook" onclick="manageGitHook()">
+                <span class="hook-icon" id="hook-icon">🔗</span> <span data-i18n="panel.actions.gitHook">Git Hook</span>
             </button>
+            <button class="btn btn-secondary btn-sm" id="btn-validate" onclick="validateEnvironments()">
+                <span class="validate-icon" id="validate-icon">✅</span> <span data-i18n="panel.actions.validate">Validate</span>
+            </button>
+        </div>
+        <div class="header-language-divider" aria-hidden="true"></div>
+        <div class="header-language">
+            <label class="language-label" for="locale-dropdown-trigger" data-i18n="panel.language.label">Language</label>
+            <div class="locale-dropdown" id="locale-dropdown">
+                <button
+                    type="button"
+                    id="locale-dropdown-trigger"
+                    class="locale-dropdown-trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-controls="locale-dropdown-menu">
+                    <span class="locale-dropdown-value" id="locale-dropdown-value">English</span>
+                    <span class="locale-dropdown-chevron" aria-hidden="true"></span>
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- Dashboard cards: Cloud Sync, Git Hook, Validation (Status removed) -->
     <div class="dashboard" id="dashboard">
         <div class="dashboard-grid">
             <div class="dashboard-card cloud-card">
                 <div class="card-header">
                     <span class="card-icon">☁️</span>
-                    <span class="card-title">Cloud Sync</span>
+                    <span class="card-title" data-i18n="panel.cloud.title">Cloud Sync</span>
                 </div>
                 <div class="card-content">
                     <div class="sync-status">
-                        <span class="status-indicator status-disconnected" id="cloud-status">Not Connected</span>
+                        <span class="status-indicator status-disconnected" id="cloud-status" data-i18n="panel.cloud.notConnected">Not Connected</span>
                     </div>
                     <div class="sync-last">
-                        <span class="sync-time" id="last-sync">Last: Never</span>
+                        <span class="sync-time" id="last-sync"></span>
                     </div>
                 </div>
             </div>
@@ -65,15 +91,15 @@
             <div class="dashboard-card git-card">
                 <div class="card-header">
                     <span class="card-icon">🔗</span>
-                    <span class="card-title">Git Hook</span>
+                    <span class="card-title" data-i18n="panel.git.title">Git Hook</span>
                 </div>
                 <div class="card-content">
                     <div class="hook-status">
-                        <span class="status-indicator status-warning" id="hook-status">Not Installed</span>
+                        <span class="status-indicator status-warning" id="hook-status" data-i18n="panel.git.notInstalled">Not Installed</span>
                     </div>
                     <div class="hook-actions">
-                        <button class="btn btn-sm btn-secondary" data-action="installHook">Install</button>
-                        <button class="btn btn-sm btn-secondary" data-action="removeHook">Remove</button>
+                        <button class="btn btn-sm btn-secondary" id="btn-install-hook" onclick="installHook()" data-i18n="panel.git.install">Install</button>
+                        <button class="btn btn-sm btn-secondary" id="btn-remove-hook" onclick="removeHook()" data-i18n="panel.git.remove">Remove</button>
                     </div>
                 </div>
             </div>
@@ -81,14 +107,14 @@
             <div class="dashboard-card validation-card">
                 <div class="card-header">
                     <span class="card-icon">✅</span>
-                    <span class="card-title">Validation</span>
+                    <span class="card-title" data-i18n="panel.validation.title">Validation</span>
                 </div>
                 <div class="card-content">
                     <div class="validation-status">
-                        <span class="status-indicator status-valid" id="validation-status">Valid</span>
+                        <span class="status-indicator status-valid" id="validation-status" data-i18n="panel.validation.valid">Valid</span>
                     </div>
                     <div class="validation-errors" id="validation-errors" style="display: none;">
-                        <span class="error-count">0 errors</span>
+                        <span class="error-count"></span>
                     </div>
                 </div>
             </div>
@@ -97,30 +123,32 @@
 
     <div class="environments" id="environments">
         <div class="section-header">
-            <h3>Available Environments</h3>
-            <button class="btn btn-primary btn-sm" data-action="createEnvFile">Create Environment</button>
+            <h3 data-i18n="panel.environments.title">Available Environments</h3>
+            <button class="btn btn-primary btn-sm" id="btn-create-env" onclick="createEnvFile()" data-i18n="panel.environments.create">Create Environment</button>
         </div>
         <div class="environments-grid" id="environments-list">
-            <p>Loading environments...</p>
+            <p data-i18n="panel.environments.loading">Loading environments...</p>
         </div>
     </div>
 
-
-
     <div class="backup-section" id="backup-section">
         <div class="section-header">
-            <h3>Backup Settings</h3>
+            <h3 data-i18n="panel.backup.title">Backup Settings</h3>
         </div>
         <div class="backup-settings" id="backup-settings">
             <div class="setting-item">
-                <label>Backup Location: <span id="backup-path-display">Default (~/.dotenvy-backups)</span></label>
+                <label><span data-i18n="panel.backup.location">Backup Location:</span> <span id="backup-path-display" data-i18n="panel.backup.defaultPath">Default (~/.dotenvy-backups)</span></label>
             </div>
             <div class="setting-item">
                 <label>
-                    <input type="checkbox" id="encrypt-backups-checkbox"> Encrypt Backups
+                    <input type="checkbox" id="encrypt-backups-checkbox"> <span data-i18n="panel.backup.encrypt">Encrypt Backups</span>
                 </label>
             </div>
         </div>
+    </div>
+    <div class="locale-dropdown-menu" id="locale-dropdown-menu" role="listbox" hidden>
+        <button type="button" class="locale-dropdown-option" role="option" data-locale="en" data-i18n="panel.language.en">English</button>
+        <button type="button" class="locale-dropdown-option" role="option" data-locale="it" data-i18n="panel.language.it">Italiano</button>
     </div>
     <script src="{{panelJsUri}}"></script>
 </body>

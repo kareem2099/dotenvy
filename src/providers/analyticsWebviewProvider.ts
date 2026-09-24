@@ -3,6 +3,8 @@ import { HistoryManager } from '../utils/historyManager';
 import { HistoryAnalytics } from '../utils/historyAnalytics';
 import { logger } from '../utils/logger';
 import { loadWebviewHtml } from '../utils/webviewUtils';
+import { postLocaleToPanel } from '../i18n/webviewLocale';
+import { t } from '../i18n';
 
 export class AnalyticsWebviewProvider {
     public static readonly viewType = 'dotenvy.analyticsViewer';
@@ -16,13 +18,17 @@ export class AnalyticsWebviewProvider {
         AnalyticsWebviewProvider._context      = context;
     }
 
+    public static refreshLocale(): void {
+        postLocaleToPanel(AnalyticsWebviewProvider._panel, 'analytics.');
+    }
+
     /** Open (or reveal) the Analytics webview panel */
     public static async openOrReveal(): Promise<void> {
         const context      = AnalyticsWebviewProvider._context;
         const extensionUri = AnalyticsWebviewProvider._extensionUri;
 
         if (!context || !extensionUri) {
-            vscode.window.showErrorMessage('Analytics Manager not initialized.');
+            vscode.window.showErrorMessage(t('analytics.notInitialized'));
             return;
         }
 
@@ -33,7 +39,7 @@ export class AnalyticsWebviewProvider {
 
         const panel = vscode.window.createWebviewPanel(
             AnalyticsWebviewProvider.viewType,
-            'Environment Analytics',
+            t('analytics.title'),
             vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -44,6 +50,7 @@ export class AnalyticsWebviewProvider {
 
         AnalyticsWebviewProvider._panel = panel;
         panel.webview.html = AnalyticsWebviewProvider._getHtml(panel.webview, extensionUri);
+        postLocaleToPanel(panel, 'analytics.');
 
         // Handle messages from the webview
         panel.webview.onDidReceiveMessage(async (message) => {
@@ -127,6 +134,7 @@ export class AnalyticsWebviewProvider {
                 styleUri:      webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css')).toString(),
                 extraStyleUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'analytics.css')).toString(),
                 scriptUri:     webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'analytics.js')).toString(),
+                i18nScriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'webview-i18n.js')).toString(),
             },
         });
     }

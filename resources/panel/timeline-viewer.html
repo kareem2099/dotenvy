@@ -5,25 +5,25 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data: https:; font-src 'self' data: https:; style-src {{CSP_SOURCE}} 'unsafe-inline'; script-src 'nonce-{{NONCE}}';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="{{STYLE_URI}}" rel="stylesheet">
-    <title>Environment Timeline</title>
+    <title data-i18n="timeline.title">Environment Timeline</title>
 </head>
 <body class="timeline-only">
     <div class="history-container">
         <div class="history-header">
-            <h3>📊 Environment Timeline</h3>
+            <h3 data-i18n="timeline.title">📊 Environment Timeline</h3>
             <div class="history-stats" id="stats"></div>
         </div>
 
         <div class="history-toolbar">
-            <div class="view-info">Visualizing environment lifecycle and changes</div>
-            <button id="refresh-btn" class="btn-secondary">🔄 Refresh</button>
+            <div class="view-info" data-i18n="timeline.subtitle">Visualizing environment lifecycle and changes</div>
+            <button id="refresh-btn" class="btn-secondary" data-i18n="timeline.refresh">🔄 Refresh</button>
         </div>
 
         <div class="timeline-container standalone" id="timeline-container">
             <div class="timeline-controls">
-                <button id="zoom-in-btn" class="btn-secondary" title="Zoom In">🔍+</button>
-                <button id="zoom-out-btn" class="btn-secondary" title="Zoom Out">🔍-</button>
-                <button id="fit-to-screen-btn" class="btn-secondary" title="Fit to Screen">📐</button>
+                <button id="zoom-in-btn" class="btn-secondary" title="Zoom In" data-i18n-title="timeline.zoomIn">🔍+</button>
+                <button id="zoom-out-btn" class="btn-secondary" title="Zoom Out" data-i18n-title="timeline.zoomOut">🔍-</button>
+                <button id="fit-to-screen-btn" class="btn-secondary" title="Fit to Screen" data-i18n-title="timeline.fitToScreen">📐</button>
                 <span class="zoom-level" id="zoom-level">100%</span>
             </div>
             <div class="timeline-wrapper">
@@ -41,6 +41,7 @@
             </div>
         </div>
     </div>
+    <script nonce="{{NONCE}}" src="{{I18N_SCRIPT_URI}}"></script>
     <script nonce="{{NONCE}}" src="{{SCRIPT_URI}}"></script>
 </body>
 </html>

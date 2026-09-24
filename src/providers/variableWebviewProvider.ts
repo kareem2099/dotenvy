@@ -4,6 +4,8 @@ import { EncryptedEnvironmentFile } from '../utils/encryptedVars';
 import { logger } from '../utils/logger';
 import { TrashBinManager } from '../utils/trashBinManager';
 import { loadWebviewHtml } from '../utils/webviewUtils';
+import { postLocaleToPanel } from '../i18n/webviewLocale';
+import { t } from '../i18n';
 
 export class VariableWebviewProvider {
     public static readonly viewType = 'dotenvy.variableManager';
@@ -16,12 +18,16 @@ export class VariableWebviewProvider {
         VariableWebviewProvider._context = context;
     }
 
+    public static refreshLocale(): void {
+        postLocaleToPanel(VariableWebviewProvider._panel, 'variableManager.');
+    }
+
     public static async openOrReveal(fileName = '.env'): Promise<void> {
         const context      = VariableWebviewProvider._context;
         const extensionUri = VariableWebviewProvider._extensionUri;
 
         if (!context || !extensionUri) {
-            vscode.window.showErrorMessage('Variable Manager not initialized.');
+            vscode.window.showErrorMessage(t('variableManager.notInitialized'));
             return;
         }
 
@@ -34,7 +40,7 @@ export class VariableWebviewProvider {
 
         const panel = vscode.window.createWebviewPanel(
             VariableWebviewProvider.viewType,
-            `Variable Manager`,
+            t('variableManager.title'),
             vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -45,6 +51,7 @@ export class VariableWebviewProvider {
 
         VariableWebviewProvider._panel = panel;
         panel.webview.html = VariableWebviewProvider._getHtml(panel.webview, extensionUri);
+        postLocaleToPanel(panel, 'variableManager.');
 
         panel.webview.onDidReceiveMessage(async (message) => {
             await VariableWebviewProvider._handleMessage(message);
@@ -230,6 +237,7 @@ export class VariableWebviewProvider {
             tokens: {
                 styleUri:  webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css')).toString(),
                 scriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'variable-manager.js')).toString(),
+                i18nScriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'webview-i18n.js')).toString(),
             },
         });
     }

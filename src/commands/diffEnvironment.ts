@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { EnvironmentDiffer } from '../utils/environmentDiffer';
 import { WorkspaceManager } from '../providers/workspaceManager';
+import { showSyncToast } from '../utils/panelNotification';
+import { t } from '../i18n';
 
 export class DiffEnvironmentCommand implements vscode.Disposable {
 	public async execute(): Promise<void> {
@@ -8,7 +10,7 @@ export class DiffEnvironmentCommand implements vscode.Disposable {
 		const allWorkspaces = workspaceManager.getAllWorkspaces();
 
 		if (allWorkspaces.length === 0) {
-			vscode.window.showErrorMessage('No workspace folder open.');
+			showSyncToast(t('common.noWorkspace'), 'error');
 			return;
 		}
 
@@ -19,7 +21,7 @@ export class DiffEnvironmentCommand implements vscode.Disposable {
 		} else {
 			const workspaceItems = workspaceManager.getWorkspaceQuickPickItems();
 			const selectedItem = await vscode.window.showQuickPick(workspaceItems, {
-				placeHolder: 'Select workspace for diff'
+				placeHolder: t('diff.workspacePlaceholder')
 			});
 
 			if (!selectedItem) return;
@@ -38,7 +40,7 @@ export class DiffEnvironmentCommand implements vscode.Disposable {
         // Get all environments
         const environments = await environmentProvider.getEnvironments();
         if (environments.length < 2) {
-            vscode.window.showInformationMessage('Need at least 2 environment files to compare.');
+            showSyncToast(t('diff.needTwo'), 'warning');
             return;
         }
 
@@ -51,7 +53,7 @@ export class DiffEnvironmentCommand implements vscode.Disposable {
         }));
 
         const sourceSelection = await vscode.window.showQuickPick(items, {
-            placeHolder: 'Select source environment (current state)'
+            placeHolder: t('diff.sourcePlaceholder')
         });
 
         if (!sourceSelection) return;
@@ -59,7 +61,7 @@ export class DiffEnvironmentCommand implements vscode.Disposable {
         // Select target environment
         const remainingItems = items.filter(item => item.env.name !== sourceSelection.env.name);
         const targetSelection = await vscode.window.showQuickPick(remainingItems, {
-            placeHolder: 'Select target environment to compare'
+            placeHolder: t('diff.targetPlaceholder')
         });
 
         if (!targetSelection) return;
@@ -71,7 +73,7 @@ export class DiffEnvironmentCommand implements vscode.Disposable {
             const targetPath = targetSelection.env.filePath;
 
             if (!sourcePath.startsWith(rootPath) || !targetPath.startsWith(rootPath)) {
-                vscode.window.showErrorMessage('Environment files must be within the selected workspace.');
+                showSyncToast(t('diff.filesOutsideWorkspace'), 'error');
                 return;
             }
 
@@ -86,7 +88,7 @@ export class DiffEnvironmentCommand implements vscode.Disposable {
             await vscode.window.showTextDocument(doc, { preview: true });
 
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to compare environments: ${(error as Error).message}`);
+            showSyncToast(t('diff.failed', { message: (error as Error).message }), 'error');
         }
     }
 

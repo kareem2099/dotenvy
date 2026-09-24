@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { HistoryManager } from '../utils/historyManager';
 import { logger } from '../utils/logger';
 import { loadWebviewHtml } from '../utils/webviewUtils';
+import { postLocaleToPanel } from '../i18n/webviewLocale';
+import { t } from '../i18n';
 
 export class TimelineWebviewProvider {
     public static readonly viewType = 'dotenvy.timelineViewer';
@@ -15,13 +17,17 @@ export class TimelineWebviewProvider {
         TimelineWebviewProvider._context      = context;
     }
 
+    public static refreshLocale(): void {
+        postLocaleToPanel(TimelineWebviewProvider._panel, 'timeline.');
+    }
+
     /** Open (or reveal) the Timeline webview panel */
     public static async openOrReveal(): Promise<void> {
         const context      = TimelineWebviewProvider._context;
         const extensionUri = TimelineWebviewProvider._extensionUri;
 
         if (!context || !extensionUri) {
-            vscode.window.showErrorMessage('Timeline Manager not initialized.');
+            vscode.window.showErrorMessage(t('timeline.notInitialized'));
             return;
         }
 
@@ -32,7 +38,7 @@ export class TimelineWebviewProvider {
 
         const panel = vscode.window.createWebviewPanel(
             TimelineWebviewProvider.viewType,
-            'Environment Timeline',
+            t('timeline.title'),
             vscode.ViewColumn.Two, // Open side-by-side by default for coolness
             {
                 enableScripts: true,
@@ -43,6 +49,7 @@ export class TimelineWebviewProvider {
 
         TimelineWebviewProvider._panel = panel;
         panel.webview.html = TimelineWebviewProvider._getHtml(panel.webview, extensionUri);
+        postLocaleToPanel(panel, 'timeline.');
 
         // Handle messages from the webview
         panel.webview.onDidReceiveMessage(async (message) => {
@@ -119,6 +126,7 @@ export class TimelineWebviewProvider {
             tokens: {
                 styleUri:  webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css')).toString(),
                 scriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'timeline-viewer.js')).toString(),
+                i18nScriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'webview-i18n.js')).toString(),
             },
         });
     }

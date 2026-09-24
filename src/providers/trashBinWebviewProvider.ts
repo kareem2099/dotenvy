@@ -4,6 +4,8 @@ import * as fs from 'fs';
 import { TrashBinManager, TrashBinEntry } from '../utils/trashBinManager';
 import { logger } from '../utils/logger';
 import { loadWebviewHtml } from '../utils/webviewUtils';
+import { postLocaleToPanel } from '../i18n/webviewLocale';
+import { t } from '../i18n';
 
 export class TrashBinWebviewProvider {
     public static readonly viewType = 'dotenvy.trashBin';
@@ -21,12 +23,16 @@ export class TrashBinWebviewProvider {
         });
     }
 
+    public static refreshLocale(): void {
+        postLocaleToPanel(TrashBinWebviewProvider._panel, 'trash.');
+    }
+
     public static async openOrReveal(): Promise<void> {
         const context      = TrashBinWebviewProvider._context;
         const extensionUri = TrashBinWebviewProvider._extensionUri;
 
         if (!context || !extensionUri) {
-            vscode.window.showErrorMessage('Trash Bin Manager not initialized.');
+            vscode.window.showErrorMessage(t('trash.notInitialized'));
             return;
         }
 
@@ -38,7 +44,7 @@ export class TrashBinWebviewProvider {
 
         const panel = vscode.window.createWebviewPanel(
             TrashBinWebviewProvider.viewType,
-            '🗑️ Session Trash Bin',
+            t('trash.title'),
             vscode.ViewColumn.Two,
             {
                 enableScripts: true,
@@ -49,6 +55,7 @@ export class TrashBinWebviewProvider {
 
         TrashBinWebviewProvider._panel = panel;
         panel.webview.html = TrashBinWebviewProvider._getHtml(panel.webview, extensionUri);
+        postLocaleToPanel(panel, 'trash.');
 
         panel.webview.onDidReceiveMessage(async (msg) => {
             await TrashBinWebviewProvider._handleMessage(msg);
@@ -136,6 +143,7 @@ export class TrashBinWebviewProvider {
             tokens: {
                 styleUri:  webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css')).toString(),
                 scriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'trash-bin.js')).toString(),
+                i18nScriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'webview-i18n.js')).toString(),
             },
         });
     }

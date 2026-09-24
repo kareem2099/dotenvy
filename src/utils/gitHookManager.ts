@@ -1,32 +1,84 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { execSync } from 'child_process';
 import { SecretsGuard } from './secretsGuard';
 import { EnvironmentValidator } from './environmentValidator';
 import { ConfigUtils } from './configUtils';
 import { GitCommitHookConfig } from '../types/environment';
+import { WorkspaceManager } from '../providers/workspaceManager';
+import { showSyncToast } from './panelNotification';
 import { spawn } from 'child_process';
+import { t } from '../i18n';
+
+const DOTENVY_HOOK_MARKER = 'dotenvy pre-commit hook';
 
 export class GitHookManager {
+	/**
+	 * Show install/remove menu for the git hook.
+	 */
+	static async manageHook(preferredPath?: string): Promise<void> {
+		const workspacePath = await WorkspaceManager.resolveWorkspacePath(preferredPath, t('common.selectWorkspace'));
+		if (!workspacePath) {
+			showSyncToast(t('gitHook.manage.cancelledNoWorkspace'), 'info');
+			return;
+		}
+
+		const gitRoot = this.resolveGitRoot(workspacePath);
+		if (!gitRoot) {
+			showSyncToast(t('common.notGitRepo'), 'error');
+			return;
+		}
+
+		const installed = this.isHookInstalled(workspacePath);
+		const options = installed
+			? [
+				{ label: `$(trash) ${t('gitHook.manage.removeLabel')}`, description: t('gitHook.manage.removeDesc'), action: 'remove' as const },
+				{ label: `$(refresh) ${t('gitHook.manage.reinstallLabel')}`, description: t('gitHook.manage.reinstallDesc'), action: 'install' as const }
+			]
+			: [
+				{ label: `$(link) ${t('gitHook.manage.installLabel')}`, description: t('gitHook.manage.installDesc'), action: 'install' as const }
+			];
+
+		const choice = await vscode.window.showQuickPick(options, {
+			placeHolder: installed ? t('gitHook.manage.installedPlaceholder') : t('gitHook.manage.installPlaceholder')
+		});
+
+		if (!choice) {
+			showSyncToast(t('gitHook.manage.cancelled'), 'info');
+			return;
+		}
+
+		if (choice.action === 'remove') {
+			const { RemoveGitHookCommand } = await import('../commands/removeGitHook');
+			await new RemoveGitHookCommand().execute(workspacePath);
+			return;
+		}
+
+		const { InstallGitHookCommand } = await import('../commands/installGitHook');
+		await new InstallGitHookCommand().execute(workspacePath);
+	}
+
 	/**
 	 * Install pre-commit hook that blocks commits with sensitive data
 	 */
 	static async installHook(workspacePath: string): Promise<void> {
-		const gitHooksPath = path.join(workspacePath, '.git', 'hooks');
-		const hookPath = path.join(gitHooksPath, 'pre-commit');
-
-		// Ensure .git/hooks directory exists
-		if (!fs.existsSync(gitHooksPath)) {
-			throw new Error('Git hooks directory not found. Make sure this is a Git repository.');
+		const gitRoot = this.resolveGitRoot(workspacePath);
+		if (!gitRoot) {
+			throw new Error('Git repository not found. Open the folder that contains the repository root.');
 		}
 
-		// Create the hook script
+		const gitHooksPath = this.resolveHooksDirectory(gitRoot);
+		const hookPath = path.join(gitHooksPath, 'pre-commit');
+
+		if (!fs.existsSync(gitHooksPath)) {
+			await fs.promises.mkdir(gitHooksPath, { recursive: true });
+		}
+
 		const hookScript = this.generateHookScript();
 
-		// Make sure hook is executable
 		try {
 			await fs.promises.writeFile(hookPath, hookScript, { mode: 0o755 });
-			vscode.window.showInformationMessage('✅ dotenvy pre-commit hook installed successfully!');
 		} catch (error) {
 			throw new Error(`Failed to install hook: ${error}`, { cause: error });
 		}
@@ -36,33 +88,107 @@ export class GitHookManager {
 	 * Remove pre-commit hook
 	 */
 	static async removeHook(workspacePath: string): Promise<void> {
-		const hookPath = path.join(workspacePath, '.git', 'hooks', 'pre-commit');
+		const gitRoot = this.resolveGitRoot(workspacePath);
+		if (!gitRoot) {
+			throw new Error('Git repository not found. Open the folder that contains the repository root.');
+		}
+
+		const hookPath = path.join(this.resolveHooksDirectory(gitRoot), 'pre-commit');
 
 		try {
-			if (fs.existsSync(hookPath)) {
-				await fs.promises.unlink(hookPath);
-				vscode.window.showInformationMessage('✅ dotenvy pre-commit hook removed successfully!');
-			} else {
-				vscode.window.showInformationMessage('No dotenvy hook found to remove.');
+			if (!fs.existsSync(hookPath)) {
+				return;
 			}
+
+			const content = fs.readFileSync(hookPath, 'utf8');
+			if (!this.isDotenvyHookContent(content)) {
+				throw new Error(
+					'A pre-commit hook exists but it was not installed by dotenvy. Remove it manually to avoid deleting another tool\'s hook.'
+				);
+			}
+
+			await fs.promises.unlink(hookPath);
 		} catch (error) {
+			if (error instanceof Error && error.message.includes('not installed by dotenvy')) {
+				throw error;
+			}
 			throw new Error(`Failed to remove hook: ${error}`, { cause: error });
 		}
 	}
 
 	/**
-	 * Check if hook is installed
+	 * Check if dotenvy hook is installed
 	 */
 	static isHookInstalled(workspacePath: string): boolean {
-		const hookPath = path.join(workspacePath, '.git', 'hooks', 'pre-commit');
-		return fs.existsSync(hookPath);
+		const content = this.readHookContent(workspacePath);
+		return content !== null && this.isDotenvyHookContent(content);
+	}
+
+	/**
+	 * Whether any pre-commit hook file exists (dotenvy or third-party)
+	 */
+	static hasPreCommitHook(workspacePath: string): boolean {
+		return this.readHookContent(workspacePath) !== null;
+	}
+
+	static resolveGitRoot(workspacePath: string): string | null {
+		try {
+			const gitRoot = execSync('git rev-parse --show-toplevel', {
+				cwd: workspacePath,
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'ignore']
+			}).trim();
+
+			return gitRoot || null;
+		} catch {
+			if (fs.existsSync(path.join(workspacePath, '.git'))) {
+				return workspacePath;
+			}
+			return null;
+		}
+	}
+
+	static resolveHooksDirectory(gitRoot: string): string {
+		try {
+			const hooksPath = execSync('git config --get core.hooksPath', {
+				cwd: gitRoot,
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'ignore']
+			}).trim();
+
+			if (hooksPath) {
+				return path.isAbsolute(hooksPath) ? hooksPath : path.join(gitRoot, hooksPath);
+			}
+		} catch {
+			// Fall back to default hooks directory
+		}
+
+		return path.join(gitRoot, '.git', 'hooks');
+	}
+
+	private static readHookContent(workspacePath: string): string | null {
+		const gitRoot = this.resolveGitRoot(workspacePath);
+		if (!gitRoot) {
+			return null;
+		}
+
+		const hookPath = path.join(this.resolveHooksDirectory(gitRoot), 'pre-commit');
+		if (!fs.existsSync(hookPath)) {
+			return null;
+		}
+
+		return fs.readFileSync(hookPath, 'utf8');
+	}
+
+	private static isDotenvyHookContent(content: string): boolean {
+		return content.includes(DOTENVY_HOOK_MARKER) || content.includes('dotenvy-hook');
 	}
 
 	/**
 	 * Run pre-commit checks on staged files
 	 */
 	static async runPreCommitChecks(workspacePath: string): Promise<{blocked: boolean, message: string}> {
-  const config = await ConfigUtils.readQuickEnvConfig();
+		const config = await ConfigUtils.readQuickEnvConfig();
 		const hookDefaults: GitCommitHookConfig = {
 			blockEnvFiles: true,
 			blockSecrets: true,
@@ -128,7 +254,7 @@ export class GitHookManager {
 	 */
 	private static generateHookScript(): string {
 		return `#!/bin/sh
-# dotenvy pre-commit hook - prevents committing sensitive environment data
+# ${DOTENVY_HOOK_MARKER} - prevents committing sensitive environment data
 # Generated by dotenvy VS Code extension
 
 # Get the workspace root (assuming hook is in .git/hooks/)
@@ -161,7 +287,8 @@ exec "$HOOK_SCRIPT" "$WORKSPACE_DIR"
 	 */
 	private static async getStagedFiles(workspacePath: string): Promise<string[]> {
 		try {
-			const result = await this.execGitCommand(workspacePath, ['diff', '--cached', '--name-only']);
+			const gitRoot = this.resolveGitRoot(workspacePath) ?? workspacePath;
+			const result = await this.execGitCommand(gitRoot, ['diff', '--cached', '--name-only']);
 			return result.split('\n').filter(line => line.trim().length > 0);
 		} catch {
 			return [];
@@ -205,7 +332,8 @@ exec "$HOOK_SCRIPT" "$WORKSPACE_DIR"
 	 */
 	private static async scanFileForSecrets(workspacePath: string, filePath: string): Promise<string[]> {
 		try {
-			const fullPath = path.join(workspacePath, filePath);
+			const gitRoot = this.resolveGitRoot(workspacePath) ?? workspacePath;
+			const fullPath = path.join(gitRoot, filePath);
 			const stats = await fs.promises.stat(fullPath);
 
 			// Skip if file is too large (>1MB) or binary

@@ -373,10 +373,19 @@
     }
 
 
+    let currentStats = null;
+
+    function tr(key, params, fallback) {
+        if (window.dotenvyI18n && typeof window.dotenvyI18n.tr === 'function') {
+            return window.dotenvyI18n.tr(key, params, fallback);
+        }
+        return fallback !== undefined ? fallback : key;
+    }
+
     function showLoading() {
         const tbody = document.getElementById('history-body');
         if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading history...</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="5" class="loading" data-i18n="history.loading">${tr('history.loading', {}, 'Loading history…')}</td></tr>`;
         }
     }
 
@@ -391,9 +400,14 @@
                     currentWorkspace = message.workspacePath;
                 }
                 currentHistory = message.history;
+                currentStats = message.stats;
                 updateStats(message.stats);
                 filterHistory();
                 loadFilterOptions();
+                break;
+            case 'localeChanged':
+                if (currentStats) updateStats(currentStats);
+                filterHistory();
                 break;
             case 'analyticsLoaded':
                 break;
@@ -423,12 +437,12 @@
         if (!stats) return;
 
         statsDiv.innerHTML = `
-            <div class="stat-item">
-                <span class="stat-label">Total:</span>
+            <div class="stat-chip">
+                <span class="stat-label">${tr('history.total', {}, 'Total')}</span>
                 <span class="stat-value">${stats.totalEntries}</span>
             </div>
-            <div class="stat-item">
-                <span class="stat-label">Size:</span>
+            <div class="stat-chip">
+                <span class="stat-label">${tr('history.size', {}, 'Size')}</span>
                 <span class="stat-value">${formatBytes(stats.storageSize)}</span>
             </div>
         `;
@@ -468,7 +482,7 @@
         if (!tbody) return;
 
         if (filteredHistory.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No history entries found</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="5" class="empty-state">${tr('history.empty', {}, 'No history entries found')}</td></tr>`;
             return;
         }
 
@@ -486,8 +500,8 @@
                 <td class="col-action"><span class="action-badge action-${entry.action}">${entry.action.replace('_', ' ')}</span></td>
                 <td class="col-note">${note}</td>
                 <td class="col-actions">
-                    <button class="btn-table" data-action="diff" data-entry-id="${entry.id}" title="Open native VS Code diff">⟷ Diff</button>
-                    <button class="btn-table btn-table-danger" data-action="rollback" data-entry-id="${entry.id}" title="Rollback to this state">↩ Rollback</button>
+                    <button class="btn-table" data-action="diff" data-entry-id="${entry.id}" title="${tr('history.diffTitle', {}, 'Open native VS Code diff')}">${tr('history.diffBtn', {}, '⟷ Diff')}</button>
+                    <button class="btn-table btn-table-danger" data-action="rollback" data-entry-id="${entry.id}" title="${tr('history.rollbackTitle', {}, 'Rollback to this state')}">${tr('history.rollbackBtn', {}, '↩ Rollback')}</button>
                 </td>
             </tr>`;
         }).join('');

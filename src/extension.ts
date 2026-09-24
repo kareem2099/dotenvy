@@ -39,6 +39,7 @@ import { LLMAnalyzer } from './utils/llmAnalyzer';
 import { FeedbackManager } from './utils/feedbackManager';
 import { logger, LogLevel } from './utils/logger';
 import { InitDotenvyIgnoreCommand } from './commands/initDotenvyIgnore';
+import { LocalizationService, t } from './i18n';
 
 export let extensionUri: vscode.Uri;
 export let extensionContext: vscode.ExtensionContext;
@@ -51,6 +52,9 @@ export async function activate(context: vscode.ExtensionContext) {
         : LogLevel.WARN
     );
     logger.info('DotEnvy extension is now active! 🚀', 'Extension');
+
+    const localization = LocalizationService.getInstance();
+    await localization.initialize(context);
 
     // ─── 0. Initialize LLMAnalyzer (must be first — other commands depend on it) ──
     //
@@ -86,6 +90,26 @@ export async function activate(context: vscode.ExtensionContext) {
     const completionProvider = new EnvironmentCompletionProvider(initialWorkspacePath);
     const commandsTreeProvider = new CommandsTreeProvider();
     const initIgnoreCommand = new InitDotenvyIgnoreCommand();
+
+    localization.onDidChangeLocale(() => {
+        commandsTreeProvider.refresh();
+        for (const ws of workspaceManager.getAllWorkspaces()) {
+            ws.statusBarProvider.forceRefresh();
+        }
+        void vscode.commands.executeCommand('dotenvy.refreshLocalizedViews');
+    });
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('dotenvy.refreshLocalizedViews', async () => {
+            await webviewProvider.refreshEnvironments();
+            HistoryWebviewProvider.refreshLocale();
+            AnalyticsWebviewProvider.refreshLocale();
+            TimelineWebviewProvider.refreshLocale();
+            TrashBinWebviewProvider.refreshLocale();
+            VariableWebviewProvider.refreshLocale();
+            commandsTreeProvider.refresh();
+        }),
+    );
 
     // ─── Registrations ─────────────────────────────────────────────────────────
     context.subscriptions.push(
@@ -174,17 +198,16 @@ export async function activate(context: vscode.ExtensionContext) {
         // Wire this to a settings button / onboarding flow in your webview
         vscode.commands.registerCommand('dotenvy.setupLLMSecret', async () => {
             const secret = await vscode.window.showInputBox({
-                prompt: 'Enter DotEnvy LLM Shared Secret',
+                prompt: t('extension.llm.prompt'),
                 password: true,           // hides input
                 ignoreFocusOut: true,
-                placeHolder: 'Paste your shared secret here...',
+                placeHolder: t('extension.llm.placeholder'),
             });
             if (secret) {
                 await LLMAnalyzer.getInstance().setSharedSecret(secret);
-                vscode.window.showInformationMessage('✅ DotEnvy: LLM secret saved securely.');
+                vscode.window.showInformationMessage(t('extension.llm.saved'));
             }
         }),
-
 
         vscode.commands.registerCommand('dotenvy.addToIgnore', async (uri: vscode.Uri) => {
             const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -210,9 +233,9 @@ export async function activate(context: vscode.ExtensionContext) {
                     ignoreUri,
                     Buffer.from(`${content.trimEnd()}\n${pattern}\n`, 'utf8')
                 );
-                vscode.window.showInformationMessage(`✅ Added "${pattern}" to .dotenvyignore`);
+                vscode.window.showInformationMessage(t('extension.ignore.added', { pattern }));
             } else {
-                vscode.window.showInformationMessage(`Already ignored: "${pattern}"`);
+                vscode.window.showInformationMessage(t('extension.ignore.already', { pattern }));
             }
         }),
     );

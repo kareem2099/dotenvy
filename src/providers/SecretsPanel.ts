@@ -4,6 +4,7 @@ import { DetectedSecret } from '../utils/secretScannerTypes';
 import { FeedbackManager } from '../utils/feedbackManager';
 import { logger } from '../utils/logger';
 import { loadWebviewHtml } from '../utils/webviewUtils';
+import { t } from '../i18n';
 
 export class SecretsPanel {
     public static currentPanel: SecretsPanel | undefined;
@@ -26,7 +27,7 @@ export class SecretsPanel {
 
         const panel = vscode.window.createWebviewPanel(
             SecretsPanel.viewType,
-            `🔍 DotEnvy — Secrets Scanner`,
+            `🔍 DotEnvy — ${t('secretsScanner.title')}`,
             column || vscode.ViewColumn.One,
             { enableScripts: true, retainContextWhenHidden: true,
               localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources')] }
@@ -143,7 +144,11 @@ export class SecretsPanel {
 
         const rows = secrets.map((s, i) => {
             const badge  = `<span class="badge ${s.confidence}">${s.confidence === 'high' ? 'HIGH' : s.confidence === 'medium' ? 'MED' : 'LOW'}</span>`;
-            const method = s.detectionMethod === 'hybrid' ? '🤖 AI + Pattern' : s.detectionMethod === 'pattern' ? '🔎 Pattern' : '📊 Statistical';
+            const method = s.detectionMethod === 'hybrid'
+                ? t('secretsScanner.methodAi')
+                : s.detectionMethod === 'pattern'
+                ? t('secretsScanner.methodPattern')
+                : t('secretsScanner.methodStatistical');
             return `
             <div class="secret-row" data-confidence="${s.confidence}" data-index="${i}">
                 <div class="secret-header">
@@ -158,9 +163,9 @@ export class SecretsPanel {
                     <div class="secret-env">→ <strong>${this._e(s.suggestedEnvVar)}</strong></div>
                 </div>
                 <div class="secret-actions">
-                    <button class="btn-view"   data-action="view"   data-index="${i}">📍 View</button>
-                    <button class="btn-move"   data-action="move"   data-index="${i}">📥 Move to .env</button>
-                    <button class="btn-ignore" data-action="ignore" data-index="${i}" title="Mark as false positive — trains the AI">👁️ Not a Secret</button>
+                    <button class="btn-view"   data-action="view"   data-index="${i}">${t('secretsScanner.view')}</button>
+                    <button class="btn-move"   data-action="move"   data-index="${i}">${t('secretsScanner.moveToEnv')}</button>
+                    <button class="btn-ignore" data-action="ignore" data-index="${i}" title="${t('secretsScanner.notASecretTitle')}">${t('secretsScanner.notASecret')}</button>
                 </div>
             </div>`;
         }).join('');
@@ -168,11 +173,11 @@ export class SecretsPanel {
         const json = JSON.stringify(secrets).replace(/</g, '\\u003c');
         
         const statsHint = secrets.length > 0 
-            ? '<div class="hint">🧠 Click <strong>Not a Secret</strong> on false positives — your feedback trains the AI to be smarter.</div>' 
+            ? `<div class="hint">${t('secretsScanner.hint')}</div>`
             : '';
             
         const secretsContent = secrets.length === 0
-            ? '<div class="empty"><div class="icon">✅</div><h3>No secrets detected!</h3><p>Your codebase looks clean.</p></div>'
+            ? `<div class="empty"><div class="icon">✅</div><h3>${t('secretsScanner.emptyTitle')}</h3><p>${t('secretsScanner.emptyDesc')}</p></div>`
             : `<div class="secrets-list" id="list">${rows}</div>`;
 
         return loadWebviewHtml({
@@ -180,6 +185,13 @@ export class SecretsPanel {
             extensionUri: this._extensionUri,
             templatePath: ['resources', 'panel', 'secrets-scanner.html'],
             tokens: {
+                title:          t('secretsScanner.title'),
+                headerTitle:    t('secretsScanner.headerTitle'),
+                allLabel:       t('secretsScanner.all'),
+                highLabel:      t('secretsScanner.high'),
+                mediumLabel:    t('secretsScanner.medium'),
+                lowLabel:       t('secretsScanner.low'),
+                searchPlaceholder: t('secretsScanner.filterPlaceholder'),
                 styleUri:       this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'panel', 'panel.css')).toString(),
                 extraStyleUri:  this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'panel', 'secrets-scanner.css')).toString(),
                 allCount:       secrets.length.toString(),

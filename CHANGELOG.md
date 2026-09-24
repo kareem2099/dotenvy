@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-09-24
+
+### **Aegis** — Internationalization (Italian & English) + Sidebar UX Redesign + Advanced Cloud Sync & Monorepo Git Hooks
+
+#### 🙏 **Special Thanks & Community Contribution**
+A huge, heartfelt thank you to **[@FaberVi](https://github.com/FaberVi)** for the incredible PR ([#2](https://github.com/kareem2099/dotenvy/pull/2)) introducing full Italian localization, sidebar UX modernization, Doppler multi-file prefix mapping, and monorepo git hooks. We sincerely apologize for the delay in reviewing and integrating these contributions — our team was deeply heads-down refactoring the core security architecture, dynamic credential handshakes, and scanner hardening. Your outstanding work is now fully integrated into DotEnvy core!
+
+#### 🌐 **Internationalization (i18n)**
+- **Full Italian Localization (`it`)**: Complete Italian translation catalog covering all commands, notifications, dialogs, status bar, and all webview panels.
+- **Deep Webview Panel Localization**: Extended localization across all secondary panels—Variable Manager, Session Trash Bin, Environment Timeline, History Viewer, Analytics Dashboard, and Secrets Scanner (modals, search placeholders, stat badges, and table headers).
+- **Dynamic Language Switcher**: Added custom dropdown in the sidebar allowing instant switching between English and Italian without restarting VS Code.
+- **VS Code NLS Integration**: Manifest commands, configurations, and views localized via `package.nls.json` and `package.nls.it.json`.
+
+#### 🎨 **Sidebar UX & Onboarding Modernization**
+- **Compact Sidebar Cards**: Redesigned environment cards and status indicators with a responsive grid layout optimized for narrow sidebars.
+- **Onboarding Setup Banner**: Interactive banner guiding new users to initialize secure projects with one click.
+- **In-Panel Toast Notifications**: Real-time progress indicators and toast messages inside the dashboard for push/pull actions.
+- **Clean Sidebar Layout**: Streamlined view containers by removing legacy redundant tree providers.
+
+#### ☁️ **Advanced Cloud Sync & Doppler Integration**
+- **Multi-File Prefix Mapping**: Route environment variables across multiple `.env` files using prefixes (`BACKEND_`, `FRONTEND_`).
+- **Orphan Key Cleanup**: Automatic removal of deleted local variables from Doppler cloud during push operations.
+- **Auto-Discovery**: Automatic discovery of nested `.env` files in workspace subfolders and automatic Doppler project name resolution.
+- **Quick Dashboard Shortcut**: Direct link to open the Doppler web dashboard from inside DotEnvy.
+
+#### 🪝 **Monorepo & Nested Git Hook Support**
+- **Intelligent Git Root Discovery**: Accurately resolves git repositories in monorepos and subfolders with QuickPick directory selection.
+
+---
+
 ## [2.1.3] - 2026-09-23
 
 ### **Aegis** — Static Scanner Hardening & Build Hygiene

@@ -9,6 +9,7 @@ import { CacheManager } from './cacheManager';
 import { LLMAnalyzer } from './llmAnalyzer';
 import { DotenvyIgnore } from './dotenvyIgnore';
 import { logger } from './logger';
+import { t } from '../i18n';
 
 export class SecretDetector {
     private static scanProgressCallback?: (progress: ScanProgress) => void;
@@ -168,10 +169,10 @@ export class SecretDetector {
                 onSecretsFound(secrets);
             } else {
                 vscode.window.showWarningMessage(
-                    `⚠️ ${secrets.length} potential secret(s) detected in ${path.basename(filePath)}`,
-                    'Review Secrets'
+                    t('secretDetector.foundInFile', { count: secrets.length, fileName: path.basename(filePath) }),
+                    t('secretDetector.review')
                 ).then(selection => {
-                    if (selection === 'Review Secrets') {
+                    if (selection === t('secretDetector.review')) {
                         logger.info('Secrets found:', 'SecretDetector');
                     }
                 });
@@ -198,7 +199,7 @@ export class SecretDetector {
         const workspaceFolders = vscode.workspace.workspaceFolders;
 
         if (!workspaceFolders) {
-            vscode.window.showInformationMessage('Open a workspace folder to scan for secrets.');
+            vscode.window.showInformationMessage(t('secretDetector.noWorkspace'));
             return secrets;
         }
 
@@ -459,7 +460,7 @@ export class SecretDetector {
         const workspaceFolders = vscode.workspace.workspaceFolders;
 
         if (!workspaceFolders) {
-            vscode.window.showInformationMessage('Open a workspace folder to scan for secrets.');
+            vscode.window.showInformationMessage(t('secretDetector.noWorkspace'));
             return secrets;
         }
 

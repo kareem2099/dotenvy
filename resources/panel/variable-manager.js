@@ -10,6 +10,13 @@
     let allVariables = [];
     let currentFile = '.env';
 
+    function tr(key, params, fallback) {
+        if (window.dotenvyI18n && typeof window.dotenvyI18n.tr === 'function') {
+            return window.dotenvyI18n.tr(key, params, fallback);
+        }
+        return fallback !== undefined ? fallback : key;
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // 1. MESSAGE HANDLING
     // ──────────────────────────────────────────────────────────────────────────
@@ -24,6 +31,10 @@
                 updateStats();
                 renderVariables(allVariables);
                 break;
+            case 'localeChanged':
+                updateStats();
+                renderVariables(allVariables, searchBox ? searchBox.value.toLowerCase().trim() : '');
+                break;
             case 'error':
                 showError(message.message);
                 break;
@@ -31,7 +42,7 @@
     });
 
     if (refreshBtn) refreshBtn.addEventListener('click', () => {
-        rootEl.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Refreshing...</p></div>`;
+        rootEl.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>${tr('variableManager.refreshing', {}, 'Refreshing...')}</p></div>`;
         vscode.postMessage({ type: 'refresh', fileName: currentFile });
     });
 
@@ -65,17 +76,17 @@
             <div class="stat-chip">
                 <span class="stat-icon">📦</span>
                 <span class="stat-value">${total}</span>
-                <span class="stat-label">Total</span>
+                <span class="stat-label">${tr('variableManager.total', {}, 'Total')}</span>
             </div>
             <div class="stat-chip stat-chip--plain">
                 <span class="stat-icon">🔓</span>
                 <span class="stat-value">${plain}</span>
-                <span class="stat-label">Plain</span>
+                <span class="stat-label">${tr('variableManager.plain', {}, 'Plain')}</span>
             </div>
             <div class="stat-chip stat-chip--encrypted">
                 <span class="stat-icon">🔒</span>
                 <span class="stat-value">${encrypted}</span>
-                <span class="stat-label">Encrypted</span>
+                <span class="stat-label">${tr('variableManager.encrypted', {}, 'Encrypted')}</span>
             </div>
         `;
     }
@@ -99,9 +110,9 @@
             rootEl.innerHTML = `
                 <div class="vm-empty-state">
                     <div class="vm-empty-icon">${isFiltered ? '🔍' : '📭'}</div>
-                    <h3>${isFiltered ? 'No matching variables' : 'No variables yet'}</h3>
-                    <p>${isFiltered ? `Nothing matches "${escHtml(searchQuery)}"` : `${currentFile} is empty`}</p>
-                    ${!isFiltered ? `<button class="btn btn-primary" id="empty-add-btn">＋ Add First Variable</button>` : ''}
+                    <h3>${isFiltered ? tr('variableManager.noMatching', {}, 'No matching variables') : tr('variableManager.noVariables', {}, 'No variables yet')}</h3>
+                    <p>${isFiltered ? tr('variableManager.nothingMatches', { query: escHtml(searchQuery) }, `Nothing matches "${escHtml(searchQuery)}"`) : tr('variableManager.fileEmpty', { file: currentFile }, `${currentFile} is empty`)}</p>
+                    ${!isFiltered ? `<button class="btn btn-primary" id="empty-add-btn">${tr('variableManager.addFirst', {}, '＋ Add First Variable')}</button>` : ''}
                 </div>`;
             const emptyAdd = document.getElementById('empty-add-btn');
             if (emptyAdd) emptyAdd.addEventListener('click', showAddVariableModal);
@@ -109,7 +120,7 @@
         }
 
         const rows = variables.map((v) => {
-            const displayValue = v.encrypted ? '••••••••••••' : (v.value === '' ? '<em style="opacity:0.4">empty</em>' : highlightText(v.value, searchQuery));
+            const displayValue = v.encrypted ? '••••••••••••' : (v.value === '' ? `<em style="opacity:0.4">${tr('variableManager.emptyVal', {}, 'empty')}</em>` : highlightText(v.value, searchQuery));
             const keyHtml = highlightText(v.key, searchQuery);
             return `
             <div class="vm-row" data-key="${escAttr(v.key)}">
@@ -121,18 +132,18 @@
                     <div class="vm-value-wrap">
                         <span class="vm-value-text ${v.encrypted ? 'is-encrypted' : ''}" data-raw="${escAttr(v.value)}">${displayValue}</span>
                         ${v.encrypted ? `
-                            <button class="vm-btn-peek" title="Peek value" data-key="${escAttr(v.key)}">👁</button>
+                            <button class="vm-btn-peek" title="${tr('variableManager.peekValue', {}, 'Peek value')}" data-key="${escAttr(v.key)}">👁</button>
                         ` : ''}
                     </div>
                 </div>
                 <div class="vm-cell vm-cell--actions">
-                    <button class="vm-action-btn vm-action-btn--lock ${v.encrypted ? 'is-active' : ''}" title="${v.encrypted ? 'Remove encryption' : 'Encrypt value'}" data-key="${escAttr(v.key)}" data-action="toggle">
+                    <button class="vm-action-btn vm-action-btn--lock ${v.encrypted ? 'is-active' : ''}" title="${v.encrypted ? tr('variableManager.removeEnc', {}, 'Remove encryption') : tr('variableManager.encryptVal', {}, 'Encrypt value')}" data-key="${escAttr(v.key)}" data-action="toggle">
                         ${v.encrypted ? '🔒' : '🔓'}
                     </button>
-                    <button class="vm-action-btn vm-action-btn--edit" title="Edit value" data-key="${escAttr(v.key)}" data-action="edit">
+                    <button class="vm-action-btn vm-action-btn--edit" title="${tr('variableManager.editVal', {}, 'Edit value')}" data-key="${escAttr(v.key)}" data-action="edit">
                         ✏️
                     </button>
-                    <button class="vm-action-btn vm-action-btn--delete" title="Delete variable" data-key="${escAttr(v.key)}" data-action="delete">
+                    <button class="vm-action-btn vm-action-btn--delete" title="${tr('variableManager.deleteVar', {}, 'Delete variable')}" data-key="${escAttr(v.key)}" data-action="delete">
                         🗑
                     </button>
                 </div>
@@ -141,9 +152,9 @@
 
         rootEl.innerHTML = `
             <div class="vm-table-header">
-                <div class="vm-th vm-th--key">KEY</div>
-                <div class="vm-th vm-th--value">VALUE</div>
-                <div class="vm-th vm-th--actions">ACTIONS</div>
+                <div class="vm-th vm-th--key">${tr('variableManager.thKey', {}, 'KEY')}</div>
+                <div class="vm-th vm-th--value">${tr('variableManager.thValue', {}, 'VALUE')}</div>
+                <div class="vm-th vm-th--actions">${tr('variableManager.thActions', {}, 'ACTIONS')}</div>
             </div>
             <div class="vm-list" id="vm-list">
                 ${rows}
@@ -188,11 +199,11 @@
             if (valSpan.dataset.peeking === 'true') {
                 valSpan.innerHTML = '••••••••••••';
                 valSpan.dataset.peeking = 'false';
-                peekBtn.title = 'Peek value';
+                peekBtn.title = tr('variableManager.peekValue', {}, 'Peek value');
             } else {
-                valSpan.textContent = variable.value || '(empty)';
+                valSpan.textContent = variable.value || `(${tr('variableManager.emptyVal', {}, 'empty')})`;
                 valSpan.dataset.peeking = 'true';
-                peekBtn.title = 'Hide value';
+                peekBtn.title = tr('variableManager.hideValue', {}, 'Hide value');
             }
         });
     }
@@ -203,14 +214,14 @@
 
     function showAddVariableModal() {
         showVariableModal({
-            title: '＋ Add Variable',
+            title: tr('variableManager.addModalTitle', {}, '＋ Add Variable'),
             keyValue: '',
             valueValue: '',
             keyEditable: true,
-            submitLabel: 'Add Variable',
+            submitLabel: tr('variableManager.addBtn', {}, '＋ Add Variable'),
             onSubmit: ({ key, value }) => {
-                if (!key.trim()) return 'Key cannot be empty';
-                if (allVariables.find(v => v.key === key.trim())) return `Key "${key}" already exists`;
+                if (!key.trim()) return tr('variableManager.keyEmpty', {}, 'Key cannot be empty');
+                if (allVariables.find(v => v.key === key.trim())) return tr('variableManager.keyExists', { key }, `Key "${key}" already exists`);
                 vscode.postMessage({ type: 'updateVariable', key: key.trim(), value, fileName: currentFile });
             }
         });
@@ -218,11 +229,11 @@
 
     function startEditingModal(variable) {
         showVariableModal({
-            title: `✏️ Edit  ${variable.key}`,
+            title: tr('variableManager.editModalTitle', { key: variable.key }, `✏️ Edit  ${variable.key}`),
             keyValue: variable.key,
             valueValue: variable.encrypted ? '' : variable.value,
             keyEditable: false,
-            submitLabel: 'Save Changes',
+            submitLabel: tr('variableManager.saveChanges', {}, 'Save Changes'),
             valuePlaceholder: variable.encrypted ? '(enter new value for encrypted var)' : '',
             onSubmit: ({ value }) => {
                 vscode.postMessage({
@@ -249,7 +260,7 @@
                 </div>
                 <div class="vm-modal-body">
                     <div class="vm-form-group">
-                        <label class="vm-form-label" for="modal-key">Key</label>
+                        <label class="vm-form-label" for="modal-key">${tr('variableManager.keyLabel', {}, 'KEY')}</label>
                         <input
                             id="modal-key"
                             class="vm-form-input vm-mono"
@@ -262,7 +273,7 @@
                         >
                     </div>
                     <div class="vm-form-group">
-                        <label class="vm-form-label" for="modal-value">Value</label>
+                        <label class="vm-form-label" for="modal-value">${tr('variableManager.valueLabel', {}, 'VALUE')}</label>
                         <textarea
                             id="modal-value"
                             class="vm-form-input vm-form-textarea vm-mono"
@@ -275,7 +286,7 @@
                     <div class="vm-form-error" id="vm-form-error"></div>
                 </div>
                 <div class="vm-modal-footer">
-                    <button class="btn btn-secondary" id="vm-modal-cancel">Cancel</button>
+                    <button class="btn btn-secondary" id="vm-modal-cancel">${tr('variableManager.cancel', {}, 'Cancel')}</button>
                     <button class="btn btn-primary" id="vm-modal-submit">${submitLabel}</button>
                 </div>
             </div>`;
@@ -322,16 +333,16 @@
         overlay.innerHTML = `
             <div class="vm-modal vm-modal--sm" role="dialog" aria-modal="true">
                 <div class="vm-modal-header">
-                    <h3 class="vm-modal-title">🗑 Delete Variable</h3>
+                    <h3 class="vm-modal-title">🗑 ${tr('variableManager.deleteConfirmTitle', {}, 'Delete Variable')}</h3>
                     <button class="vm-modal-close" id="vm-modal-close" aria-label="Close">✕</button>
                 </div>
                 <div class="vm-modal-body">
-                    <p class="vm-delete-msg">Delete <code class="vm-inline-code">${escHtml(key)}</code>?</p>
+                    <p class="vm-delete-msg">${tr('variableManager.deleteConfirmDesc', { key: escHtml(key) }, `Delete ${escHtml(key)}?`)}</p>
                     <p class="vm-delete-hint">This will be saved to the Trash Bin and can be restored.</p>
                 </div>
                 <div class="vm-modal-footer">
-                    <button class="btn btn-secondary" id="vm-modal-cancel">Cancel</button>
-                    <button class="btn btn-danger" id="vm-modal-confirm">Delete</button>
+                    <button class="btn btn-secondary" id="vm-modal-cancel">${tr('variableManager.cancel', {}, 'Cancel')}</button>
+                    <button class="btn btn-danger" id="vm-modal-confirm">${tr('variableManager.deleteConfirmBtn', {}, 'Delete')}</button>
                 </div>
             </div>`;
 

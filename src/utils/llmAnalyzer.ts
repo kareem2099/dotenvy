@@ -39,7 +39,7 @@ const KNOWN_SECRET_PATTERNS: { name: string; regex: RegExp }[] = [
 export class LLMAnalyzer {
 
     private static instance: LLMAnalyzer | null = null;
-    private readonly serviceUrl = 'https://python-llm-production.up.railway.app';
+    private readonly serviceUrl = 'https://aegis.dotsuite.dev';
     private sharedSecret: string | undefined;
     private readonly secrets: vscode.SecretStorage;
     private readonly extensionMode: vscode.ExtensionMode;
@@ -92,10 +92,11 @@ export class LLMAnalyzer {
     public async registerWithBackend(): Promise<boolean> {
         return new Promise((resolve) => {
             const machineId = this.getMachineId();
+            const extVersion = vscode.extensions.getExtension('FreeRave.dotenvy')?.packageJSON?.version || '2.2.0';
             const payload = JSON.stringify({
                 machine_id: machineId,
                 vscode_version: vscode.version || '',
-                extension_version: '2.1.2'
+                extension_version: extVersion
             });
 
             const url = new URL('/extension/register', this.serviceUrl);

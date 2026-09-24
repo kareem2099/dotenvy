@@ -66,6 +66,15 @@
         });
     }
 
+    let currentStats = null;
+
+    function tr(key, params, fallback) {
+        if (window.dotenvyI18n && typeof window.dotenvyI18n.tr === 'function') {
+            return window.dotenvyI18n.tr(key, params, fallback);
+        }
+        return fallback !== undefined ? fallback : key;
+    }
+
     // Message handling
     window.addEventListener('message', event => {
         const message = event.data;
@@ -73,7 +82,12 @@
             case 'historyLoaded':
                 currentWorkspace = message.workspacePath;
                 timelineData = [...message.history].reverse(); // Oldest first for timeline
+                currentStats = message.stats;
                 updateStats(message.stats);
+                renderTimeline();
+                break;
+            case 'localeChanged':
+                if (currentStats) updateStats(currentStats);
                 renderTimeline();
                 break;
         }
@@ -82,12 +96,12 @@
     function updateStats(stats) {
         if (!stats || !statsDiv) return;
         statsDiv.innerHTML = `
-            <div class="stat-item">
-                <span class="stat-label">Entries:</span>
+            <div class="stat-chip">
+                <span class="stat-label">${tr('timeline.entries', {}, 'Entries')}</span>
                 <span class="stat-value">${stats.totalEntries}</span>
             </div>
-            <div class="stat-item">
-                <span class="stat-label">Span:</span>
+            <div class="stat-chip">
+                <span class="stat-label">${tr('timeline.span', {}, 'Span')}</span>
                 <span class="stat-value">${calculateDateSpan(stats.oldestEntry, stats.newestEntry)}</span>
             </div>
         `;
@@ -98,7 +112,7 @@
         const s = new Date(start);
         const e = new Date(end);
         const diffDays = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24));
-        return `${diffDays} days`;
+        return tr('timeline.days', { count: diffDays }, `${diffDays} days`);
     }
 
     function renderTimeline() {
@@ -106,7 +120,7 @@
         timelineContent.innerHTML = '';
 
         if (timelineData.length === 0) {
-            timelineContainer.innerHTML = '<div class="empty-state">No history recorded yet</div>';
+            timelineContainer.innerHTML = `<div class="empty-state">${tr('timeline.empty', {}, 'No history recorded yet')}</div>`;
             return;
         }
 

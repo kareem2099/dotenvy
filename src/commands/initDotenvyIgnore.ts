@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { DotenvyIgnore } from '../utils/dotenvyIgnore';
 import { logger } from '../utils/logger';
+import { showActionStart, showSyncToast } from '../utils/panelNotification';
+import { t } from '../i18n';
 
 /**
  * Creates a default .dotenvyignore in the workspace root.
@@ -17,26 +19,27 @@ export class InitDotenvyIgnoreCommand implements vscode.Disposable {
     }
 
     async execute(): Promise<void> {
+        showActionStart(t('initIgnore.actionStart'));
+
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) {
-            vscode.window.showErrorMessage('No workspace folder open.');
+            showSyncToast(t('common.noWorkspace'), 'error');
             return;
         }
 
         const rootPath = workspaceFolders[0].uri.fsPath;
 
         if (DotenvyIgnore.exists(rootPath)) {
-            // Already exists — just open it
             const uri = vscode.Uri.joinPath(workspaceFolders[0].uri, DotenvyIgnore.FILENAME);
             const doc = await vscode.workspace.openTextDocument(uri);
             await vscode.window.showTextDocument(doc);
-            vscode.window.showInformationMessage(
-                `📄 ${DotenvyIgnore.FILENAME} already exists — opened for editing.`
+            showSyncToast(
+                t('initIgnore.alreadyExists'),
+                'info'
             );
             return;
         }
 
-        // Create default file
         const created = DotenvyIgnore.createDefault(rootPath);
 
         if (created) {
@@ -45,8 +48,9 @@ export class InitDotenvyIgnoreCommand implements vscode.Disposable {
             await vscode.window.showTextDocument(doc);
 
             logger.info(`${DotenvyIgnore.FILENAME} created`, 'InitDotenvyIgnore');
-            vscode.window.showInformationMessage(
-                `✅ Created ${DotenvyIgnore.FILENAME} — customize it to exclude files from secret scanning.`
+            showSyncToast(
+                t('initIgnore.created'),
+                'success'
             );
         }
     }

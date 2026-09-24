@@ -2,7 +2,7 @@
   "name": "dotenvy",
   "displayName": "DotEnvy – VS Code Environment Manager",
   "description": "Effortlessly manage, secure, and sync .env files directly inside VS Code with enterprise-grade encryption.",
-  "version": "2.1.3",
+  "version": "2.2.0",
   "icon": "resources/icons/icon.png",
   "publisher": "FreeRave",
   "author": "Kareem Ehab",
@@ -64,41 +64,41 @@
         "dotenvy.backupPath": {
           "type": "string",
           "default": "",
-          "description": "Path to store encrypted backups of .env files. Leave empty to use workspace folder."
+          "description": "%config.backupPath%"
         },
         "dotenvy.encryptBackups": {
           "type": "boolean",
           "default": true,
-          "description": "Enable AES-256 encryption for backup files."
+          "description": "%config.encryptBackups%"
         },
         "dotenvy.history.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable environment history tracking."
+          "description": "%config.history.enabled%"
         },
         "dotenvy.history.retentionDays": {
           "type": "number",
           "default": 180,
           "minimum": 1,
           "maximum": 3650,
-          "description": "Number of days to retain environment history."
+          "description": "%config.history.retentionDays%"
         },
         "dotenvy.history.maxEntries": {
           "type": "number",
           "default": 1000,
           "minimum": 10,
           "maximum": 10000,
-          "description": "Maximum number of history entries to keep."
+          "description": "%config.history.maxEntries%"
         },
         "dotenvy.history.autoCleanup": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically clean up old history entries."
+          "description": "%config.history.autoCleanup%"
         },
         "dotenvy.cloudSync.encryptCloudSync": {
           "type": "boolean",
           "default": true,
-          "description": "Encrypt secrets before syncing to cloud (End-to-End Encryption)."
+          "description": "%config.cloudSync.encryptCloudSync%"
         },
         "dotenvy.cloudSync.provider": {
           "type": "string",
@@ -108,142 +108,137 @@
             "vercel",
             "aws"
           ],
-          "description": "Cloud provider to sync secrets with."
+          "description": "%config.cloudSync.provider%"
         }
       }
     },
     "commands": [
       {
         "command": "dotenvy.scanSecrets",
-        "title": "DotEnvy: Scan for Secrets",
+        "title": "%command.scanSecrets%",
         "icon": "$(search-view-icon)"
       },
       {
         "command": "dotenvy.switchEnvironment",
-        "title": "DotEnvy: Switch Environment"
+        "title": "%command.switchEnvironment%"
       },
       {
         "command": "dotenvy.initDotenvyIgnore",
-        "title": "DotEnvy: Init .dotenvyignore",
+        "title": "%command.initDotenvyIgnore%",
         "icon": "$(exclude)"
       },
       {
         "command": "dotenvy.addToIgnore",
-        "title": "DotEnvy: Ignore this path",
+        "title": "%command.addToIgnore%",
         "icon": "$(eye-closed)"
       },
       {
         "command": "dotenvy.openEnvironmentPanel",
-        "title": "DotEnvy: Open Main Dashboard"
+        "title": "%command.openEnvironmentPanel%"
       },
       {
         "command": "dotenvy.openVariableManager",
-        "title": "DotEnvy: Open Variable Manager",
+        "title": "%command.openVariableManager%",
         "icon": "$(edit)"
       },
       {
         "command": "dotenvy.setupLLMSecret",
-        "title": "DotEnvy: Setup LLM Secret",
+        "title": "%command.setupLLMSecret%",
         "icon": "$(key)"
       },
       {
         "command": "dotenvy.validateEnvironment",
-        "title": "DotEnvy: Validate Environment Files"
+        "title": "%command.validateEnvironment%"
       },
       {
         "command": "dotenvy.diffEnvironment",
-        "title": "DotEnvy: Diff Environment Files"
+        "title": "%command.diffEnvironment%"
       },
       {
         "command": "dotenvy.installGitHook",
-        "title": "DotEnvy: Install Git Commit Hook"
+        "title": "%command.installGitHook%"
       },
       {
         "command": "dotenvy.removeGitHook",
-        "title": "DotEnvy: Remove Git Commit Hook"
+        "title": "%command.removeGitHook%"
       },
       {
         "command": "dotenvy.pullFromCloud",
-        "title": "DotEnvy: Pull Environment from Cloud"
+        "title": "%command.pullFromCloud%"
       },
       {
         "command": "dotenvy.pushToCloud",
-        "title": "DotEnvy: Push Environment to Cloud"
+        "title": "%command.pushToCloud%"
       },
       {
         "command": "dotenvy.feedback",
-        "title": "DotEnvy: Feedback & Support"
+        "title": "%command.feedback%"
       },
       {
         "command": "dotenvy.viewEnvironmentHistory",
-        "title": "DotEnvy: View Environment History"
+        "title": "%command.viewEnvironmentHistory%"
       },
       {
         "command": "dotenvy.openHistoryPanel",
-        "title": "DotEnvy: Open History Panel",
+        "title": "%command.openHistoryPanel%",
         "icon": "$(history)"
       },
       {
         "command": "dotenvy.openAnalyticsPanel",
-        "title": "DotEnvy: Open Analytics Panel",
+        "title": "%command.openAnalyticsPanel%",
         "icon": "$(graph)"
       },
       {
         "command": "dotenvy.openTimelinePanel",
-        "title": "DotEnvy: Open Timeline Panel",
+        "title": "%command.openTimelinePanel%",
         "icon": "$(history)"
       },
       {
         "command": "dotenvy.initSecureProject",
-        "title": "DotEnvy: Init Secure Project",
+        "title": "%command.initSecureProject%",
         "icon": "$(shield-lock)"
       },
       {
         "command": "dotenvy.addUser",
-        "title": "DotEnvy: Add User to Secure Project",
+        "title": "%command.addUser%",
         "icon": "$(person-add)"
       },
       {
         "command": "dotenvy.revokeUser",
-        "title": "DotEnvy: Revoke User Access",
+        "title": "%command.revokeUser%",
         "icon": "$(person-remove)"
       },
       {
         "command": "dotenvy.loginToSecureProject",
-        "title": "DotEnvy: Login to Secure Project",
+        "title": "%command.loginToSecureProject%",
         "icon": "$(unlock)"
       },
       {
         "command": "dotenvy.showChangelog",
-        "title": "DotEnvy: Show What's New",
+        "title": "%command.showChangelog%",
         "category": "DotEnvy"
       },
       {
         "command": "dotenvy.backup",
-        "title": "DotEnvy: Backup Current Environment",
+        "title": "%command.backup%",
         "icon": "$(archive)"
       },
       {
         "command": "dotenvy.restore",
-        "title": "DotEnvy: Restore from Backup",
+        "title": "%command.restore%",
         "icon": "$(history)"
       },
       {
         "command": "dotenvy.openTrashBin",
-        "title": "DotEnvy: Open Session Trash Bin",
+        "title": "%command.openTrashBin%",
         "icon": "$(trash)"
-      },
-      {
-        "command": "dotenvy.setMasterPassword",
-        "title": "DotEnvy: Set Master Password",
-        "icon": "$(lock)"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
           "id": "dotenvy",
-          "title": "DotEnvy",
+          "title": "%views.container.title%",
           "icon": "./resources/icons/icon.png"
         }
       ]
@@ -252,13 +247,13 @@
       "dotenvy": [
         {
           "id": "dotenvy.environments",
-          "name": "Environment Switcher",
+          "name": "%views.environments.name%",
           "type": "webview",
           "icon": "$(settings-gear)"
         },
         {
           "id": "dotenvy.commands",
-          "name": "Secure Commands",
+          "name": "%views.commands.name%",
           "type": "tree",
           "icon": "$(lock)"
         }

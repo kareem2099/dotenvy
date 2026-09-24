@@ -20,6 +20,18 @@ export interface GitCommitHookConfig {
 	customMessage?: string;
 }
 
+export interface EnvSyncTarget {
+	/** Relative path from workspace root, e.g. backend/.env.development */
+	file: string;
+	/** Doppler key prefix applied on push and stripped on pull, e.g. BACKEND_ */
+	keyPrefix?: string;
+	/** Variable keys starting with any of these prefixes are routed to this file on pull (fallback) */
+	prefixes?: string[];
+	/** Receives keys that do not match any other target's prefixes */
+	catchAll?: boolean;
+	label?: string;
+}
+
 export interface CloudSyncConfig {
 	provider: 'doppler' | 'vault';
 	project: string;
@@ -27,6 +39,10 @@ export interface CloudSyncConfig {
 	token?: string; // Optional, can be set via env var or secure storage
 	baseUrl?: string; // For custom Vault installations
 	encryptCloudSync?: boolean; // Enable end-to-end encryption for cloud sync
+	/** When set, push/pull merge and split secrets across multiple .env files */
+	envTargets?: EnvSyncTarget[];
+	/** replace: delete remote keys not in local files (default). merge: upsert only */
+	pushMode?: 'replace' | 'merge';
 }
 
 export interface QuickEnvConfig {

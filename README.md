@@ -1,7 +1,7 @@
 # dotenvy – VS Code Environment Manager
 
-[![Version](https://img.shields.io/badge/version-2.1.3-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
-[![Codename](https://img.shields.io/badge/codename-Aegis-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.1.3)
+[![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Codename](https://img.shields.io/badge/codename-Aegis-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.2.0)
 [![Publisher](https://img.shields.io/badge/publisher-FreeRave-red.svg)](https://marketplace.visualstudio.com/publishers/FreeRave)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![VS Code Marketplace](https://img.shields.io/badge/vscode-marketplace-007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
@@ -21,6 +21,15 @@
 ### 🔄 **Environment Switching**
 Effortlessly switch between `.env.development`, `.env.staging`, `.env.production`, or any custom `.env.*` file with a single click.
 
+### 🌐 **Full Deep Internationalization (New in v2.2.0!)**
+Native support for both **English** and **Italian (`it`)**, with a seamless sidebar dropdown to switch languages instantly across all dialogs, dashboards, and panels (Variable Manager, Trash Bin, History, Timeline, Analytics, and Secrets Scanner).
+
+### 🎨 **Compact Sidebar & Onboarding Banner (New!)**
+A modern, space-efficient sidebar design tailored for narrow split screens, complete with an interactive onboarding setup banner for newly opened repositories.
+
+### ☁️ **Advanced Cloud Sync & Doppler Integration**
+Bidirectional cloud sync with Doppler Secrets Manager, supporting multi-file prefix routing (`BACKEND_`, `FRONTEND_`), orphan key cleanup, and automatic project discovery.
+
 ### 📂 **Auto Detection & Sync**
 Automatically scans your workspace for `.env` files and syncs seamlessly across multi-workspace setups.
 
@@ -33,11 +42,8 @@ Validate .env files for syntax errors, required variables, and type checking wit
 ### 📄 **Diff View**
 Compare environment files side-by-side before switching to preview changes and avoid surprises.
 
-### 🛡️ **Git Commit Security**
-Prevent committing sensitive data with pre-commit hooks that scan for secrets, validation errors, and block `.env` files.
-
-### ☁️ **Cloud Sync Support**
-Bidirectional cloud sync with Doppler Secrets Manager for team-based environment variable management.
+### 🛡️ **Git Commit Security & Monorepo Support**
+Prevent committing sensitive data with pre-commit hooks that scan for secrets, validation errors, and block `.env` files, featuring smart git root discovery for monorepos.
 
 ### 💾 **Backup & Recovery**
 Automatic backup creation before switching, with portable AES-256-GCM encrypted backups that work across any device.
@@ -45,13 +51,19 @@ Automatic backup creation before switching, with portable AES-256-GCM encrypted 
 ### 📊 **Status Bar Integration**
 Real-time environment indicator in status bar showing current configuration, validation status, and cloud sync state.
 
-## 🚀 What's New in v2.1.3? (Aegis — Security & Scanner Hardening)
+## 🚀 What's New in v2.2.0?
 
-### 🔐 Zero Client Secrets & Dynamic Credential Handshake
-DotEnvy now uses a dynamic, per-installation registration protocol. No shared keys or secrets are embedded into extension binaries. Unique credentials are created dynamically on first launch and preserved inside OS-encrypted VS Code `SecretStorage`.
+> ### 🌟 Community Spotlight & Thank You!
+> A heartfelt thank you to **[@FaberVi](https://github.com/FaberVi)** for contributing PR [#2](https://github.com/kareem2099/dotenvy/pull/2), bringing full Italian localization, sidebar UX modernization, Doppler multi-file prefix mapping, and monorepo git hooks. We apologize for the delay in reviewing and integrating your PR while we were re-architecting the core security engine. Your contributions are now a proud part of DotEnvy!
 
-### 🛡️ Pattern Obfuscation & Build Hygiene
-All internal regex and signature patterns are dynamically assembled at runtime to prevent false positives from static code scanners. All legacy uncompiled build artifacts are purged automatically on build.
+### 🌐 Complete Italian Localization & Custom Switcher
+DotEnvy is now fully localized into Italian across the entire extension! Every command, notification, and webview panel (including Variable Manager, Trash Bin, Timeline, History, Analytics, and Secrets Scanner) supports seamless, instant switching between English and Italian from the sidebar without restarting your editor.
+
+### 🎨 Compact Sidebar Redesign & Toasts
+Redesigned with a compact responsive layout for sidebars, plus clean in-panel toast notifications and progress bars.
+
+### ☁️ Doppler Multi-File Sync & Cleanups
+Easily split and merge Doppler secrets across multiple `.env` files using environment prefixes, with automatic orphan variable cleanup.
 
 ### 🗑️ Session Trash Bin (Lifesaver!)
 Deleted a crucial variable by mistake? No worries. Restore it with a single click from the new Session Trash Bin.
@@ -248,6 +260,12 @@ Run **`DotEnvy: Init .dotenvyignore`** to create a default file, or right-click 
 
 For upcoming features, see [ROADMAP.md](ROADMAP.md).  
 Issues and PRs are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
+
+---
+
+## 👥 Contributors & Special Thanks
+
+Special thanks to **[@FaberVi](https://github.com/FaberVi)** for authoring the Italian localization, custom dropdown language switcher, compact sidebar design, and Doppler multi-file sync improvements in PR #2.
 
 ---
 
