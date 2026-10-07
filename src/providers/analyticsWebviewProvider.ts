@@ -99,7 +99,7 @@ export class AnalyticsWebviewProvider {
             logger.error('Failed to load analytics:', error, 'AnalyticsWebviewProvider');
             AnalyticsWebviewProvider._post({
                 type: 'error',
-                message: `Failed to load analytics: ${(error as Error).message}`,
+                errorMessage: (error as Error).message,
             });
         }
     }

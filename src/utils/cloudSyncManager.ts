@@ -6,10 +6,15 @@ export interface CloudSecrets {
 	[key: string]: string;
 }
 
+export type CloudSyncErrorCode = 'CONFIG_NOT_FOUND' | 'INVALID_PROJECT';
+
 export interface CloudSyncResult {
 	success: boolean;
 	secrets?: CloudSecrets;
 	error?: string;
+	/** Doppler config slug used after alias/API resolution */
+	resolvedConfig?: string;
+	errorCode?: CloudSyncErrorCode;
 }
 
 /**

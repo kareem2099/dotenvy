@@ -76,6 +76,13 @@ const buttonEffects = {
 
 let currentStrings = {};
 let currentLocale = 'en';
+const DEFAULT_LOCALES = [
+    { code: 'en', label: 'English' },
+    { code: 'it', label: 'Italiano' },
+    { code: 'ar', label: 'العربية' },
+    { code: 'ru', label: 'Русский' },
+];
+let availableLocales = [...DEFAULT_LOCALES];
 
 function tr(key, params = {}) {
     let text = currentStrings[key] || key;
@@ -108,11 +115,36 @@ function applyTranslations() {
     syncLocaleDropdown();
 }
 
+function renderLocaleMenu() {
+    const menu = document.getElementById('locale-dropdown-menu');
+    if (!menu) {
+        return;
+    }
+
+    menu.innerHTML = '';
+    for (const entry of availableLocales) {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'locale-dropdown-option';
+        option.setAttribute('role', 'option');
+        option.dataset.locale = entry.code;
+        const labelKey = `panel.language.${entry.code}`;
+        option.setAttribute('data-i18n', labelKey);
+        const translated = tr(labelKey);
+        option.textContent = translated !== labelKey ? translated : entry.label;
+        menu.appendChild(option);
+    }
+}
+
 function syncLocaleDropdown() {
     const menu = document.getElementById('locale-dropdown-menu');
     const valueEl = document.getElementById('locale-dropdown-value');
     if (!menu || !valueEl || !currentLocale) {
         return;
+    }
+
+    if (menu.childElementCount === 0) {
+        renderLocaleMenu();
     }
 
     menu.querySelectorAll('.locale-dropdown-option').forEach((opt) => {
@@ -200,19 +232,17 @@ function initLocaleDropdown() {
         toggleLocaleDropdown();
     });
 
-    menu.querySelectorAll('.locale-dropdown-option').forEach((opt) => {
-        opt.addEventListener('click', (event) => {
-            event.stopPropagation();
-            const locale = opt.dataset.locale;
-            if (locale && locale !== currentLocale) {
-                setLocale(locale);
-            }
-            closeLocaleDropdown();
-        });
-    });
-
     menu.addEventListener('click', (event) => {
         event.stopPropagation();
+        const option = event.target.closest('.locale-dropdown-option');
+        if (!option) {
+            return;
+        }
+        const locale = option.dataset.locale;
+        if (locale && locale !== currentLocale) {
+            setLocale(locale);
+        }
+        closeLocaleDropdown();
     });
 
     document.addEventListener('click', () => closeLocaleDropdown());
@@ -238,6 +268,13 @@ function updateDashboard(data) {
     }
     if (data.locale) {
         currentLocale = data.locale;
+    }
+    if (Array.isArray(data.locales) && data.locales.length > 0) {
+        availableLocales = data.locales.map((entry) => ({
+            code: entry.code,
+            label: entry.label,
+        }));
+        renderLocaleMenu();
     }
     applyTranslations();
     console.log('📊 Updating dashboard...', data);
@@ -485,6 +522,7 @@ window.addEventListener('message', event => {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 DotEnvy UI Initialized');
     addAnimationStyles();
+    renderLocaleMenu();
     initLocaleDropdown();
 
     document.querySelectorAll('.btn').forEach(btn => {

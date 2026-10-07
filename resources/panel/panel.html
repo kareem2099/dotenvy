@@ -22,34 +22,34 @@
             <span data-i18n="panel.header.title">dotenvy Environment Manager</span>
         </h2>
         <div class="header-actions">
-            <button class="btn btn-secondary btn-sm" id="btn-doppler" onclick="openDopplerDashboard()"
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-doppler" onclick="openDopplerDashboard()"
                 data-i18n-title="panel.actions.dopplerTip">
                 <span>🌐</span> <span data-i18n="panel.actions.doppler">Doppler</span>
             </button>
-            <button class="btn btn-secondary btn-sm" id="btn-history" onclick="openHistoryPanel()"
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-history" onclick="openHistoryPanel()"
                 data-i18n-title="panel.actions.historyTip">
                 <span>🕐</span> <span data-i18n="panel.actions.history">History</span>
             </button>
-            <button class="btn btn-secondary btn-sm" id="btn-analytics" onclick="openAnalyticsPanel()" data-i18n-title="panel.actions.analyticsTip">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-analytics" onclick="openAnalyticsPanel()" data-i18n-title="panel.actions.analyticsTip">
                 <span>📈</span> <span data-i18n="panel.actions.analytics">Analytics</span>
             </button>
-            <button class="btn btn-secondary btn-sm" id="btn-trash" onclick="openTrashBin()" data-i18n-title="panel.actions.trashTip">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-trash" onclick="openTrashBin()" data-i18n-title="panel.actions.trashTip">
                 <span>🗑️</span> <span data-i18n="panel.actions.trash">Trash Bin</span>
             </button>
-            <button class="btn btn-danger btn-sm" id="btn-scan" onclick="scanSecrets()"
+            <button type="button" class="btn btn-danger btn-sm" id="btn-scan" onclick="scanSecrets()"
                 data-i18n-title="panel.actions.scanTip">
                 <span class="scan-icon">🔍</span> <span data-i18n="panel.actions.scan">Scan Secrets</span>
             </button>
-            <button class="btn btn-primary btn-sm" id="btn-pull" onclick="pullFromCloud()">
+            <button type="button" class="btn btn-primary btn-sm" id="btn-pull" onclick="pullFromCloud()">
                 <span class="sync-icon" id="sync-icon">☁️</span> <span data-i18n="panel.actions.pull">Pull from Cloud</span>
             </button>
-            <button class="btn btn-secondary btn-sm" id="btn-push" onclick="pushToCloud()">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-push" onclick="pushToCloud()">
                 <span class="sync-icon" id="push-icon">⬆️</span> <span data-i18n="panel.actions.push">Push to Cloud</span>
             </button>
-            <button class="btn btn-secondary btn-sm" id="btn-githook" onclick="manageGitHook()">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-githook" onclick="manageGitHook()">
                 <span class="hook-icon" id="hook-icon">🔗</span> <span data-i18n="panel.actions.gitHook">Git Hook</span>
             </button>
-            <button class="btn btn-secondary btn-sm" id="btn-validate" onclick="validateEnvironments()">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-validate" onclick="validateEnvironments()">
                 <span class="validate-icon" id="validate-icon">✅</span> <span data-i18n="panel.actions.validate">Validate</span>
             </button>
         </div>
@@ -98,8 +98,8 @@
                         <span class="status-indicator status-warning" id="hook-status" data-i18n="panel.git.notInstalled">Not Installed</span>
                     </div>
                     <div class="hook-actions">
-                        <button class="btn btn-sm btn-secondary" id="btn-install-hook" onclick="installHook()" data-i18n="panel.git.install">Install</button>
-                        <button class="btn btn-sm btn-secondary" id="btn-remove-hook" onclick="removeHook()" data-i18n="panel.git.remove">Remove</button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="btn-install-hook" onclick="installHook()" data-i18n="panel.git.install">Install</button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="btn-remove-hook" onclick="removeHook()" data-i18n="panel.git.remove">Remove</button>
                     </div>
                 </div>
             </div>
@@ -124,7 +124,7 @@
     <div class="environments" id="environments">
         <div class="section-header">
             <h3 data-i18n="panel.environments.title">Available Environments</h3>
-            <button class="btn btn-primary btn-sm" id="btn-create-env" onclick="createEnvFile()" data-i18n="panel.environments.create">Create Environment</button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-create-env" onclick="createEnvFile()" data-i18n="panel.environments.create">Create Environment</button>
         </div>
         <div class="environments-grid" id="environments-list">
             <p data-i18n="panel.environments.loading">Loading environments...</p>
@@ -146,12 +146,8 @@
             </div>
         </div>
     </div>
-    <div class="locale-dropdown-menu" id="locale-dropdown-menu" role="listbox" hidden>
-        <button type="button" class="locale-dropdown-option" role="option" data-locale="en" data-i18n="panel.language.en">English</button>
-        <button type="button" class="locale-dropdown-option" role="option" data-locale="it" data-i18n="panel.language.it">Italiano</button>
-        <button type="button" class="locale-dropdown-option" role="option" data-locale="ar" data-i18n="panel.language.ar">العربية</button>
-        <button type="button" class="locale-dropdown-option" role="option" data-locale="ru" data-i18n="panel.language.ru">Русский</button>
-    </div>
+    <!-- html-validate-disable-next prefer-native-element -- Custom locale menu: native select is not styleable in the VS Code webview -->
+    <div class="locale-dropdown-menu" id="locale-dropdown-menu" role="listbox" hidden></div>
     <script src="{{panelJsUri}}"></script>
 </body>
 

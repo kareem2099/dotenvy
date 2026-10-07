@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - 2026-10-07
+
+### 🌐 Webview localization & History filters UX
+
+- **Analytics panel i18n**: Localized all dynamically rendered strings (sections, table headers, heatmap, footer, rates, loading/error states); locale-aware hours and dates via `getLocale()`; error messages use `analytics.loadFailed`.
+- **History viewer i18n**: Localized relative timestamps, action badges, filter summary chips, rollback alerts, and variable-history copy; structured filter tags replace hardcoded English summaries from the extension host.
+- **Variable Manager i18n**: Localized modals (placeholders, delete hint, retry), encrypted badge label, and load-error handling with `variableManager.loadFailed`.
+- **Advanced filters drawer**: Improved contrast and layout for inputs/selects (VS Code theme tokens, `color-scheme`); uniform field widths and spacing; localized date-range presets (`history.preset.*`); footer buttons aligned to a single control style; removed stale “Loading…” placeholders in multi-selects.
+- **History header stats**: Unified label/value typography (UI font, aligned chips) instead of monospace numerals.
+- **Accessibility**: Added `scope="col"` on history table header cells (`wcag/h63`).
+- **i18n catalog**: New `history.*` and `variableManager.*` keys in `en`, `it`, `ar`, and `ru`; date presets identified by `id` in `HistoryFilters.getDateRangePresets()`.
+
 ## [2.2.1] - 2026-09-24
 
 ### 🌐 Full Arabic (`ar`) & Russian (`ru`) Localization + Factory Function Decoupling

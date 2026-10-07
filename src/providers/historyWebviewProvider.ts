@@ -91,7 +91,7 @@ export class HistoryWebviewProvider {
             logger.error('Failed to load history:', error, 'HistoryWebviewProvider');
             HistoryWebviewProvider._post({
                 type: 'error',
-                message: `Failed to load history: ${(error as Error).message}`
+                errorMessage: (error as Error).message,
             });
         }
     }

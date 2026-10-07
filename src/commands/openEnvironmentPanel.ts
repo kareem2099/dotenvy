@@ -145,6 +145,7 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
             type: 'refresh',
             locale: localePayload.locale,
             strings: localePayload.strings,
+            locales: localePayload.locales,
             environments: enhancedEnvironments,
             currentFile,
             currentEnvironment: currentEnvironment?.name || null,

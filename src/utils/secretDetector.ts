@@ -51,7 +51,11 @@ export class SecretDetector {
             if (uri.scheme !== 'file') return;
 
             const filePath = uri.fsPath;
-            if (!PatternRegistry.shouldScanFile(filePath, workspaceFolders[0].uri.fsPath)) {
+            const rootPath = workspaceFolders[0].uri.fsPath;
+            if (!PatternRegistry.shouldScanFile(filePath, rootPath)) {
+                return;
+            }
+            if (DotenvyIgnore.shouldIgnore(filePath, rootPath)) {
                 return;
             }
 
@@ -62,7 +66,11 @@ export class SecretDetector {
             if (uri.scheme !== 'file') return;
 
             const filePath = uri.fsPath;
-            if (!PatternRegistry.shouldScanFile(filePath, workspaceFolders[0].uri.fsPath)) {
+            const rootPath = workspaceFolders[0].uri.fsPath;
+            if (!PatternRegistry.shouldScanFile(filePath, rootPath)) {
+                return;
+            }
+            if (DotenvyIgnore.shouldIgnore(filePath, rootPath)) {
                 return;
             }
 

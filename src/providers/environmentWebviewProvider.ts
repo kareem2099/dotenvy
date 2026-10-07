@@ -72,6 +72,7 @@ interface DashboardData {
     type: string;
     locale?: string;
     strings?: Record<string, string>;
+    locales?: Array<{ code: string; label: string }>;
     environments: EnvironmentData[];
     currentFile: CurrentFileData | null;
     currentEnvironment: string | null;
@@ -346,6 +347,7 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
             type: 'refresh',
             locale: localePayload.locale,
             strings: localePayload.strings,
+            locales: localePayload.locales,
             environments: enhancedEnvironments,
             currentFile,
             currentEnvironment: currentEnvName,

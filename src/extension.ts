@@ -14,7 +14,6 @@ import { ScanSecretsCommand } from './commands/scanSecrets';
 import { FeedbackCommand } from './commands/feedback';
 import { ViewEnvironmentHistoryCommand } from './commands/viewEnvironmentHistory';
 import { SetMasterPasswordCommand } from './commands/setMasterPassword';
-import { ExportEnvironmentCommand } from './commands/exportEnvironment';
 import { InitSecureProjectCommand } from './commands/initSecureProject';
 import { AddUserCommand } from './commands/addUser';
 import { RevokeUserCommand } from './commands/revokeUser';
@@ -157,7 +156,6 @@ export async function activate(context: vscode.ExtensionContext) {
     // ─── Commands Initialization ───────────────────────────────────────────────
     const switchEnvCommand = new SwitchEnvironmentCommand();
     const openPanelCommand = new OpenEnvironmentPanelCommand();
-    const validateEnvCommand = new ValidateEnvironmentCommand();
     const diffEnvCommand = new DiffEnvironmentCommand();
     const installHookCommand = new InstallGitHookCommand();
     const removeHookCommand = new RemoveGitHookCommand();
@@ -167,19 +165,45 @@ export async function activate(context: vscode.ExtensionContext) {
     const feedbackCommand = new FeedbackCommand();
     const viewHistoryCommand = new ViewEnvironmentHistoryCommand();
     const setMasterPasswordCommand = new SetMasterPasswordCommand(context);
-    const exportEnvironmentCommand = new ExportEnvironmentCommand();
-
     const initSecureProjectCommand = new InitSecureProjectCommand();
     const addUserCommand = new AddUserCommand();
     const revokeUserCommand = new RevokeUserCommand();
     const loginToSecureProjectCommand = new LoginToSecureProjectCommand();
 
     context.subscriptions.push(
-        switchEnvCommand, openPanelCommand, validateEnvCommand, diffEnvCommand,
-        installHookCommand, removeHookCommand, pullFromCloudCommand, pushToCloudCommand,
+        switchEnvCommand,
+        viewHistoryCommand,
+        setMasterPasswordCommand,
+        initIgnoreCommand,
+        vscode.commands.registerCommand('dotenvy.openEnvironmentPanel', () => openPanelCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.validateEnvironment', () =>
+            ValidateEnvironmentCommand.manageValidation()),
+        vscode.commands.registerCommand('dotenvy.diffEnvironment', () => diffEnvCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.installGitHook', () => installHookCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.removeGitHook', () => removeHookCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.pullFromCloud', () => pullFromCloudCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.pushToCloud', () => pushToCloudCommand.execute()),
         vscode.commands.registerCommand('dotenvy.scanSecrets', () => scanSecretsCommand.execute()),
-        feedbackCommand, viewHistoryCommand, setMasterPasswordCommand,
-        exportEnvironmentCommand, initIgnoreCommand,
+        vscode.commands.registerCommand('dotenvy.feedback', () => feedbackCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.backup', async () => {
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage(t('common.noWorkspace'));
+                return;
+            }
+            const envPath = path.join(workspaceFolder.uri.fsPath, '.env');
+            const { BackupCommands } = await import('./commands/backupCommands');
+            await BackupCommands.backupEnv(context, envPath);
+        }),
+        vscode.commands.registerCommand('dotenvy.restore', async () => {
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage(t('common.noWorkspace'));
+                return;
+            }
+            const { BackupCommands } = await import('./commands/backupCommands');
+            await BackupCommands.restoreFromBackup(context, workspaceFolder.uri.fsPath);
+        }),
     );
 
     context.subscriptions.push(
@@ -219,7 +243,7 @@ export async function activate(context: vscode.ExtensionContext) {
             const pattern = isDir ? `${relativePath}/**` : relativePath;
 
             const ignoreUri = vscode.Uri.joinPath(workspaceFolders[0].uri, '.dotenvyignore');
-            let content = '';
+            let content: string;
             try {
                 content = Buffer.from(await vscode.workspace.fs.readFile(ignoreUri)).toString('utf8');
             } catch {

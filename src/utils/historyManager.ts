@@ -642,7 +642,7 @@ export class HistoryManager {
         environments: string[];
         actions: string[];
         variables: string[];
-        dateRangePresets: Array<{ label: string; range: { start?: Date; end?: Date } }>;
+        dateRangePresets: Array<{ id: string; range: { start?: Date; end?: Date } }>;
         stats: {
             totalEntries: number;
             dateRange: { start: Date; end: Date };

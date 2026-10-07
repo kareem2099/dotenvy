@@ -24,11 +24,25 @@ export interface HistoryFilterOptions {
     variables?: string[];
 }
 
+export type AppliedFilterKind =
+    | 'dateRange'
+    | 'search'
+    | 'users'
+    | 'environments'
+    | 'actions'
+    | 'variables';
+
+export interface AppliedFilterTag {
+    kind: AppliedFilterKind;
+    scope?: string;
+    count?: number;
+}
+
 export interface FilterResult {
     entries: HistoryEntry[];
     totalCount: number;
     filteredCount: number;
-    appliedFilters: string[];
+    appliedFilterTags: AppliedFilterTag[];
 }
 
 export class HistoryFilters {
@@ -40,12 +54,12 @@ export class HistoryFilters {
         filters: HistoryFilterOptions
     ): Promise<FilterResult> {
         let filteredEntries = [...entries];
-        const appliedFilters: string[] = [];
+        const appliedFilterTags: AppliedFilterTag[] = [];
 
         // Apply date range filter
         if (filters.dateRange) {
             filteredEntries = this.filterByDateRange(filteredEntries, filters.dateRange);
-            appliedFilters.push('Date Range');
+            appliedFilterTags.push({ kind: 'dateRange' });
         }
 
         // Apply search filter
@@ -56,38 +70,41 @@ export class HistoryFilters {
                 filters.searchRegex || false,
                 filters.searchScope || 'all'
             );
-            appliedFilters.push(`Search (${filters.searchScope || 'all'})`);
+            appliedFilterTags.push({
+                kind: 'search',
+                scope: filters.searchScope || 'all',
+            });
         }
 
         // Apply user filter
         if (filters.users && filters.users.length > 0) {
             filteredEntries = this.filterByUsers(filteredEntries, filters.users);
-            appliedFilters.push(`Users (${filters.users.length})`);
+            appliedFilterTags.push({ kind: 'users', count: filters.users.length });
         }
 
         // Apply environment filter
         if (filters.environments && filters.environments.length > 0) {
             filteredEntries = this.filterByEnvironments(filteredEntries, filters.environments);
-            appliedFilters.push(`Environments (${filters.environments.length})`);
+            appliedFilterTags.push({ kind: 'environments', count: filters.environments.length });
         }
 
         // Apply action filter
         if (filters.actions && filters.actions.length > 0) {
             filteredEntries = this.filterByActions(filteredEntries, filters.actions);
-            appliedFilters.push(`Actions (${filters.actions.length})`);
+            appliedFilterTags.push({ kind: 'actions', count: filters.actions.length });
         }
 
         // Apply variable filter
         if (filters.variables && filters.variables.length > 0) {
             filteredEntries = this.filterByVariables(filteredEntries, filters.variables);
-            appliedFilters.push(`Variables (${filters.variables.length})`);
+            appliedFilterTags.push({ kind: 'variables', count: filters.variables.length });
         }
 
         return {
             entries: filteredEntries,
             totalCount: entries.length,
             filteredCount: filteredEntries.length,
-            appliedFilters
+            appliedFilterTags,
         };
     }
 
@@ -272,33 +289,33 @@ export class HistoryFilters {
     /**
      * Create common date range presets
      */
-    static getDateRangePresets(): Array<{ label: string; range: DateRange }> {
+    static getDateRangePresets(): Array<{ id: string; range: DateRange }> {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
         return [
             {
-                label: 'Today',
+                id: 'today',
                 range: { start: today, end: new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1) }
             },
             {
-                label: 'Last 7 days',
+                id: 'last7days',
                 range: { start: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000) }
             },
             {
-                label: 'Last 30 days',
+                id: 'last30days',
                 range: { start: new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000) }
             },
             {
-                label: 'Last 3 months',
+                id: 'last3months',
                 range: { start: new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000) }
             },
             {
-                label: 'Last 6 months',
+                id: 'last6months',
                 range: { start: new Date(today.getTime() - 180 * 24 * 60 * 60 * 1000) }
             },
             {
-                label: 'Last year',
+                id: 'lastyear',
                 range: { start: new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000) }
             }
         ];

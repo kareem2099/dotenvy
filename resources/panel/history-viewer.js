@@ -5,6 +5,8 @@
     let currentWorkspace = null;
     let currentHistory = [];
     let filteredHistory = [];
+    let lastFilterResult = null;
+    let lastErrorDetail = null;
 
     // DOM elements
     const statsDiv = document.getElementById('stats');
@@ -50,6 +52,9 @@
 
         if (shouldShow && !isVisible) {
             loadFilterOptions();
+            if (window.dotenvyI18n && window.dotenvyI18n.applyTranslations) {
+                window.dotenvyI18n.applyTranslations();
+            }
         }
     }
 
@@ -199,13 +204,19 @@
         });
     }
 
-    function populateMultiSelect(selectElement, options, placeholder = 'All') {
-        // Clear existing options except the first one if it's a placeholder
-        while (selectElement.options.length > 1) {
-            selectElement.remove(1);
+    function populateMultiSelect(selectElement, options) {
+        if (!selectElement) { return; }
+        selectElement.innerHTML = '';
+
+        if (!options || options.length === 0) {
+            const empty = document.createElement('option');
+            empty.value = '';
+            empty.textContent = tr('history.noFilterOptions', {}, 'No items available');
+            empty.disabled = true;
+            selectElement.appendChild(empty);
+            return;
         }
 
-        // Add new options
         options.forEach(option => {
             const optionElement = document.createElement('option');
             optionElement.value = option;
@@ -232,30 +243,107 @@
         }
     }
 
+    function formatSearchScope(scope) {
+        const scopeKeys = {
+            all: 'history.scopeAll',
+            environments: 'history.scopeEnvs',
+            variables: 'history.scopeVars',
+            values: 'history.scopeVals',
+        };
+        const key = scopeKeys[scope] || scopeKeys.all;
+        return tr(key, {}, scope);
+    }
+
+    function formatAppliedFilterTag(tag) {
+        if (!tag || !tag.kind) { return ''; }
+        switch (tag.kind) {
+            case 'dateRange':
+                return tr('history.appliedTagDateRange', {}, 'Date range');
+            case 'search':
+                return tr(
+                    'history.appliedTagSearch',
+                    { scope: formatSearchScope(tag.scope || 'all') },
+                    `Search (${tag.scope || 'all'})`
+                );
+            case 'users':
+                return tr('history.appliedTagUsers', { count: tag.count }, `Users (${tag.count})`);
+            case 'environments':
+                return tr('history.appliedTagEnvironments', { count: tag.count }, `Environments (${tag.count})`);
+            case 'actions':
+                return tr('history.appliedTagActions', { count: tag.count }, `Actions (${tag.count})`);
+            case 'variables':
+                return tr('history.appliedTagVariables', { count: tag.count }, `Variables (${tag.count})`);
+            default:
+                return '';
+        }
+    }
+
+    function getAppliedFilterLabels(result) {
+        const tags = result.appliedFilterTags || [];
+        if (tags.length > 0) {
+            return tags.map(formatAppliedFilterTag).filter(Boolean);
+        }
+        if (result.appliedFilters && result.appliedFilters.length > 0) {
+            return result.appliedFilters;
+        }
+        return [];
+    }
+
     function updateFilterStats(result) {
-        if (!result.appliedFilters || result.appliedFilters.length === 0) {
-            filterStats.innerHTML = '';
+        if (!result || result.totalCount === undefined) {
+            if (filterStats) { filterStats.innerHTML = ''; }
             return;
         }
+        const labels = getAppliedFilterLabels(result);
 
+        const showing = tr(
+            'history.filterStatsShowing',
+            { filtered: result.filteredCount, total: result.totalCount },
+            `Showing ${result.filteredCount} of ${result.totalCount} entries`
+        );
+        const applied = labels.length > 0
+            ? tr(
+                'history.filterStatsApplied',
+                { list: labels.join(', ') },
+                `Filters: ${labels.join(', ')}`
+            )
+            : '';
         filterStats.innerHTML = `
             <div class="filter-stats-content">
-                <span class="filter-count">Showing ${result.filteredCount} of ${result.totalCount} entries</span>
-                <span class="applied-filters">Filters: ${result.appliedFilters.join(', ')}</span>
+                <span class="filter-count">${showing}</span>
+                ${applied ? `<span class="applied-filters">${applied}</span>` : ''}
             </div>
         `;
+    }
+
+    function presetLabel(presetId) {
+        const key = 'history.preset.' + presetId;
+        const fallbacks = {
+            today: 'Today',
+            last7days: 'Last 7 days',
+            last30days: 'Last 30 days',
+            last3months: 'Last 3 months',
+            last6months: 'Last 6 months',
+            lastyear: 'Last year',
+        };
+        return tr(key, {}, fallbacks[presetId] || presetId);
     }
 
     function populateFilterOptions(options) {
         // Populate date presets
         const datePresets = options.dateRangePresets || [];
-        datePresetSelect.innerHTML = '<option value="">Custom Range</option>';
+        const previousPreset = datePresetSelect ? datePresetSelect.value : '';
+        datePresetSelect.innerHTML = `<option value="">${tr('history.presetCustomRange', {}, 'Custom range')}</option>`;
         datePresets.forEach(preset => {
             const option = document.createElement('option');
-            option.value = preset.label.toLowerCase().replace(/\s+/g, '');
-            option.textContent = preset.label;
+            const id = preset.id || (preset.label ? preset.label.toLowerCase().replace(/\s+/g, '') : '');
+            option.value = id;
+            option.textContent = presetLabel(id);
             datePresetSelect.appendChild(option);
         });
+        if (previousPreset && datePresetSelect.querySelector(`option[value="${previousPreset}"]`)) {
+            datePresetSelect.value = previousPreset;
+        }
 
         // Populate users
         populateMultiSelect(userFilterSelect, options.users || []);
@@ -265,6 +353,10 @@
 
         // Populate variables
         populateMultiSelect(variableFilterSelect, options.variables || []);
+
+        if (window.dotenvyI18n && window.dotenvyI18n.applyTranslations) {
+            window.dotenvyI18n.applyTranslations();
+        }
     }
 
     function handleRegexValidation(message) {
@@ -274,19 +366,31 @@
             input.title = '';
         } else {
             input.classList.add('invalid');
-            input.title = `Invalid regex: ${message.error}`;
+            input.title = tr('history.invalidRegex', { error: message.error }, `Invalid regex: ${message.error}`);
         }
     }
 
+    function formatAction(action) {
+        const map = {
+            switch: tr('history.actionSwitch', {}, 'Switch'),
+            rollback: tr('history.actionRollback', {}, 'Rollback'),
+            manual_edit: tr('history.actionEdit', {}, 'Edit'),
+            import: tr('history.actionImport', {}, 'Import'),
+            initial: tr('history.actionInitial', {}, 'Initial'),
+        };
+        return map[action] || action.replace(/_/g, ' ');
+    }
+
     function displayVariableHistory(variableName, history) {
+        if (typeof detailContent === 'undefined' || !detailContent) { return; }
         if (history.length === 0) {
-            detailContent.innerHTML = `<div class="empty-state">No history found for variable "${variableName}"</div>`;
+            detailContent.innerHTML = `<div class="empty-state">${tr('history.varHistoryEmpty', { name: variableName }, `No history found for variable "${variableName}"`)}</div>`;
             return;
         }
 
         const html = `
             <div class="variable-history">
-                <h4>Change History for "${variableName}"</h4>
+                <h4>${tr('history.varHistoryTitle', { name: variableName }, `Change history for "${variableName}"`)}</h4>
                 <div class="variable-timeline">
                     ${history.map(item => `
                         <div class="variable-change-item">
@@ -296,11 +400,11 @@
                             </div>
                             <div class="variable-change-details">
                                 <span class="variable-environment">${item.entry.environmentName}</span>
-                                ${item.entry.user ? `<span class="variable-user">by ${item.entry.user}</span>` : ''}
+                                ${item.entry.user ? `<span class="variable-user">${tr('history.byUser', { user: item.entry.user }, `by ${item.entry.user}`)}</span>` : ''}
                                 ${item.entry.metadata.reason ? `<span class="variable-reason">${item.entry.metadata.reason}</span>` : ''}
                             </div>
                             <div class="variable-change-actions">
-                                <button class="btn-small" data-action="view" data-entry-id="${item.entry.id}">View Entry</button>
+                                <button type="button" class="btn-small" data-action="view" data-entry-id="${item.entry.id}">${tr('history.viewEntryBtn', {}, 'View entry')}</button>
                             </div>
                         </div>
                     `).join('')}
@@ -399,6 +503,7 @@
                 if (message.workspacePath) {
                     currentWorkspace = message.workspacePath;
                 }
+                lastErrorDetail = null;
                 currentHistory = message.history;
                 currentStats = message.stats;
                 updateStats(message.stats);
@@ -406,8 +511,17 @@
                 loadFilterOptions();
                 break;
             case 'localeChanged':
+                if (window.dotenvyI18n && window.dotenvyI18n.applyTranslations) {
+                    window.dotenvyI18n.applyTranslations();
+                }
                 if (currentStats) updateStats(currentStats);
                 filterHistory();
+                if (lastFilterResult) updateFilterStats(lastFilterResult);
+                if (lastErrorDetail !== null) {
+                    showError(lastErrorDetail);
+                } else if (currentWorkspace) {
+                    loadFilterOptions();
+                }
                 break;
             case 'analyticsLoaded':
                 break;
@@ -415,6 +529,7 @@
                 handleRollbackResult(message);
                 break;
             case 'filtersApplied':
+                lastFilterResult = message.result;
                 displayFilteredHistory(message.result);
                 updateFilterStats(message.result);
                 break;
@@ -428,7 +543,7 @@
                 displayVariableHistory(message.variableName, message.history);
                 break;
             case 'error':
-                showError(message.message);
+                showError(message.errorMessage || message.message || '');
                 break;
         }
     }
@@ -489,7 +604,9 @@
         tbody.innerHTML = filteredHistory.map(entry => {
             const note = entry.metadata?.reason
                 ? escapeHtml(entry.metadata.reason)
-                : (entry.previousEnvironment ? `from ${entry.previousEnvironment}` : '');
+                : (entry.previousEnvironment
+                    ? tr('history.noteFromEnv', { env: escapeHtml(entry.previousEnvironment) }, `from ${entry.previousEnvironment}`)
+                    : '');
             return `
             <tr class="history-row" data-entry-id="${entry.id}">
                 <td class="col-time" title="${new Date(entry.timestamp).toLocaleString()}">${formatTimestamp(entry.timestamp)}</td>
@@ -497,11 +614,11 @@
                     <span class="env-pill">${escapeHtml(entry.environmentName)}</span>
                     <span class="env-file">${escapeHtml(getDisplayFileName(entry))}</span>
                 </td>
-                <td class="col-action"><span class="action-badge action-${entry.action}">${entry.action.replace('_', ' ')}</span></td>
+                <td class="col-action"><span class="action-badge action-${entry.action}">${formatAction(entry.action)}</span></td>
                 <td class="col-note">${note}</td>
                 <td class="col-actions">
-                    <button class="btn-table" data-action="diff" data-entry-id="${entry.id}" title="${tr('history.diffTitle', {}, 'Open native VS Code diff')}">${tr('history.diffBtn', {}, '⟷ Diff')}</button>
-                    <button class="btn-table btn-table-danger" data-action="rollback" data-entry-id="${entry.id}" title="${tr('history.rollbackTitle', {}, 'Rollback to this state')}">${tr('history.rollbackBtn', {}, '↩ Rollback')}</button>
+                    <button type="button" class="btn-table" data-action="diff" data-entry-id="${entry.id}" title="${tr('history.diffTitle', {}, 'Open native VS Code diff')}">${tr('history.diffBtn', {}, '⟷ Diff')}</button>
+                    <button type="button" class="btn-table btn-table-danger" data-action="rollback" data-entry-id="${entry.id}" title="${tr('history.rollbackTitle', {}, 'Rollback to this state')}">${tr('history.rollbackBtn', {}, '↩ Rollback')}</button>
                 </td>
             </tr>`;
         }).join('');
@@ -542,18 +659,21 @@
         const diffMinutes = Math.floor(diffMs / (1000 * 60));
         const diffHours = Math.floor(diffMinutes / 60);
         const diffDays = Math.floor(diffHours / 24);
+        const locale = (window.dotenvyI18n && window.dotenvyI18n.getLocale)
+            ? window.dotenvyI18n.getLocale()
+            : undefined;
 
-        if (diffMinutes < 1) return 'Just now';
-        if (diffMinutes < 60) return `${diffMinutes}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
+        if (diffMinutes < 1) return tr('history.timeJustNow', {}, 'Just now');
+        if (diffMinutes < 60) return tr('history.timeMinutesAgo', { minutes: diffMinutes }, `${diffMinutes}m ago`);
+        if (diffHours < 24) return tr('history.timeHoursAgo', { hours: diffHours }, `${diffHours}h ago`);
+        if (diffDays < 7) return tr('history.timeDaysAgo', { days: diffDays }, `${diffDays}d ago`);
 
-        return date.toLocaleDateString();
+        return date.toLocaleDateString(locale);
     }
 
     function showDiff(entryId) {
         if (!currentWorkspace) {
-            alert('Error: Workspace not initialized. Please refresh the history view.');
+            alert(tr('history.workspaceNotReady', {}, 'Workspace not initialized. Please refresh the history view.'));
             return;
         }
         vscode.postMessage({
@@ -565,12 +685,12 @@
 
     function rollback(entryId) {
         if (!currentWorkspace) {
-            alert('Error: Workspace not initialized. Please refresh the history view.');
+            alert(tr('history.workspaceNotReady', {}, 'Workspace not initialized. Please refresh the history view.'));
             return;
         }
         const entry = currentHistory.find(e => e.id === entryId);
         if (!entry) {
-            alert('Error: Entry not found.');
+            alert(tr('history.entryNotFound', {}, 'Entry not found.'));
             return;
         }
 
@@ -585,14 +705,25 @@
 
     function handleRollbackResult(message) {
         if (message.success) {
-            alert(`Successfully rolled back to historical environment state!`);
+            alert(tr('history.rollbackSuccess', {}, 'Successfully rolled back to the historical environment state.'));
         } else {
-            alert('Failed to rollback to the selected environment state.');
+            alert(tr('history.rollbackFailed', {}, 'Failed to rollback to the selected environment state.'));
         }
     }
 
     function showError(message) {
-        historyList.innerHTML = `<div class="error-state">Error: ${message}</div>`;
+        lastErrorDetail = message || '';
+        const text = tr(
+            'history.loadFailed',
+            { message: lastErrorDetail },
+            `Failed to load history: ${lastErrorDetail}`
+        );
+        const tbody = document.getElementById('history-body');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="5" class="error-state">${escapeHtml(text)}</td></tr>`;
+        } else if (historyList) {
+            historyList.innerHTML = `<div class="error-state">${escapeHtml(text)}</div>`;
+        }
     }
 
 

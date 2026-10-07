@@ -6,6 +6,8 @@
  * and sensitive information in code files.
  */
 
+import * as path from 'path';
+import { DotenvyIgnore } from './dotenvyIgnore';
 import { PatternDefinition } from './secretScannerTypes';
 
 export class PatternRegistry {
@@ -245,7 +247,38 @@ export class PatternRegistry {
             }
         ];
 
-        this.excludePattern = `{**/*.git/**,**/.vscode/**,**/node_modules/**,**/build/**,**/dist/**,**/out/**,**/*.log,**/*.tmp,**/*.cache,**/coverage/**}`;
+        this.excludePattern = [
+            '**/.git/**',
+            '**/.vscode/**',
+            '**/.idea/**',
+            '**/.cursor/**',
+            '**/node_modules/**',
+            '**/vendor/**',
+            '**/build/**',
+            '**/dist/**',
+            '**/out/**',
+            '**/target/**',
+            '**/.next/**',
+            '**/.nuxt/**',
+            '**/.svelte-kit/**',
+            '**/.turbo/**',
+            '**/.cache/**',
+            '**/.venv/**',
+            '**/venv/**',
+            '**/__pycache__/**',
+            '**/.dotenvy/**',
+            '**/.dotenvy-backups/**',
+            '**/coverage/**',
+            '**/*.log',
+            '**/*.tmp',
+            '**/*.map',
+            '**/package-lock.json',
+            '**/yarn.lock',
+            '**/pnpm-lock.yaml',
+            '**/package.json',
+            '**/.dotenvy.json',
+            '**/.dotenvyGit.json',
+        ].join(',');
     }
 
     /**
@@ -287,25 +320,20 @@ export class PatternRegistry {
      * Check if a file should be scanned based on the exclude pattern
      */
     static shouldScanFile(filePath: string, workspaceRoot: string): boolean {
-        // Don't scan files in excluded directories
-        const relativePath = filePath.replace(workspaceRoot, '').replace(/^[/\\]/, '');
+        if (DotenvyIgnore.isBuiltinIgnored(filePath, workspaceRoot)) {
+            return false;
+        }
 
-        // Check against common exclude patterns
-        if (relativePath.includes('.git/') ||
-            relativePath.includes('node_modules/') ||
-            relativePath.includes('.vscode/') ||
-            relativePath.includes('build/') ||
-            relativePath.includes('dist/') ||
-            relativePath.includes('out/') ||
-            relativePath.includes('coverage/')) {
+        const relativePath = path.relative(workspaceRoot, filePath).replace(/\\/g, '/');
+        if (!relativePath || relativePath.startsWith('..')) {
             return false;
         }
 
         // Only scan relevant file types
-        const ext = filePath.toLowerCase().substring(filePath.lastIndexOf('.'));
+        const ext = path.extname(filePath).toLowerCase();
         const allowedExtensions = ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp', '.cs', '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.scala', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd', '.yaml', '.yml', '.json', '.xml', '.env', '.dotenv', '.toml', '.ini', '.cfg', '.conf'];
 
-        return allowedExtensions.includes(ext) || !ext; // Include files without extensions (shell scripts, etc.)
+        return allowedExtensions.includes(ext) || !ext;
     }
 
     /**

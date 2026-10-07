@@ -94,7 +94,7 @@ export class VariableWebviewProvider {
             logger.error('Failed to load variables:', error, 'VariableWebviewProvider');
             VariableWebviewProvider._post({
                 type: 'error',
-                message: `Failed to load variables: ${(error as Error).message}`
+                errorMessage: (error as Error).message,
             });
         }
     }
@@ -105,6 +105,7 @@ export class VariableWebviewProvider {
         fileName?: string; 
         workspacePath?: string;
         message?: string;
+        errorMessage?: string;
     }): void {
         VariableWebviewProvider._panel?.webview.postMessage(message);
     }
