@@ -12,6 +12,7 @@ const { createTempDir, removeTempDir } = require('./support/tempWorkspace');
 
 installVscodeMock(createHarness());
 
+const { GitUtils } = require('../out/utils/gitUtils.js');
 const { EnvironmentDiffer } = require('../out/utils/environmentDiffer.js');
 const { EnvironmentValidator } = require('../out/utils/environmentValidator.js');
 const { formatEnvFileContent, mergeEnvFileContent, parseEnvFile } = require('../out/utils/envFileContent.js');
@@ -292,5 +293,34 @@ describe('environment files', () => {
         assert.equal(diff.remoteOnly.includes('DOTENVY_ENCRYPTED'), false);
         assert.equal(diff.remoteOnly.includes('__dotenvy_encrypted__'), false);
         assert.equal(diff.remoteOnly.includes(reservedKey), false);
+    });
+
+    test('pull gitignore pattern is created, appended, and left unchanged when present', async () => {
+        const pattern = GitUtils.envBackupGitignorePattern;
+        const root = createTempDir('dotenvy-gitignore-');
+        const gitignorePath = path.join(root, '.gitignore');
+        try {
+            await GitUtils.ensureGitignoreEntries(root, [pattern]);
+            assert.equal(fs.readFileSync(gitignorePath, 'utf8'), `${pattern}\n`);
+
+            const created = fs.readFileSync(gitignorePath);
+            await GitUtils.ensureGitignoreEntries(root, [pattern]);
+            assert.deepEqual(fs.readFileSync(gitignorePath), created);
+
+            writeFile(gitignorePath, `node_modules\n# ${pattern}\n`);
+            await GitUtils.ensureGitignoreEntries(root, [pattern]);
+            assert.equal(fs.readFileSync(gitignorePath, 'utf8'), `node_modules\n# ${pattern}\n${pattern}\n`);
+
+            writeFile(gitignorePath, 'dist');
+            await GitUtils.ensureGitignoreEntries(root, [pattern]);
+            assert.equal(fs.readFileSync(gitignorePath, 'utf8'), `dist\n${pattern}\n`);
+
+            const crlf = Buffer.from(`node_modules/\r\n${pattern}\r\n`, 'utf8');
+            fs.writeFileSync(gitignorePath, crlf);
+            await GitUtils.ensureGitignoreEntries(root, [pattern]);
+            assert.deepEqual(fs.readFileSync(gitignorePath), crlf);
+        } finally {
+            removeTempDir(root);
+        }
     });
 });

@@ -9,6 +9,7 @@ import { extensionContext } from '../extension';
 import { createCloudSyncManager } from '../utils/encryptedCloudSyncManager';
 import { showActionStart, showSyncToast } from '../utils/panelNotification';
 import { t } from '../i18n';
+import { GitUtils } from '../utils/gitUtils';
 
 export class PullFromCloudCommand implements vscode.Disposable {
 	public async execute(preferredWorkspacePath?: string): Promise<void> {
@@ -121,6 +122,8 @@ export class PullFromCloudCommand implements vscode.Disposable {
 				);
 				return;
 			}
+
+			await GitUtils.ensureGitignoreEntries(rootPath, [GitUtils.envBackupGitignorePattern]);
 
 			const secrets = EnvSyncUtils.filterCloudMetadataKeys(
 				EnvSyncUtils.filterDopplerReservedKeys(result.secrets)
