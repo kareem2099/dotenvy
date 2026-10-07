@@ -273,7 +273,7 @@ function updateEnvironmentsGrid(data) {
             <div class="env-card-actions">
                 <button class="btn btn-primary btn-sm" onclick="switchTo('${env.name}')">${tr('panel.environments.switch')}</button>
                 <button class="btn btn-secondary btn-sm" onclick="diffWithCurrent('${env.name}')">${tr('panel.environments.compare')}</button>
-                <button class="btn-secondary btn-sm" onclick="openVariableManager('${env.fileName}')">${tr('panel.environments.edit')}</button>
+                <button class="btn btn-secondary btn-sm" onclick="openVariableManager('${env.fileName}')">${tr('panel.environments.edit')}</button>
             </div>
         `;
         container.appendChild(card);

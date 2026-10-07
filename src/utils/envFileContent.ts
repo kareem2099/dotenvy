@@ -19,6 +19,74 @@ export function formatEnvFileContent(secrets: CloudSecrets): string {
 		.join('\n') + (Object.keys(secrets).length > 0 ? '\n' : '');
 }
 
+function splitValueAndInlineComment(valuePart: string): { suffix: string } {
+	const match = valuePart.match(/\s+#/);
+	if (!match || match.index === undefined) {
+		return { suffix: '' };
+	}
+	return { suffix: valuePart.slice(match.index) };
+}
+
+/**
+ * Applies cloud secrets onto existing env text: keeps comments, blanks, and key order;
+ * updates values, drops keys absent from secrets, appends new keys at the end.
+ */
+export function mergeEnvFileContent(existingContent: string, secrets: CloudSecrets): string {
+	const secretKeys = Object.keys(secrets);
+	if (secretKeys.length === 0 && existingContent.trim() === '') {
+		return '';
+	}
+	if (existingContent.trim() === '') {
+		return formatEnvFileContent(secrets);
+	}
+
+	const remaining = new Set(secretKeys);
+	const output: string[] = [];
+
+	for (const line of existingContent.split(/\r?\n/)) {
+		const trimmed = line.trim();
+		if (!trimmed || trimmed.startsWith('#')) {
+			output.push(line);
+			continue;
+		}
+
+		const equalIndex = trimmed.indexOf('=');
+		if (equalIndex === -1) {
+			output.push(line);
+			continue;
+		}
+
+		const key = trimmed.substring(0, equalIndex).trim();
+		if (!key || !Object.prototype.hasOwnProperty.call(secrets, key)) {
+			if (key && /^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+				continue;
+			}
+			output.push(line);
+			continue;
+		}
+
+		remaining.delete(key);
+		const prefix = line.match(/^(\s*)/)?.[1] ?? '';
+		const valuePart = trimmed.substring(equalIndex + 1);
+		const { suffix } = splitValueAndInlineComment(valuePart);
+		output.push(`${prefix}${key}=${secrets[key]}${suffix}`);
+	}
+
+	if (remaining.size > 0) {
+		if (output.length > 0 && output[output.length - 1] !== '') {
+			output.push('');
+		}
+		for (const key of secretKeys) {
+			if (remaining.has(key)) {
+				output.push(`${key}=${secrets[key]}`);
+			}
+		}
+	}
+
+	const text = output.join('\n');
+	return text.length > 0 && !text.endsWith('\n') ? `${text}\n` : text;
+}
+
 /**
  * Parses a plaintext env file into a secret map. Missing files yield an empty map.
  */
@@ -76,11 +144,12 @@ export async function writeSecretsToTargets(
 		const secrets = splitSecrets.get(target.file) ?? {};
 		await backupEnvFile(target.absolutePath);
 		await fs.promises.mkdir(path.dirname(target.absolutePath), { recursive: true });
-		await fs.promises.writeFile(
-			target.absolutePath,
-			formatEnvFileContent(secrets),
-			'utf8'
-		);
+		let content = formatEnvFileContent(secrets);
+		if (fs.existsSync(target.absolutePath)) {
+			const existing = await fs.promises.readFile(target.absolutePath, 'utf8');
+			content = mergeEnvFileContent(existing, secrets);
+		}
+		await fs.promises.writeFile(target.absolutePath, content, 'utf8');
 		writtenFiles.push(target.file);
 	}
 

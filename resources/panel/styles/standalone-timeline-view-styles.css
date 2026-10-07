@@ -28,6 +28,15 @@
 }
 
 .timeline-only .history-header {
-    margin-bottom: var(--space-xl);
+    margin-bottom: var(--space-md);
+}
+
+.timeline-only .history-toolbar {
+    margin-bottom: var(--space-lg);
+}
+
+.timeline-only .history-toolbar .view-info {
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.875rem;
 }
 

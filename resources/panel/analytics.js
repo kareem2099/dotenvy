@@ -309,9 +309,12 @@
     }
 
     function loadData() {
-        if (!currentWorkspace) { return; }
         showLoading();
-        vscode.postMessage({ type: 'loadAnalytics', workspacePath: currentWorkspace });
+        if (currentWorkspace) {
+            vscode.postMessage({ type: 'loadAnalytics', workspacePath: currentWorkspace });
+        } else {
+            vscode.postMessage({ type: 'refresh' });
+        }
     }
 
     window.loadData = loadData;
@@ -353,10 +356,17 @@
     // ──────────────────────────────────────────────────────────────
     // Refresh button
     // ──────────────────────────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', () => {
+    function bootstrap() {
         const btn = document.getElementById('refresh-btn');
         if (btn) { btn.addEventListener('click', loadData); }
-    });
+        vscode.postMessage({ type: 'webviewReady' });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootstrap);
+    } else {
+        bootstrap();
+    }
 
     // Delegated handler for dynamically injected buttons (e.g. "Try Again")
     document.addEventListener('click', (e) => {

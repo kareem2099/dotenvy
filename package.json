@@ -31,7 +31,7 @@
       ]
     }
   ],
-  "version": "2.2.2",
+  "version": "2.2.3",
   "icon": "resources/icons/icon.png",
   "publisher": "FreeRave",
   "author": "Kareem Ehab",
@@ -68,7 +68,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "rm -rf out && tsc -p ./",
+    "compile": "node -e \"require('fs').rmSync('out',{recursive:true,force:true})\" && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src/**/*.ts",
@@ -184,6 +184,10 @@
         "title": "%command.diffEnvironment%"
       },
       {
+        "command": "dotenvy.compareEnvironments",
+        "title": "%command.compareEnvironments%"
+      },
+      {
         "command": "dotenvy.installGitHook",
         "title": "%command.installGitHook%"
       },
@@ -194,6 +198,10 @@
       {
         "command": "dotenvy.pullFromCloud",
         "title": "%command.pullFromCloud%"
+      },
+      {
+        "command": "dotenvy.diffCloud",
+        "title": "%command.diffCloud%"
       },
       {
         "command": "dotenvy.pushToCloud",

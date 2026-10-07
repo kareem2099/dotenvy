@@ -19,6 +19,8 @@
   "command.setupLLMSecret": "DotEnvy: Настроить секрет LLM",
   "command.validateEnvironment": "DotEnvy: Проверить файлы окружения",
   "command.diffEnvironment": "DotEnvy: Сравнить файлы окружения (Diff)",
+  "command.compareEnvironments": "DotEnvy: Сравнить окружения",
+  "command.diffCloud": "DotEnvy: Сравнить облачные секреты",
   "command.installGitHook": "DotEnvy: Установить Git Commit хук",
   "command.removeGitHook": "DotEnvy: Удалить Git Commit хук",
   "command.pullFromCloud": "DotEnvy: Загрузить окружение из облака",

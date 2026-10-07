@@ -344,3 +344,12 @@ body.sidebar-view .setting-item {
     padding: 10px 12px;
 }
 
+body.sidebar-view .setting-item-backup-path {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+}
+
+body.sidebar-view .setting-label {
+    white-space: normal;
+}
+

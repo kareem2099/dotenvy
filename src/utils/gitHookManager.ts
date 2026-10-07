@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { execSync } from 'child_process';
+import { scanText } from './localSecretScan';
 import { SecretsGuard } from './secretsGuard';
 import { EnvironmentValidator } from './environmentValidator';
 import { ConfigUtils } from './configUtils';
@@ -348,7 +349,9 @@ exec "$HOOK_SCRIPT" "$WORKSPACE_DIR"
 				return [];
 			}
 
-			return SecretsGuard.checkFile(fullPath);
+			const nameHits = SecretsGuard.checkFile(fullPath);
+			const patternHits = scanText(content).map(span => `${span.type} (line ${span.line})`);
+			return [...nameHits, ...patternHits];
 		} catch {
 			return [];
 		}

@@ -11,6 +11,7 @@ export class SecretsPanel {
     private readonly _panel: vscode.WebviewPanel;
     private _secrets: DetectedSecret[] = [];
     private _disposables: vscode.Disposable[] = [];
+    private _renderGeneration = 0;
 
     public static readonly viewType = 'dotenvy.secretsPanel';
 
@@ -41,7 +42,7 @@ export class SecretsPanel {
         this._panel   = panel;
         this._secrets = secrets;
         this._extensionUri = extensionUri;
-        this._render();
+        void this._render();
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
         this._panel.webview.onDidReceiveMessage(
             async (msg) => { await this._handleMessage(msg); },
@@ -51,7 +52,7 @@ export class SecretsPanel {
 
     public update(secrets: DetectedSecret[]): void {
         this._secrets = secrets;
-        this._render();
+        void this._render();
     }
 
     // ─── Messages ──────────────────────────────────────────────────────────────
@@ -114,29 +115,30 @@ export class SecretsPanel {
 
     private async _ignore(secret: DetectedSecret): Promise<void> {
         // ✅ Training signal: false positive
-        await FeedbackManager.recordFalsePositive(secret);
+            await FeedbackManager.recordFalsePositive(secret);
         this._remove(secret);
-
-        const stats = await FeedbackManager.getStats();
-        if (stats.falsePositives > 0 && stats.falsePositives % 5 === 0) {
-            vscode.window.showInformationMessage(
-                `🧠 Thanks! ${stats.falsePositives} false positives recorded — helping train the AI.`
-            );
-        }
     }
 
     private _remove(secret: DetectedSecret): void {
         this._secrets = this._secrets.filter(s =>
             !(s.file === secret.file && s.line === secret.line && s.column === secret.column)
         );
-        this._render();
+        void this._render();
     }
 
     // ─── HTML ──────────────────────────────────────────────────────────────────
 
-    private _render(): void { this._panel.webview.html = this._getHtml(); }
+    private async _render(): Promise<void> {
+        const generation = ++this._renderGeneration;
+        const html = await this._getHtml();
+        if (generation !== this._renderGeneration) {
+            return;
+        }
+        this._panel.webview.html = html;
+    }
 
-    private _getHtml(): string {
+    private async _getHtml(): Promise<string> {
+        const feedback = await FeedbackManager.getStats();
         const secrets = this._secrets;
         const high    = secrets.filter(s => s.confidence === 'high');
         const medium  = secrets.filter(s => s.confidence === 'medium');
@@ -194,6 +196,12 @@ export class SecretsPanel {
                 searchPlaceholder: t('secretsScanner.filterPlaceholder'),
                 styleUri:       this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'panel', 'panel.css')).toString(),
                 extraStyleUri:  this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'panel', 'secrets-scanner.css')).toString(),
+                feedbackConfirmedLabel: t('secretsScanner.feedbackConfirmed'),
+                feedbackFalsePositivesLabel: t('secretsScanner.feedbackFalsePositives'),
+                feedbackPendingLabel: t('secretsScanner.feedbackPending'),
+                feedbackConfirmed: feedback.confirmed.toString(),
+                feedbackFalsePositives: feedback.falsePositives.toString(),
+                feedbackPending: feedback.pending.toString(),
                 allCount:       secrets.length.toString(),
                 highCount:      high.length.toString(),
                 mediumCount:    medium.length.toString(),

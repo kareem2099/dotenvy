@@ -18,6 +18,7 @@ function historyFilename(timestamp: Date): string {
  * Appends one history entry to the monthly history file for the workspace.
  */
 export async function saveHistoryEntry(rootPath: string, entry: HistoryEntry): Promise<void> {
+    entry.timestamp = new Date(entry.timestamp);
     const historyDir = await HistoryManager.getHistoryDir(rootPath);
     const filename = historyFilename(entry.timestamp);
     const filePath = path.join(historyDir, filename);

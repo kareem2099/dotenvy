@@ -7,6 +7,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { EnvironmentProvider } from './environmentProvider';
 import { LocalizationService } from '../i18n';
+import { ConfigUtils } from '../utils/configUtils';
+import { DopplerSyncManager } from '../utils/dopplerSyncManager';
 import {
     deleteEnvironmentVariable,
     toggleEnvironmentVariableEncryption,
@@ -232,6 +234,25 @@ DEBUG=false
                 const removeHookCommand = new RemoveGitHookCommand();
                 await removeHookCommand.execute();
                 await host.refreshEnvironments();
+                break;
+
+            case 'openDopplerDashboard': {
+                const quickEnvConfig = await ConfigUtils.readQuickEnvConfig(rootPath);
+                const dashboardUrl = DopplerSyncManager.getDashboardUrl(
+                    quickEnvConfig?.cloudSync?.project,
+                    quickEnvConfig?.cloudSync?.config
+                );
+                await vscode.env.openExternal(vscode.Uri.parse(dashboardUrl));
+                break;
+            }
+
+            case 'initSecureProject':
+                await vscode.commands.executeCommand('dotenvy.initSecureProject');
+                await host.refreshEnvironments();
+                break;
+
+            case 'initDotenvyIgnore':
+                await vscode.commands.executeCommand('dotenvy.initDotenvyIgnore');
                 break;
 
             case 'openWorkspace':

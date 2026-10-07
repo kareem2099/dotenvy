@@ -72,6 +72,12 @@ export class CommandsTreeProvider implements vscode.TreeDataProvider<vscode.Tree
                 description: t('tree.diff.desc')
             },
             {
+                command: 'dotenvy.compareEnvironments',
+                title: t('tree.compare.title'),
+                category: 'DotEnvy',
+                description: t('tree.compare.desc')
+            },
+            {
                 command: 'dotenvy.scanSecrets',
                 title: t('tree.scan.title'),
                 category: 'DotEnvy',
@@ -97,6 +103,12 @@ export class CommandsTreeProvider implements vscode.TreeDataProvider<vscode.Tree
                 description: t('tree.pull.desc')
             },
             {
+                command: 'dotenvy.diffCloud',
+                title: t('tree.diffCloud.title'),
+                category: 'DotEnvy',
+                description: t('tree.diffCloud.desc')
+            },
+            {
                 command: 'dotenvy.pushToCloud',
                 title: t('tree.push.title'),
                 category: 'DotEnvy',
@@ -116,15 +128,15 @@ export class CommandsTreeProvider implements vscode.TreeDataProvider<vscode.Tree
             },
             {
                 command: 'dotenvy.addUser',
-                title: 'Add User to Secure Project',
+                title: t('tree.addUser.title'),
                 category: 'DotEnvy',
-                description: 'Add a new developer to the secure project with individual access credentials'
+                description: t('tree.addUser.desc')
             },
             {
                 command: 'dotenvy.revokeUser',
-                title: 'Revoke User Access',
+                title: t('tree.revokeUser.title'),
                 category: 'DotEnvy',
-                description: 'Remove a user\'s access to the secure project environment'
+                description: t('tree.revokeUser.desc')
             }
         ];
     }

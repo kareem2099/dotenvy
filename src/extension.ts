@@ -6,6 +6,8 @@ import { SwitchEnvironmentCommand } from './commands/switchEnvironment';
 import { OpenEnvironmentPanelCommand } from './commands/openEnvironmentPanel';
 import { ValidateEnvironmentCommand } from './commands/validateEnvironment';
 import { DiffEnvironmentCommand } from './commands/diffEnvironment';
+import { CompareEnvironmentsCommand } from './commands/compareEnvironments';
+import { DiffCloudCommand } from './commands/diffCloud';
 import { InstallGitHookCommand } from './commands/installGitHook';
 import { RemoveGitHookCommand } from './commands/removeGitHook';
 import { PullFromCloudCommand } from './commands/pullFromCloud';
@@ -30,6 +32,7 @@ import { EnvironmentCompletionProvider } from './providers/environmentCompletion
 import { TrashBinWebviewProvider } from './providers/trashBinWebviewProvider';
 import { VariableWebviewProvider } from './providers/variableWebviewProvider';
 import { SecretDetector } from './utils/secretDetector';
+import { registerSecretDiagnostics } from './providers/secretDiagnostics';
 import { HistoryManager } from './utils/historyManager';
 import { UpdateManager } from './managers/UpdateManager';
 
@@ -157,6 +160,8 @@ export async function activate(context: vscode.ExtensionContext) {
     const switchEnvCommand = new SwitchEnvironmentCommand();
     const openPanelCommand = new OpenEnvironmentPanelCommand();
     const diffEnvCommand = new DiffEnvironmentCommand();
+    const compareEnvironmentsCommand = new CompareEnvironmentsCommand();
+    const diffCloudCommand = new DiffCloudCommand();
     const installHookCommand = new InstallGitHookCommand();
     const removeHookCommand = new RemoveGitHookCommand();
     const pullFromCloudCommand = new PullFromCloudCommand();
@@ -179,9 +184,11 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('dotenvy.validateEnvironment', () =>
             ValidateEnvironmentCommand.manageValidation()),
         vscode.commands.registerCommand('dotenvy.diffEnvironment', () => diffEnvCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.compareEnvironments', () => compareEnvironmentsCommand.execute()),
         vscode.commands.registerCommand('dotenvy.installGitHook', () => installHookCommand.execute()),
         vscode.commands.registerCommand('dotenvy.removeGitHook', () => removeHookCommand.execute()),
         vscode.commands.registerCommand('dotenvy.pullFromCloud', () => pullFromCloudCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.diffCloud', () => diffCloudCommand.execute()),
         vscode.commands.registerCommand('dotenvy.pushToCloud', () => pushToCloudCommand.execute()),
         vscode.commands.registerCommand('dotenvy.scanSecrets', () => scanSecretsCommand.execute()),
         vscode.commands.registerCommand('dotenvy.feedback', () => feedbackCommand.execute()),
@@ -316,6 +323,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Start real-time secret monitoring
     SecretDetector.startFileWatcher();
+    registerSecretDiagnostics(context);
 }
 
 export function deactivate() {

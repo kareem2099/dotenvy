@@ -97,6 +97,9 @@ export class DotenvyIgnore {
         '.dotenvy-backups',
         '.cursor',
         'articles',
+        'test',
+        'tests',
+        '__tests__',
     ]);
 
     /** Default content written when user runs "Init .dotenvyignore" */
@@ -189,6 +192,21 @@ go.sum
             return true;
         }
 
+        if (DotenvyIgnore.isBuiltinTestFileName(baseName)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** Test and e2e fixtures often embed fake secrets on purpose. */
+    private static isBuiltinTestFileName(baseNameLower: string): boolean {
+        if (/\.(test|spec)\.(js|ts|tsx|jsx|mjs|cjs)$/.test(baseNameLower)) {
+            return true;
+        }
+        if (baseNameLower.startsWith('e2e-') || baseNameLower.endsWith('-standalone.js')) {
+            return true;
+        }
         return false;
     }
 

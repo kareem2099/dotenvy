@@ -95,7 +95,7 @@
                 </div>
                 <div class="card-content">
                     <div class="hook-status">
-                        <span class="status-indicator status-warning" id="hook-status" data-i18n="panel.git.notInstalled">Not Installed</span>
+                        <span class="status-indicator status-warning" id="hook-status" aria-live="polite"></span>
                     </div>
                     <div class="hook-actions">
                         <button type="button" class="btn btn-sm btn-secondary" id="btn-install-hook" onclick="installHook()" data-i18n="panel.git.install">Install</button>
@@ -136,12 +136,14 @@
             <h3 data-i18n="panel.backup.title">Backup Settings</h3>
         </div>
         <div class="backup-settings" id="backup-settings">
-            <div class="setting-item">
-                <label><span data-i18n="panel.backup.location">Backup Location:</span> <span id="backup-path-display" data-i18n="panel.backup.defaultPath">Default (~/.dotenvy-backups)</span></label>
+            <div class="setting-item setting-item-backup-path">
+                <span class="setting-label" data-i18n="panel.backup.location">Backup Location:</span>
+                <span class="setting-value" id="backup-path-display" data-i18n="panel.backup.defaultPath">Default (~/.dotenvy-backups)</span>
             </div>
-            <div class="setting-item">
-                <label>
-                    <input type="checkbox" id="encrypt-backups-checkbox"> <span data-i18n="panel.backup.encrypt">Encrypt Backups</span>
+            <div class="setting-item setting-item-checkbox">
+                <label class="setting-checkbox-label" for="encrypt-backups-checkbox">
+                    <input type="checkbox" id="encrypt-backups-checkbox" class="setting-checkbox">
+                    <span class="setting-checkbox-text" data-i18n="panel.backup.encrypt">Encrypt Backups</span>
                 </label>
             </div>
         </div>

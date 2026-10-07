@@ -120,7 +120,11 @@ export class InitSecureProjectCommand implements vscode.Disposable {
                 if (result.success) {
                     workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
                     if (workspacePath) {
-                        await ConfigUtils.ensureWorkspaceConfigFile(workspacePath, undefined, false);
+                        await ConfigUtils.ensureWorkspaceConfigFile(
+                            workspacePath,
+                            projectName?.trim() || undefined,
+                            false
+                        );
                     }
 
                     showSyncToast(result.message, 'success');

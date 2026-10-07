@@ -11,6 +11,7 @@ import {
 	promptConfigSelection,
 	promptProjectSelection,
 } from './dopplerConfigPrompt';
+import { normalizeDopplerProjectSlug } from './dopplerProjectSlug';
 // Doppler API response format for individual secrets
 type DopplerSecretData = {
 	computed: string;
@@ -19,9 +20,16 @@ type DopplerSecretData = {
 export class DopplerSyncManager extends CloudSyncManager {
 	private resolvedConfig?: string;
 
+	constructor(config: CloudSyncConfig, token?: string) {
+		const project = config.project?.trim()
+			? normalizeDopplerProjectSlug(config.project)
+			: config.project;
+		super({ ...config, project }, token);
+	}
+
 	static getDashboardUrl(project?: string, config?: string): string {
 		const base = 'https://dashboard.doppler.com';
-		const trimmedProject = project?.trim();
+		const trimmedProject = project?.trim() ? normalizeDopplerProjectSlug(project) : undefined;
 		if (!trimmedProject) {
 			return base;
 		}

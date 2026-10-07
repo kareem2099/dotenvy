@@ -5,6 +5,7 @@ import { QuickEnvConfig, EnvironmentValidationRules } from '../types/environment
 import { extensionContext } from '../extension';
 import { logger } from './logger';
 import { discoverEnvironmentEntries as discoverWorkspaceEnvironmentEntries, discoverEnvironments as discoverWorkspaceEnvironments } from './environmentDiscovery';
+import { normalizeDopplerProjectSlug } from './dopplerProjectSlug';
 
 export class ConfigUtils {
 	private static readonly CONFIG_KEY = 'dotenvyConfig';
@@ -22,6 +23,7 @@ export class ConfigUtils {
 				if (fs.existsSync(configFilePath)) {
 					const configContent = fs.readFileSync(configFilePath, 'utf8');
 					const config = JSON.parse(configContent) as QuickEnvConfig;
+					ConfigUtils.normalizeCloudSyncProjectSlug(config);
 					// Also update VSCode storage for consistency
 					await extensionContext.workspaceState.update(this.CONFIG_KEY, config);
 					return config;
@@ -85,6 +87,8 @@ export class ConfigUtils {
 				? this.normalizeProjectName(projectName)
 				: this.resolveProjectName(rootPath);
 		}
+
+		this.normalizeCloudSyncProjectSlug(hydrated);
 
 		return hydrated;
 	}
@@ -221,14 +225,20 @@ export class ConfigUtils {
 	}
 
 	private static normalizeProjectName(name: string): string {
-		const unscoped = name.startsWith('@') ? (name.split('/').pop() ?? name) : name;
-		return unscoped.trim().toLowerCase().replace(/[_\s]+/g, '-');
+		return normalizeDopplerProjectSlug(name);
+	}
+
+	static normalizeCloudSyncProjectSlug(config: QuickEnvConfig): void {
+		if (config.cloudSync?.provider === 'doppler' && config.cloudSync.project?.trim()) {
+			config.cloudSync.project = normalizeDopplerProjectSlug(config.cloudSync.project);
+		}
 	}
 
 	/**
 	 * Save QuickEnv config to VSCode storage and .dotenvy.json file
 	 */
 	static async saveQuickEnvConfig(config: QuickEnvConfig, rootPath?: string): Promise<void> {
+		this.normalizeCloudSyncProjectSlug(config);
 		await extensionContext.workspaceState.update(this.CONFIG_KEY, config);
 
 		const workspacePath = rootPath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;

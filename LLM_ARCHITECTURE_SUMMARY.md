@@ -1,112 +1,71 @@
-# LLM Architecture Summary - DotEnvy
+# LLM architecture — DotEnvy
 
-## Quick Overview
+This repository is the VS Code extension. The analysis service is external (`https://aegis.dotsuite.dev`). Its process, database, and deploy pipeline are not in this tree. There is no `python-llm` package, Railway config, Kubernetes manifest, or Terraform here.
 
-The LLM integration in DotEnvy provides ML-enhanced secret detection through a Railway-deployed Python service that communicates with the VS Code extension via HTTP API calls.
+The extension never sends a candidate to that service until cheaper local checks have passed.
 
-## Key Components
+## Components
 
-### 1. Extension Side (TypeScript)
-- **LLMAnalyzer**: Singleton class that handles HTTP communication
-- **SecretDetector**: Integrates LLM analysis into secret detection workflow
-- **Fallback Logic**: Ensures extension works even if LLM service is unavailable
+| Piece | File | Role |
+| --- | --- | --- |
+| `LLMAnalyzer` | [src/utils/llmAnalyzer.ts](src/utils/llmAnalyzer.ts) | Singleton. Owns the service URL, the device secret, the local blacklist, and the four detection layers. |
+| `signRequest` | [src/utils/llmSignedTransport.ts](src/utils/llmSignedTransport.ts) | HMAC-SHA256 over `` `${timestamp}.${body}` ``. |
+| `FeatureExtractor` | [src/utils/featureExtractor.ts](src/utils/featureExtractor.ts) | 35-number vector. Index order must stay aligned with the service model. |
+| `SecretDetector` | [src/utils/secretDetector.ts](src/utils/secretDetector.ts) | Calls `analyzeSecret` only after a pattern match that already looks like a secret. |
+| `FeedbackManager` | [src/utils/feedbackManager.ts](src/utils/feedbackManager.ts) | Stores user labels locally and flushes them in batches of 20. |
 
-### 2. Server Side (Python)
-- **FastAPI**: REST API framework for the LLM service
-- **ML Models**: Machine learning models for enhanced secret detection
-- **PostgreSQL**: Database for storing training data and results
-- **Redis**: Caching layer for performance optimization
+`activate` calls `LLMAnalyzer.initialize` before other commands. Initialization loads the device secret from VS Code Secret Storage. If none is stored, it tries `POST /extension/register` and saves `client_secret`. It then pulls `GET /extension/blacklist`. A failed handshake does not block activation.
 
-### 3. Infrastructure
-- **Railway**: Cloud platform for hosting the Python service
-- **Kubernetes**: Container orchestration for scalability
-- **Terraform**: Infrastructure as code for deployment
+## Detection
 
-## Connection Flow
+`SecretDetector` reaches the analyzer only when `EntropyAnalyzer.isLikelySecret` is true and the context score is above `0.4`. `analyzeSecret` then runs four layers and returns `high`, `medium`, or `low`.
 
-```
-VS Code Extension → HTTP Request → Railway Server → ML Analysis → Response
-```
-
-1. **Secret Detection**: Extension detects potential secrets using pattern matching
-2. **Context Extraction**: Extracts surrounding code context and variable names
-3. **LLM Request**: Sends secret + context to Railway server for analysis
-4. **Enhanced Analysis**: Server runs ML models to provide confidence scoring
-5. **Response Processing**: Extension receives enhanced confidence level
-6. **Fallback**: If server unavailable, uses traditional entropy analysis
-
-## Configuration
-
-### Environment Variables
-```bash
-# Extension Configuration
-DOTENVY_LLM_SERVICE_URL=https://[service-name]-production.up.railway.app
-
-# Server Configuration
-DATABASE_URL=postgresql://...
-REDIS_URL=redis://...
-API_KEYS=comma_separated_keys
-JWT_SECRET=secure_jwt_secret
+```mermaid
+flowchart TD
+  scan[SecretDetector pattern match]
+  gate{Likely secret and context score above 0.4}
+  l1[L1 known key regex]
+  l2[L2 local community hash]
+  l3{L3 entropy below 3.5}
+  l4{Circuit open or no device secret}
+  remote[POST /extension/analyze]
+  local[Local feature fallback]
+  scan --> gate
+  gate -->|no| stopNode[Keep the entropy baseline]
+  gate -->|yes| l1
+  l1 -->|match| highNode[high]
+  l1 -->|miss| l2
+  l2 -->|hash present| highNode
+  l2 -->|miss| l3
+  l3 -->|yes| lowNode[low]
+  l3 -->|no| l4
+  l4 -->|yes| local
+  l4 -->|no| remote
+  remote -->|HTTP error| local
 ```
 
-### API Endpoints
-- `GET /health` - Service health check
-- `POST /analyze` - Secret analysis with ML
-- `GET /stats` - Service statistics
+L1 matches a short list of known key shapes (AWS, Stripe, GitHub, OpenAI, Google) and returns `high` without a network call. If a variable name is present and a device secret exists, the extension also posts that entry’s hash to the blacklist.
 
-## Security Features
+L2 hashes `name` plus the first 8 characters of the value with SHA-256 and keeps the first 16 hex characters. A hit in the in-memory blacklist is `high`.
 
-- **API Authentication**: Bearer token authentication
-- **Environment Variables**: Secure credential storage
-- **Container Security**: Non-root containers with read-only filesystem
-- **Rate Limiting**: DDoS protection and abuse prevention
-- **Input Validation**: Comprehensive input sanitization
+L3 uses feature index 7 (Shannon entropy divided by 8, then multiplied back by 8). Entropy below 3.5 returns `low` and never calls the service.
 
-## Performance Features
+L4 posts `{ secret_value, context, variable_name }` to `/extension/analyze`. `is_likely_secret` with `risk_level` `high` or `critical` becomes `high`. Otherwise `enhanced_confidence` is mapped (`critical` and `high` to `high`). Three failures open a circuit for 60 seconds. While it is open, or when no device secret is loaded, the extension uses the local fallback: pattern score, entropy, and high-risk context or variable-name features. The same fallback runs when the HTTP call throws.
 
-- **Redis Caching**: Application-level caching for frequent requests
-- **Parallel Processing**: Multi-worker file scanning
-- **Debounced Monitoring**: Intelligent file watching with delays
-- **Health Checks**: Continuous service availability monitoring
+`GET /health` is unsigned and only updates the connected flag. It is not on the path of `analyzeSecret`.
 
-## Fallback Mechanisms
+## Requests the extension signs
 
-When the LLM service is unavailable:
-1. Extension detects service unavailability
-2. Automatically falls back to traditional entropy-based analysis
-3. Continues normal operation without interruption
-4. Logs warning but doesn't break functionality
+Signed calls send `X-Extension-Timestamp`, `X-Extension-Signature`, and `X-Machine-ID`. The signature is HMAC-SHA256 of the timestamp, a dot, and the raw body, keyed with the device secret. Registration and `/health` are not signed.
 
-## Deployment
+| Call | Purpose |
+| --- | --- |
+| `POST /extension/register` | First-run device handshake. Stores `client_secret`. |
+| `GET /health` | Connectivity probe. |
+| `POST /extension/analyze` | L4 classification. |
+| `GET /extension/blacklist` | Replace the local hash set. |
+| `POST /extension/blacklist/add` | Contribute a hash after a local or remote `high`. |
+| `POST /extension/blacklist/report_fp` | Report a false positive. `status: removed` drops the hash locally. |
+| `POST /extension/feedback` | Upload a batch from `FeedbackManager`. |
 
-### Local Development
-```bash
-# Test locally
-cd python-llm
-python main.py
-curl http://localhost:8000/health
-```
-
-### Production
-- Deployed on Railway platform
-- Multi-region support for global performance
-- Automated CI/CD pipeline with GitHub Actions
-- Monitoring with Prometheus and Grafana
-
-## Key Benefits
-
-1. **Enhanced Accuracy**: ML models improve secret detection confidence
-2. **High Performance**: Caching and optimization for fast response times
-3. **Reliability**: Fallback mechanisms ensure continuous operation
-4. **Security**: Enterprise-grade security practices
-5. **Scalability**: Container-based architecture with auto-scaling
-
-## Integration Points
-
-The LLM service integrates seamlessly with:
-- **Secret Detection**: Enhanced confidence scoring
-- **Context Analysis**: ML-powered context understanding
-- **User Feedback**: Training data collection for model improvement
-- **Monitoring**: Real-time performance and usage metrics
-
-This architecture provides a robust, scalable, and secure ML-enhanced secret detection system that maintains high performance while ensuring reliability through comprehensive fallback mechanisms.
+The command `dotenvy.setupLLMSecret` can replace the device secret in Secret Storage. The service URL is fixed in `LLMAnalyzer` unless `setServiceUrl` is called.

@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.3] - 2026-10-08
+
+### ☁️ Doppler & cloud sync
+
+- **Project slug normalization**: Doppler project names from `package.json`, folder names, or `.dotenvy.json` now map dots to hyphens (e.g. `project.webservice` → `project-webservice`) on read, save, and every API call.
+- **Read-only cloud diff**: New command to compare local merged secrets with Doppler without writing files; uses the same metadata filters as pull and restores last-sync storage after fetch.
+- **Pull preserves `.env` formatting**: Cloud pull merges into the existing file instead of rewriting plain `KEY=value` lines—comments, blank lines, key order, and inline `#` suffixes on updated keys are kept; keys removed from Doppler are dropped; new keys are appended.
+
+### 🔍 Local safety & workspace insight
+
+- **Cross-environment value conflicts**: Discovers configured/nested `.env` files (not root `.env`) and reports the same key with different values; command output on the DotEnvy channel plus toast.
+- **Editor secret diagnostics**: Synchronous local pattern scan with debounced Problems entries (`dotenvy-secrets`); pre-commit hook uses the same scan together with `SecretsGuard`.
+- **Secrets panel feedback stats**: Scanner webview shows confirmed/false-positive counts from `FeedbackManager`; removed the “helping train the AI” toast on ignore.
+
+### 🛠️ Fixes & polish
+
+- **Secrets panel**: Generation counter avoids race conditions when refreshing webview HTML.
+- **Secret diagnostics**: Clears debounce timer on dispose.
+- **Environment panel**: “Edit” button uses full `btn` secondary styling.
+- **Docs**: `README`, `CONTRIBUTING`, `CI-CD-README`, and `LLM_ARCHITECTURE_SUMMARY` aligned with the real Node/CI stack and Aegis client architecture.
+
+### 🧪 Tests
+
+- Coverage for value conflicts, cloud diff filtering, local scan/hook behavior, Doppler slug normalization, and pull merge formatting (`dopplerProjectSlug.test.js`, extended `envFiles` / `secretsAndHook` suites).
+
 ## [2.2.2] - 2026-10-07
 
 ### 🌐 Webview localization & History filters UX

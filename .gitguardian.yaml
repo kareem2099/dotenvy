@@ -1,0 +1,10 @@
+# GitGuardian / ggshield — test fixtures intentionally contain fake secrets.
+version: 2
+
+secret:
+  ignored_paths:
+    - 'test/**'
+    - '**/*.test.js'
+    - '**/*.test.ts'
+    - '**/*.spec.js'
+    - '**/*.spec.ts'
