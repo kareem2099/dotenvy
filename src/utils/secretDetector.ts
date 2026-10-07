@@ -9,16 +9,13 @@ import { CacheManager } from './cacheManager';
 import { LLMAnalyzer } from './llmAnalyzer';
 import { DotenvyIgnore } from './dotenvyIgnore';
 import { logger } from './logger';
+import { isSecretFileWatcherActive, startSecretFileWatcher, stopSecretFileWatcher } from './secretFileWatcher';
+import { assignUniqueEnvVarNames, extractVariableName } from './secretEnvNames';
 import { t } from '../i18n';
 
 export class SecretDetector {
     private static scanProgressCallback?: (progress: ScanProgress) => void;
     private static readonly MAX_WORKERS = 4;
-    private static fileWatcher?: vscode.FileSystemWatcher;
-    private static debounceTimers = new Map<string, NodeJS.Timeout>();
-    private static readonly DEBOUNCE_DELAY = 1000;
-    private static isFileWatcherActive = false;
-    private static activeScanPromises = new Map<string, Promise<void>>();
 
     /**
      * Set progress callback for real-time updates
@@ -31,172 +28,21 @@ export class SecretDetector {
      * Start real-time file monitoring with debounced scanning
      */
     public static startFileWatcher(onSecretsFound?: (secrets: DetectedSecret[]) => void): void {
-        if (this.isFileWatcherActive) {
-            return;
-        }
-
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) {
-            return;
-        }
-
-        this.fileWatcher = vscode.workspace.createFileSystemWatcher(
-            '**/*',
-            false,
-            false,
-            false
-        );
-
-        this.fileWatcher.onDidChange(async (uri) => {
-            if (uri.scheme !== 'file') return;
-
-            const filePath = uri.fsPath;
-            const rootPath = workspaceFolders[0].uri.fsPath;
-            if (!PatternRegistry.shouldScanFile(filePath, rootPath)) {
-                return;
-            }
-            if (DotenvyIgnore.shouldIgnore(filePath, rootPath)) {
-                return;
-            }
-
-            this.debounceFileScan(filePath, onSecretsFound);
-        });
-
-        this.fileWatcher.onDidCreate(async (uri) => {
-            if (uri.scheme !== 'file') return;
-
-            const filePath = uri.fsPath;
-            const rootPath = workspaceFolders[0].uri.fsPath;
-            if (!PatternRegistry.shouldScanFile(filePath, rootPath)) {
-                return;
-            }
-            if (DotenvyIgnore.shouldIgnore(filePath, rootPath)) {
-                return;
-            }
-
-            this.debounceFileScan(filePath, onSecretsFound);
-        });
-
-        this.fileWatcher.onDidDelete((uri) => {
-            if (uri.scheme !== 'file') return;
-
-            const filePath = uri.fsPath;
-            CacheManager.invalidateFileCache(filePath);
-            this.clearDebounceTimer(filePath);
-            this.activeScanPromises.delete(filePath);
-
-            logger.info(`🗑️  File deleted - ${path.basename(filePath)}`, 'SecretDetector');
-        });
-
-        this.isFileWatcherActive = true;
-        logger.info('🔍 Real-time secret monitoring started', 'SecretDetector');
+        startSecretFileWatcher(onSecretsFound);
     }
 
     /**
      * Stop file monitoring
      */
     public static stopFileWatcher(): void {
-        try {
-            if (this.fileWatcher) {
-                this.fileWatcher.dispose();
-                this.fileWatcher = undefined;
-            }
-
-            this.debounceTimers.forEach((timer) => clearTimeout(timer));
-            this.debounceTimers.clear();
-            this.activeScanPromises.clear();
-
-            this.isFileWatcherActive = false;
-            logger.info('🛑 Real-time secret monitoring stopped', 'SecretDetector');
-        } catch (error) {
-            logger.error('Error stopping file watcher:', error, 'SecretDetector');
-            this.fileWatcher = undefined;
-            this.debounceTimers.clear();
-            this.activeScanPromises.clear();
-            this.isFileWatcherActive = false;
-        }
+        stopSecretFileWatcher();
     }
 
     /**
      * Check if file watcher is active
      */
     public static isWatching(): boolean {
-        return this.isFileWatcherActive;
-    }
-
-    /**
-     * Debounce file scanning to avoid excessive processing
-     */
-    private static debounceFileScan(filePath: string, onSecretsFound?: (secrets: DetectedSecret[]) => void): void {
-        this.clearDebounceTimer(filePath);
-
-        const timer = setTimeout(async () => {
-            try {
-                this.debounceTimers.delete(filePath);
-
-                // Check if there's already an active scan for this file
-                const activeScan = this.activeScanPromises.get(filePath);
-                if (activeScan) {
-                    await activeScan;
-                    return;
-                }
-
-                // Create new scan promise
-                const scanPromise = this.performFileScan(filePath, onSecretsFound);
-                this.activeScanPromises.set(filePath, scanPromise);
-
-                await scanPromise;
-                this.activeScanPromises.delete(filePath);
-
-            } catch (error) {
-                logger.error(`Error scanning file ${filePath}:`, error, 'SecretDetector');
-                this.activeScanPromises.delete(filePath);
-            }
-        }, this.DEBOUNCE_DELAY);
-
-        this.debounceTimers.set(filePath, timer);
-    }
-
-    /**
-     * Perform actual file scan
-     */
-    private static async performFileScan(
-        filePath: string,
-        onSecretsFound?: (secrets: DetectedSecret[]) => void
-    ): Promise<void> {
-        logger.info(`🔍 Scanning changed file: ${path.basename(filePath)}`, 'SecretDetector');
-
-        CacheManager.invalidateFileCache(filePath);
-
-        const secrets = await this.scanFile(filePath);
-
-        if (secrets.length > 0) {
-            logger.info(`⚠️  Found ${secrets.length} potential secret(s) in ${path.basename(filePath)}`, 'SecretDetector');
-
-            if (onSecretsFound) {
-                onSecretsFound(secrets);
-            } else {
-                vscode.window.showWarningMessage(
-                    t('secretDetector.foundInFile', { count: secrets.length, fileName: path.basename(filePath) }),
-                    t('secretDetector.review')
-                ).then(selection => {
-                    if (selection === t('secretDetector.review')) {
-                        logger.info('Secrets found:', 'SecretDetector');
-                    }
-                });
-            }
-        }
-    }
-
-    /**
-     * Clear debounce timer for a specific file
-     */
-    private static clearDebounceTimer(filePath: string): void {
-        const timer = this.debounceTimers.get(filePath);
-        if (timer) {
-            clearTimeout(timer);
-            this.debounceTimers.delete(filePath);
-        }
+        return isSecretFileWatcherActive();
     }
 
     /**
@@ -261,7 +107,7 @@ export class SecretDetector {
             logger.info(`Skipping file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`, 'SecretDetector');
         }
 
-        return this.assignUniqueEnvVarNames(secrets);
+        return assignUniqueEnvVarNames(secrets);
     }
 
     /**
@@ -286,7 +132,7 @@ export class SecretDetector {
                     const context = ContextEvaluator.getContextLine(allLines, lineIndex, matchIndex);
                     const secretScore = ContextEvaluator.calculateSecretScore(secretValue, context);
 
-                    const variableName = this.extractVariableName(context);
+                    const variableName = extractVariableName(context);
 
                     const baselineConfidence = EntropyAnalyzer.getConfidence(secretValue);
                     let finalConfidence = baselineConfidence;
@@ -375,92 +221,6 @@ export class SecretDetector {
     }
 
     /**
-     * Generate a unique environment variable name
-     */
-    private static generateUniqueEnvVar(secrets: DetectedSecret[], currentSecret: DetectedSecret): string {
-        const sameFileSecrets = secrets.filter(s =>
-            s.file === currentSecret.file &&
-            s.type === currentSecret.type &&
-            s !== currentSecret
-        );
-
-        let suffix = '';
-        if (sameFileSecrets.length > 0) {
-            suffix = `_${sameFileSecrets.length + 1}`;
-        }
-
-        return this.generateBaseEnvVarName(currentSecret) + suffix;
-    }
-
-    /**
-     * Generate base environment variable name
-     */
-    private static generateBaseEnvVarName(secret: DetectedSecret): string {
-        const type = secret.type;
-
-        const typeMap: Record<string, string> = {
-            'AWS API Key': 'AWS_ACCESS_KEY_ID',
-            'Stripe Secret Key': 'STRIPE_SECRET_KEY',
-            'Stripe Publishable Key': 'STRIPE_PUBLISHABLE_KEY',
-            'OpenAI API Key': 'OPENAI_API_KEY',
-            'GitHub Personal Access Token': 'GITHUB_TOKEN',
-            'GitHub Fine-grained PAT': 'GITHUB_TOKEN',
-            'Slack Bot Token': 'SLACK_BOT_TOKEN',
-            'Discord Bot Token': 'DISCORD_BOT_TOKEN',
-            'JWT Secret': 'JWT_SECRET',
-            'Database Connection URL': 'DATABASE_URL',
-            'MongoDB Atlas Connection': 'MONGODB_URI',
-            'SendGrid API Key': 'SENDGRID_API_KEY',
-            'Mailgun API Key': 'MAILGUN_API_KEY',
-            'Twilio Auth Token': 'TWILIO_AUTH_TOKEN',
-            'Sentry DSN': 'SENTRY_DSN',
-            'DigitalOcean Token': 'DIGITALOCEAN_TOKEN',
-            'Vercel API Token': 'VERCEL_API_TOKEN',
-            'SSH Private Key': 'SSH_PRIVATE_KEY',
-            'SSL Certificate': 'SSL_CERTIFICATE',
-            'Bearer Token': 'AUTH_BEARER_TOKEN',
-            'Password': 'PASSWORD',
-            'Secret Key': 'SECRET_KEY'
-        };
-
-        if (typeMap[type]) {
-            return typeMap[type];
-        }
-
-        if (secret.content.startsWith('sk-')) return 'SECRET_KEY';
-        if (secret.content.startsWith('pk_')) return 'PUBLIC_KEY';
-
-        const fileName = path.basename(secret.file, path.extname(secret.file));
-        const baseName = fileName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-        
-        return `${baseName}_SECRET`;
-    }
-
-    /**
-     * Assign unique environment variable names to secrets
-     */
-    private static assignUniqueEnvVarNames(secrets: DetectedSecret[]): DetectedSecret[] {
-        const usedNames = new Set<string>();
-
-        return secrets.map(secret => {
-            const baseName = this.generateBaseEnvVarName(secret);
-            let finalName = baseName;
-            let counter = 1;
-
-            while (usedNames.has(finalName)) {
-                finalName = `${baseName}_${counter}`;
-                counter++;
-            }
-
-            usedNames.add(finalName);
-            return {
-                ...secret,
-                suggestedEnvVar: finalName
-            };
-        });
-    }
-
-    /**
      * Enhanced workspace scanning with performance optimizations
      */
     public static async scanWorkspaceEnhanced(progressCallback?: (progress: ScanProgress) => void): Promise<DetectedSecret[]> {
@@ -541,26 +301,6 @@ export class SecretDetector {
     }
 
     /**
-     * Extract variable name from context
-     */
-    private static extractVariableName(context: string): string | undefined {
-        const patterns = [
-            /(?:const|let|var)\s+(\w+)\s*[:=]/,
-            /(\w+)\s*[:=]/,
-            /(\w+)\s*\.\.\./
-        ];
-
-        for (const pattern of patterns) {
-            const match = context.match(pattern);
-            if (match && match[1] && !match[1].includes('.') && !match[1].includes('"') && !match[1].includes("'")) {
-                return match[1];
-            }
-        }
-
-        return undefined;
-    }
-
-    /**
      * Enhanced file scanning with progress tracking
      */
     private static async scanFileEnhanced(filePath: string, index: number, total: number, startTime: number): Promise<DetectedSecret[]> {
@@ -601,7 +341,7 @@ export class SecretDetector {
             logger.info(`Skipping file ${filePath}: ${error instanceof Error ? error.message : 'Unknown error'}`, 'SecretDetector');
         }
 
-        return this.assignUniqueEnvVarNames(secrets);
+        return assignUniqueEnvVarNames(secrets);
     }
 
     /**

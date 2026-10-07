@@ -1,0 +1,7 @@
+/* Filter Button States */
+.advanced-filters-btn.active {
+    background: var(--primary-gradient) !important;
+    color: white !important;
+    border-color: rgba(102, 126, 234, 0.5) !important;
+}
+

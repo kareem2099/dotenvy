@@ -2,9 +2,7 @@ import * as vscode from 'vscode';
 import { EnvironmentProvider } from './environmentProvider';
 import { ConfigUtils } from '../utils/configUtils';
 import { GitHookManager } from '../utils/gitHookManager';
-import { CloudSyncManager } from '../utils/cloudSyncManager';
-import { DopplerSyncManager } from '../utils/dopplerSyncManager';
-import { EnvironmentValidator } from '../utils/environmentValidator';
+import { getCloudSyncStatus, getValidationStatus } from './environmentDashboardStatus';
 import { EncryptedVarsManager, EncryptedEnvironmentFile } from '../utils/encryptedVars';
 import { extensionUri } from '../extension';
 import { QuickEnvConfig } from '../types/environment';
@@ -12,11 +10,10 @@ import { CloudSyncResult } from '../utils/cloudSyncManager';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from '../utils/logger';
-import { TrashBinManager } from '../utils/trashBinManager';
 import { UserManager } from '../utils/userManager';
 import { registerPanelNotifier } from '../utils/panelNotification';
-import { LocalizationService } from '../i18n';
 import { getWebviewLocalePayload } from '../i18n/webviewLocale';
+import { handleEnvironmentPanelMessage } from './environmentPanelActions';
 
 // Dashboard data interfaces
 interface EnvironmentData {
@@ -84,51 +81,6 @@ interface DashboardData {
     backupSettings: BackupSettings;
 }
 
-// Webview message interfaces for different message types
-interface BaseWebviewMessage {
-    type: string;
-}
-
-interface SwitchEnvironmentMessage extends BaseWebviewMessage {
-    type: 'switchEnvironment';
-    environment: string;
-}
-
-interface EditFileMessage extends BaseWebviewMessage {
-    type: 'editFile';
-    fileName: string;
-}
-
-interface DiffEnvironmentMessage extends BaseWebviewMessage {
-    type: 'diffEnvironment';
-    environment?: string;
-}
-
-interface CreateEnvironmentMessage extends BaseWebviewMessage {
-    type: 'createEnvironment';
-}
-
-interface OpenVariableManagerMessage extends BaseWebviewMessage {
-    type: 'openVariableManager';
-    fileName: string;
-}
-
-interface BackupMessage extends BaseWebviewMessage {
-    type: 'backupCurrentEnv';
-}
-
-interface ToggleVarEncryptionMessage extends BaseWebviewMessage {
-    type: 'toggleVarEncryption';
-    key: string;
-}
-
-interface VariableActionMessage extends BaseWebviewMessage {
-    type: 'updateVariable' | 'deleteVariable' | 'toggleVarEncryption';
-    key: string;
-}
-
-type WebviewMessage = BaseWebviewMessage | SwitchEnvironmentMessage | EditFileMessage | OpenVariableManagerMessage | DiffEnvironmentMessage | CreateEnvironmentMessage | BackupMessage | ToggleVarEncryptionMessage | VariableActionMessage;
-
 export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private environmentProvider?: EnvironmentProvider;
@@ -176,7 +128,14 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         this.refreshEnvironments();
 
         view.webview.onDidReceiveMessage(async (message) => {
-            await this.handleMessage(message);
+            if (!this.environmentProvider) {
+                return;
+            }
+            await handleEnvironmentPanelMessage(message, {
+                environmentProvider: this.environmentProvider,
+                context: this.context,
+                refreshEnvironments: () => this.refreshEnvironments(),
+            });
         }, undefined, this.context.subscriptions);
 
         const panelNotifier = registerPanelNotifier(message => view.webview.postMessage(message));
@@ -218,9 +177,11 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         // Create webview URIs for CSS and JS resources
         const cssUri = this._view.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css'));
         const jsUri = this._view.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.js'));
+        const localeJsUri = this._view.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel-locale-menu.js'));
 
         // Replace placeholders with actual URIs
         html = html.replace('{{panelCssUri}}', cssUri.toString());
+        html = html.replace('{{panelLocaleJsUri}}', localeJsUri.toString());
         html = html.replace('{{panelJsUri}}', jsUri.toString());
         html = html.replace('<body>', '<body class="sidebar-view">');
 
@@ -374,60 +335,11 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     private async getCloudSyncStatus(rootPath: string, config: QuickEnvConfig | null) {
-        if (!config?.cloudSync) {
-            return null;
-        }
-
-        try {
-            let cloudManager: CloudSyncManager;
-
-            switch (config.cloudSync.provider) {
-                case 'doppler':
-                    cloudManager = new DopplerSyncManager(config.cloudSync);
-                    break;
-                default:
-                    return {
-                        connected: false,
-                        error: `Unsupported provider: ${config.cloudSync.provider}`
-                    };
-            }
-
-            const connected = await cloudManager.testConnection();
-
-            return {
-                connected,
-                provider: config.cloudSync.provider,
-                lastSync: null // Would track actual sync times in real implementation
-            };
-
-        } catch (error) {
-            return {
-                connected: false,
-                error: (error as Error).message
-            };
-        }
+        return getCloudSyncStatus(rootPath, config);
     }
 
     private async getValidationStatus(rootPath: string, envPath: string, config: QuickEnvConfig | null) {
-        if (!config?.validation || !fs.existsSync(envPath)) {
-            return {
-                valid: true
-            };
-        }
-
-        try {
-            const errors = EnvironmentValidator.validateFile(envPath, config.validation);
-            return {
-                valid: errors.length === 0,
-                errors: errors.length,
-                lastValidated: new Date()
-            };
-        } catch (error) {
-            return {
-                valid: false,
-                errors: 1
-            };
-        }
+        return getValidationStatus(rootPath, envPath, config);
     }
 
     private displayCachedDashboard(): void {
@@ -436,349 +348,4 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private async handleMessage(message: WebviewMessage): Promise<void> {
-        if (!this.environmentProvider) return;
-
-        const rootPath = this.environmentProvider['rootPath'];
-
-        switch (message.type) {
-            case 'setLocale': {
-                const localeMsg = message as { locale?: string };
-                if (localeMsg.locale) {
-                    await LocalizationService.getInstance().setLocale(localeMsg.locale);
-                    await this.refreshEnvironments();
-                }
-                break;
-            }
-
-            case 'refresh':
-                await this.refreshEnvironments();
-                break;
-
-            case 'openHistoryPanel':
-                vscode.commands.executeCommand('dotenvy.openHistoryPanel');
-                break;
-
-            case 'openAnalyticsPanel':
-                vscode.commands.executeCommand('dotenvy.openAnalyticsPanel');
-                break;
-
-            case 'openTrashBin':
-                vscode.commands.executeCommand('dotenvy.openTrashBin');
-                break;
-
-            case 'openVariableManager':
-                const varManagerMsg = message as OpenVariableManagerMessage;
-                vscode.commands.executeCommand('dotenvy.openVariableManager', varManagerMsg.fileName);
-                break;
-
-
-            case 'switchEnvironment':
-                const switchMsg = message as SwitchEnvironmentMessage;
-                const selectedEnv = (await this.environmentProvider.getEnvironments())
-                    .find(env => env.name === switchMsg.environment);
-
-                if (selectedEnv) {
-                    try {
-                        const { FileUtils } = await import('../utils/fileUtils');
-                        const { SecretsGuard } = await import('../utils/secretsGuard');
-
-                        await FileUtils.switchToEnvironment(selectedEnv, rootPath);
-
-                        const warnings = SecretsGuard.checkFile(selectedEnv.filePath);
-                        if (warnings.length > 0) {
-                            vscode.window.showWarningMessage(
-                                `⚠️ Selected environment contains potential secrets: ${warnings.join(', ')}`
-                            );
-                        }
-
-                        vscode.window.showInformationMessage(`Environment switched to ${selectedEnv.name}`);
-                        await this.refreshEnvironments();
-                    } catch (error) {
-                        vscode.window.showErrorMessage(`Failed to switch environment: ${(error as Error).message}`);
-                    }
-                }
-                break;
-
-            case 'editFile':
-                // Ensure fileName is passed and used correctly
-                const editMsg = message as EditFileMessage;
-                const fileUri = vscode.Uri.file(path.join(rootPath, editMsg.fileName));
-                const doc = await vscode.workspace.openTextDocument(fileUri);
-                await vscode.window.showTextDocument(doc);
-                break;
-
-            case 'diffEnvironment':
-                const diffMsg = message as DiffEnvironmentMessage;
-                if (diffMsg.environment) {
-                    const selectedEnv = (await this.environmentProvider.getEnvironments())
-                        .find(env => env.name === diffMsg.environment);
-
-                    if (selectedEnv) {
-                        const { EnvironmentDiffer } = await import('../utils/environmentDiffer');
-                        try {
-                            const diff = EnvironmentDiffer.compareFiles(path.join(rootPath, '.env'), selectedEnv.filePath);
-                            const diffText = EnvironmentDiffer.formatDiffForDisplay(diff, 'Current', selectedEnv.name);
-                            const doc = await vscode.workspace.openTextDocument({
-                                content: diffText,
-                                language: 'diff'
-                            });
-                            await vscode.window.showTextDocument(doc, { preview: true });
-                        } catch (error) {
-                            vscode.window.showErrorMessage(`Failed to show diff: ${(error as Error).message}`);
-                        }
-                    }
-                } else {
-                    // General diff command - show quick pick
-                    const { DiffEnvironmentCommand } = await import('../commands/diffEnvironment');
-                    const diffCommand = new DiffEnvironmentCommand();
-                    await diffCommand.execute();
-                }
-                break;
-
-            case 'createEnvironment':
-                const fileName = await vscode.window.showInputBox({
-                    prompt: 'Enter environment file name (e.g., .env.staging)',
-                    placeHolder: '.env.newenv',
-                    value: '.env.',
-                    validateInput: (value: string) => {
-                        if (!value.startsWith('.env.')) return 'Must start with .env.';
-                        if (fs.existsSync(path.join(rootPath, value))) return 'File already exists';
-                        return null;
-                    }
-                });
-
-                if (fileName) {
-                    try {
-                        const templateContent = `# ${fileName} environment variables
-# Copy from another environment file and modify as needed
-
-API_KEY=your_api_key_here
-DATABASE_URL=your_database_url_here
-PORT=3000
-NODE_ENV=${fileName.replace('.env.', '')}
-DEBUG=false
-`.replace(/\r?\n/g, '\n');
-
-                        fs.writeFileSync(path.join(rootPath, fileName), templateContent, 'utf8');
-                        vscode.window.showInformationMessage(`Created ${fileName}`);
-                        await this.refreshEnvironments();
-
-                        // Open the new file for editing
-                        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(rootPath, fileName)));
-                        await vscode.window.showTextDocument(doc);
-                    } catch (error) {
-                        vscode.window.showErrorMessage(`Failed to create environment file: ${(error as Error).message}`);
-                    }
-                }
-                break;
-
-            // Cloud sync actions
-            case 'pullFromCloud':
-                const { PullFromCloudCommand } = await import('../commands/pullFromCloud');
-                const pullCommand = new PullFromCloudCommand();
-                await pullCommand.execute();
-                await this.refreshEnvironments();
-                break;
-
-            case 'pushToCloud':
-                const { PushToCloudCommand } = await import('../commands/pushToCloud');
-                const pushCommand = new PushToCloudCommand();
-                await pushCommand.execute();
-                break;
-
-            // Git hook actions
-            case 'instalGitHook': // Typo in frontend - should be installGitHook
-            case 'installGitHook':
-                const { InstallGitHookCommand: InstallHookCmd } = await import('../commands/installGitHook');
-                const installHookCommand = new InstallHookCmd();
-                await installHookCommand.execute();
-                await this.refreshEnvironments();
-                break;
-
-            case 'removeGitHook':
-                const { RemoveGitHookCommand } = await import('../commands/removeGitHook');
-                const removeHookCommand = new RemoveGitHookCommand();
-                await removeHookCommand.execute();
-                await this.refreshEnvironments();
-                break;
-
-            case 'openWorkspace':
-                vscode.commands.executeCommand('vscode.openFolder');
-                break;
-
-            case 'manageGitHook':
-                const { InstallGitHookCommand: ManageHookCmd } = await import('../commands/installGitHook');
-                const manageHookCommand = new ManageHookCmd();
-                await manageHookCommand.execute();
-                await this.refreshEnvironments();
-                break;
-
-            // Validation actions
-            case 'backupCurrentEnv': {
-                const { BackupCommands } = await import('../commands/backupCommands');
-                const targetFilePath = path.join(rootPath, '.env');
-                await BackupCommands.backupEnv(this.context, targetFilePath);
-                await this.refreshEnvironments();
-                break;
-            }
-
-            case 'chooseBackupLocation': {
-                const { BackupCommands } = await import('../commands/backupCommands');
-                await BackupCommands.chooseBackupLocation();
-                await this.refreshEnvironments();
-                break;
-            }
-
-            case 'scanSecrets':
-                const { ScanSecretsCommand } = await import('../commands/scanSecrets');
-                const scanSecretsCommand = new ScanSecretsCommand();
-                await scanSecretsCommand.execute();
-                break;
-
-            case 'validateEnvironment':
-                const { ValidateEnvironmentCommand } = await import('../commands/validateEnvironment');
-                const validateCommand = new ValidateEnvironmentCommand();
-                await validateCommand.execute();
-                await this.refreshEnvironments();
-                break;
-
-            case 'toggleVarEncryption': {
-                // Handle individual variable encryption toggle
-                const toggleMsg = message as VariableActionMessage;
-                const targetKey = toggleMsg.key;
-
-                if (!targetKey) {
-                    vscode.window.showErrorMessage('No variable key provided for encryption toggle');
-                    return;
-                }
-
-                const envFilePath = path.join(rootPath, '.env');
-
-                try {
-                    // 1. Get the appropriate key (Cloud or Local)
-                    const cryptoKey = await EncryptedVarsManager.ensureMasterKey(this.context);
-
-                    // 2. Parse current environment file
-                    const currentVars = await EncryptedEnvironmentFile.parseEnvFile(envFilePath, this.context, cryptoKey);
-
-                    // 3. Find and toggle the target variable
-                    const varData = currentVars.get(targetKey);
-                    if (!varData) {
-                        vscode.window.showErrorMessage(`Variable '${targetKey}' not found in .env file`);
-                        return;
-                    }
-
-                    // 4. Toggle encryption state
-                    varData.encrypted = !varData.encrypted;
-
-                    // Update the map
-                    currentVars.set(targetKey, varData);
-
-                    // 5. Write back the file with the toggled variable
-                    await EncryptedEnvironmentFile.writeEnvFile(envFilePath, currentVars, this.context, cryptoKey);
-
-                    // 6. Refresh UI and show feedback
-                    await this.refreshEnvironments();
-
-                    const action = varData.encrypted ? 'Encrypted' : 'Decrypted';
-                    const icon = varData.encrypted ? '🔒' : '🔓';
-                    vscode.window.showInformationMessage(`${icon} ${action} variable '${targetKey}'`);
-
-                } catch (error) {
-                    vscode.window.showErrorMessage(`Failed to toggle encryption for '${targetKey}': ${(error as Error).message}`);
-                }
-                break;
-            }
-
-            case 'updateVariable': {
-                const updateMsg = message as VariableActionMessage;
-                const targetKey = updateMsg.key;
-                const envFilePath = path.join(rootPath, '.env');
-
-                try {
-                    const cryptoKey = await EncryptedVarsManager.ensureMasterKey(this.context);
-                    const currentVars = await EncryptedEnvironmentFile.parseEnvFile(envFilePath, this.context, cryptoKey);
-
-                    const varData = currentVars.get(targetKey);
-                    if (!varData) {
-                        vscode.window.showErrorMessage(`Variable '${targetKey}' not found.`);
-                        return;
-                    }
-
-                    const newValue = await vscode.window.showInputBox({
-                        prompt: `Enter new value for ${targetKey}`,
-                        value: varData.value,
-                        ignoreFocusOut: true
-                    });
-
-                    if (newValue !== undefined && newValue !== varData.value) {
-                        // Push to Trash Bin BEFORE updating
-                        TrashBinManager.getInstance().push({
-                            key: targetKey,
-                            oldValue: varData.value,
-                            newValue: newValue,
-                            environmentFile: '.env',
-                            workspacePath: rootPath,
-                            type: 'modified'
-                        });
-
-                        varData.value = newValue;
-                        currentVars.set(targetKey, varData);
-                        await EncryptedEnvironmentFile.writeEnvFile(envFilePath, currentVars, this.context, cryptoKey);
-                        await this.refreshEnvironments();
-                        vscode.window.showInformationMessage(`✅ Updated ${targetKey}`);
-                    }
-                } catch (error) {
-                    vscode.window.showErrorMessage(`Update failed: ${(error as Error).message}`);
-                }
-                break;
-            }
-
-            case 'deleteVariable': {
-                const deleteMsg = message as VariableActionMessage;
-                const targetKey = deleteMsg.key;
-                const envFilePath = path.join(rootPath, '.env');
-
-                try {
-                    const cryptoKey = await EncryptedVarsManager.ensureMasterKey(this.context);
-                    const currentVars = await EncryptedEnvironmentFile.parseEnvFile(envFilePath, this.context, cryptoKey);
-
-                    const varData = currentVars.get(targetKey);
-                    if (!varData) return;
-
-                    const confirm = await vscode.window.showWarningMessage(
-                        `Delete variable '${targetKey}'?`, { modal: true }, 'Delete'
-                    );
-
-                    if (confirm === 'Delete') {
-                        // Push to Trash Bin
-                        TrashBinManager.getInstance().push({
-                            key: targetKey,
-                            oldValue: varData.value,
-                            environmentFile: '.env',
-                            workspacePath: rootPath,
-                            type: 'deleted'
-                        });
-
-                        currentVars.delete(targetKey);
-                        await EncryptedEnvironmentFile.writeEnvFile(envFilePath, currentVars, this.context, cryptoKey);
-                        await this.refreshEnvironments();
-                        vscode.window.showInformationMessage(`🗑️ Deleted ${targetKey}`);
-                    }
-                } catch (error) {
-                    vscode.window.showErrorMessage(`Delete failed: ${(error as Error).message}`);
-                }
-                break;
-            }
-
-            case 'restoreFromBackup': {
-                const { BackupCommands } = await import('../commands/backupCommands');
-                await BackupCommands.restoreFromBackup(this.context, rootPath);
-                await this.refreshEnvironments();
-                break;
-            }
-        }
-    }
 }
-

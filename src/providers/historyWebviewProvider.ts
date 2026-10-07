@@ -380,6 +380,8 @@ export class HistoryWebviewProvider {
             tokens: {
                 styleUri:  webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css')).toString(),
                 scriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'history-viewer.js')).toString(),
+                filtersScriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'history-viewer-filters.js')).toString(),
+                filterResultsScriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'history-viewer-filter-results.js')).toString(),
                 i18nScriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'webview-i18n.js')).toString(),
             },
         });

@@ -7,6 +7,8 @@
  */
 
 import { HistoryEntry } from '../types/environment';
+import { calculateStabilityMetrics } from './historyStabilityMetrics';
+import { analyzeVariableChanges } from './historyVariableChanges';
 
 export interface UsagePatterns {
     environmentFrequency: Record<string, number>;
@@ -88,9 +90,9 @@ export class HistoryAnalytics {
 
         return {
             usagePatterns: this.analyzeUsagePatterns(sortedEntries),
-            stabilityMetrics: this.calculateStabilityMetrics(sortedEntries),
+            stabilityMetrics: calculateStabilityMetrics(sortedEntries),
             activityHeatmap: this.generateActivityHeatmap(sortedEntries),
-            variableAnalytics: this.analyzeVariableChanges(sortedEntries),
+            variableAnalytics: analyzeVariableChanges(sortedEntries),
             generatedAt: new Date(),
             dataRange
         };
@@ -177,98 +179,6 @@ export class HistoryAnalytics {
     }
 
     /**
-     * Calculate stability metrics for environments
-     */
-    private static calculateStabilityMetrics(entries: HistoryEntry[]): StabilityMetrics {
-        const envData: Record<string, {
-            changes: Date[];
-            firstChange?: Date;
-            lastChange?: Date;
-        }> = {};
-
-        // Group changes by environment
-        for (const entry of entries) {
-            const env = entry.environmentName;
-            if (!envData[env]) {
-                envData[env] = { changes: [] };
-            }
-
-            const changeTime = new Date(entry.timestamp);
-            envData[env].changes.push(changeTime);
-
-            const envEntry = envData[env];
-            if (!envEntry.firstChange || changeTime < envEntry.firstChange) {
-                envEntry.firstChange = changeTime;
-            }
-            if (!envEntry.lastChange || changeTime > envEntry.lastChange) {
-                envEntry.lastChange = changeTime;
-            }
-        }
-
-        const churnRate: Record<string, number> = {};
-        const avgTimeBetweenChanges: Record<string, number> = {};
-        const stabilityScore: Record<string, number> = {};
-        const totalChanges: Record<string, number> = {};
-        const firstChange: Record<string, Date> = {};
-        const lastChange: Record<string, Date> = {};
-
-        for (const env in envData) {
-            const data = envData[env];
-            const changes = data.changes.sort((a, b) => a.getTime() - b.getTime());
-            totalChanges[env] = changes.length;
-
-            if (data.firstChange) firstChange[env] = data.firstChange;
-            if (data.lastChange) lastChange[env] = data.lastChange;
-
-            if (changes.length > 1) {
-                // Calculate time span in days
-                const timeSpanMs = changes[changes.length - 1].getTime() - changes[0].getTime();
-                const timeSpanDays = timeSpanMs / (1000 * 60 * 60 * 24);
-
-                if (timeSpanDays > 0) {
-                    churnRate[env] = changes.length / timeSpanDays;
-                }
-
-                // Calculate average time between changes in hours
-                const intervals: number[] = [];
-                for (let i = 1; i < changes.length; i++) {
-                    const intervalMs = changes[i].getTime() - changes[i - 1].getTime();
-                    intervals.push(intervalMs / (1000 * 60 * 60)); // Convert to hours
-                }
-
-                if (intervals.length > 0) {
-                    avgTimeBetweenChanges[env] = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
-                }
-
-                // Calculate stability score (0-100, higher is more stable)
-                const avgIntervalHours = avgTimeBetweenChanges[env] || 24; // Default 24 hours
-                const changesPerWeek = (changes.length / timeSpanDays) * 7;
-
-                // Score based on predictability and frequency
-                // Lower churn rate and more predictable intervals = higher score
-                const intervalVariance = this.calculateVariance(intervals);
-                const predictabilityScore = Math.max(0, 100 - (intervalVariance / avgIntervalHours) * 50);
-                const frequencyScore = Math.max(0, 100 - changesPerWeek * 10);
-
-                stabilityScore[env] = Math.round((predictabilityScore + frequencyScore) / 2);
-            } else {
-                churnRate[env] = 0;
-                avgTimeBetweenChanges[env] = 0;
-                stabilityScore[env] = 100; // Single change = perfectly stable
-            }
-        }
-
-        return {
-            churnRate,
-            avgTimeBetweenChanges,
-            stabilityScore,
-            totalChanges,
-            firstChange,
-            lastChange
-        };
-    }
-
-    /**
      * Generate activity heatmap data
      */
     private static generateActivityHeatmap(entries: HistoryEntry[]): ActivityHeatmap {
@@ -300,111 +210,6 @@ export class HistoryAnalytics {
             hourly,
             monthly
         };
-    }
-
-    /**
-     * Analyze variable changes across history
-     */
-    private static analyzeVariableChanges(entries: HistoryEntry[]): VariableAnalytics {
-        const variableData: Record<string, {
-            changes: Array<{ timestamp: Date; value: string }>;
-            firstSeen?: Date;
-            lastChanged?: Date;
-            currentValue?: string;
-        }> = {};
-
-        // Process each entry to track variable changes
-        for (const entry of entries) {
-            if (!entry.fileContent) continue;
-
-            const lines = entry.fileContent.split('\n');
-            const variablesInEntry: Record<string, string> = {};
-
-            // Parse environment variables from this entry
-            for (const line of lines) {
-                const trimmed = line.trim();
-                if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
-                    const [key, ...valueParts] = trimmed.split('=');
-                    const value = valueParts.join('=').replace(/^["']|["']$/g, ''); // Remove quotes
-                    variablesInEntry[key.trim()] = value;
-                }
-            }
-
-            // Track changes for each variable
-            for (const [key, value] of Object.entries(variablesInEntry)) {
-                if (!variableData[key]) {
-                    variableData[key] = { changes: [] };
-                }
-
-                const timestamp = new Date(entry.timestamp);
-                const varEntry = variableData[key];
-                varEntry.changes.push({ timestamp, value });
-                varEntry.currentValue = value;
-
-                if (!varEntry.firstSeen || timestamp < varEntry.firstSeen) {
-                    varEntry.firstSeen = timestamp;
-                }
-                if (!varEntry.lastChanged || timestamp > varEntry.lastChanged) {
-                    varEntry.lastChanged = timestamp;
-                }
-            }
-        }
-
-        // Calculate analytics for each variable
-        const changeFrequency: Record<string, number> = {};
-        const lastChanged: Record<string, Date> = {};
-        const firstSeen: Record<string, Date> = {};
-        const currentValue: Record<string, string> = {};
-        const changeVelocity: Record<string, number> = {};
-        const lifecycle: Record<string, VariableLifecycle> = {};
-
-        for (const [key, data] of Object.entries(variableData)) {
-            const changes = data.changes.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-            changeFrequency[key] = changes.length - 1; // Subtract 1 because first occurrence isn't a "change"
-
-            if (data.firstSeen) firstSeen[key] = data.firstSeen;
-            if (data.lastChanged) lastChanged[key] = data.lastChanged;
-            if (data.currentValue) currentValue[key] = data.currentValue;
-
-            // Calculate change velocity (changes per day)
-            if (changes.length > 1 && data.firstSeen && data.lastChanged) {
-                const timeSpanMs = data.lastChanged.getTime() - data.firstSeen.getTime();
-                const timeSpanDays = timeSpanMs / (1000 * 60 * 60 * 24);
-                if (timeSpanDays > 0) {
-                    changeVelocity[key] = (changes.length - 1) / timeSpanDays;
-                }
-            }
-
-            // Build lifecycle
-            const uniqueValues = [...new Set(changes.map(c => c.value))];
-            lifecycle[key] = {
-                created: data.firstSeen || new Date(),
-                lastModified: data.lastChanged || new Date(),
-                totalChanges: changes.length - 1,
-                currentValue: data.currentValue || '',
-                previousValues: uniqueValues.slice(0, -1) // All except current
-            };
-        }
-
-        return {
-            changeFrequency,
-            lastChanged,
-            firstSeen,
-            currentValue,
-            changeVelocity,
-            lifecycle
-        };
-    }
-
-    /**
-     * Calculate variance of an array of numbers
-     */
-    private static calculateVariance(values: number[]): number {
-        if (values.length === 0) return 0;
-
-        const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-        const squaredDiffs = values.map(val => Math.pow(val - mean, 2));
-        return squaredDiffs.reduce((sum, val) => sum + val, 0) / values.length;
     }
 
     /**

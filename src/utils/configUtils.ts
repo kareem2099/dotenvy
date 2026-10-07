@@ -4,16 +4,11 @@ import * as path from 'path';
 import { QuickEnvConfig, EnvironmentValidationRules } from '../types/environment';
 import { extensionContext } from '../extension';
 import { logger } from './logger';
+import { discoverEnvironmentEntries as discoverWorkspaceEnvironmentEntries, discoverEnvironments as discoverWorkspaceEnvironments } from './environmentDiscovery';
 
 export class ConfigUtils {
 	private static readonly CONFIG_KEY = 'dotenvyConfig';
 	private static readonly SECRET_PREFIX = 'dotenvy:';
-
-	private static readonly SKIPPED_DIRS = new Set([
-		'node_modules', '.git', 'dist', 'build', 'out', '.venv', '.next', 'coverage', '__pycache__'
-	]);
-
-	private static readonly EXCLUDED_ENV_SUFFIXES = new Set(['backup', 'example', 'template']);
 
 	/**
 	 * Read QuickEnv config from VSCode storage or .dotenvy.json file
@@ -193,93 +188,16 @@ export class ConfigUtils {
 	 * Scan the workspace for .env files, including gitignored files in subfolders.
 	 */
 	static async discoverEnvironments(rootPath: string): Promise<Record<string, string>> {
-		const discovered = await this.discoverEnvironmentEntries(rootPath);
-		return this.buildEnvironmentMap(discovered);
+		return discoverWorkspaceEnvironments(rootPath);
 	}
 
+	/**
+	 * Returns discovered environment files with name and paths.
+	 */
 	static async discoverEnvironmentEntries(
 		rootPath: string
 	): Promise<Array<{ name: string; relativePath: string; absolutePath: string }>> {
-		const discovered: Array<{ name: string; relativePath: string }> = [];
-
-		try {
-			const absolutePaths = await this.findEnvironmentFiles(rootPath);
-			for (const absolutePath of absolutePaths) {
-				const relativePath = path.relative(rootPath, absolutePath).replace(/\\/g, '/');
-				const parsed = this.parseEnvironmentFile(relativePath);
-				if (!parsed) {
-					continue;
-				}
-
-				discovered.push({
-					name: parsed.name,
-					relativePath
-				});
-			}
-		} catch (error) {
-			logger.warn(`Failed to discover environments: ${error}`, 'ConfigUtils');
-		}
-
-		return discovered.map(entry => ({
-			...entry,
-			absolutePath: path.join(rootPath, entry.relativePath)
-		}));
-	}
-
-	private static async findEnvironmentFiles(rootPath: string): Promise<string[]> {
-		const results: string[] = [];
-		await this.walkForEnvironmentFiles(rootPath, results);
-		return results.sort();
-	}
-
-	private static async walkForEnvironmentFiles(currentDir: string, results: string[]): Promise<void> {
-		let entries: fs.Dirent[];
-
-		try {
-			entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
-		} catch {
-			return;
-		}
-
-		for (const entry of entries) {
-			const entryPath = path.join(currentDir, entry.name);
-
-			if (entry.isDirectory()) {
-				if (this.SKIPPED_DIRS.has(entry.name)) {
-					continue;
-				}
-				await this.walkForEnvironmentFiles(entryPath, results);
-				continue;
-			}
-
-			if (!entry.isFile()) {
-				continue;
-			}
-
-			if (entry.name === '.env' || entry.name.startsWith('.env.')) {
-				results.push(entryPath);
-			}
-		}
-	}
-
-	private static parseEnvironmentFile(relativePath: string): { name: string } | null {
-		const fileName = path.basename(relativePath);
-		const parentDir = path.dirname(relativePath).replace(/\\/g, '/');
-
-		if (fileName.startsWith('.env.')) {
-			const envName = fileName.substring(5);
-			if (!envName || this.EXCLUDED_ENV_SUFFIXES.has(envName.toLowerCase())) {
-				return null;
-			}
-			return { name: envName };
-		}
-
-		if (fileName === '.env' && parentDir && parentDir !== '.') {
-			const folderName = path.basename(parentDir);
-			return { name: `${folderName}-local` };
-		}
-
-		return null;
+		return discoverWorkspaceEnvironmentEntries(rootPath);
 	}
 
 	/**
@@ -305,31 +223,6 @@ export class ConfigUtils {
 	private static normalizeProjectName(name: string): string {
 		const unscoped = name.startsWith('@') ? (name.split('/').pop() ?? name) : name;
 		return unscoped.trim().toLowerCase().replace(/[_\s]+/g, '-');
-	}
-
-	private static buildEnvironmentMap(
-		discovered: Array<{ name: string; relativePath: string }>
-	): Record<string, string> {
-		const nameCounts = new Map<string, number>();
-
-		for (const entry of discovered) {
-			nameCounts.set(entry.name, (nameCounts.get(entry.name) ?? 0) + 1);
-		}
-
-		const environments: Record<string, string> = {};
-
-		for (const entry of discovered) {
-			let key = entry.name;
-
-			if ((nameCounts.get(entry.name) ?? 0) > 1) {
-				const parentDir = path.basename(path.dirname(entry.relativePath));
-				key = parentDir && parentDir !== '.' ? `${parentDir}-${entry.name}` : entry.name;
-			}
-
-			environments[key] = entry.relativePath;
-		}
-
-		return environments;
 	}
 
 	/**

@@ -1,0 +1,149 @@
+/* ======================================================
+   Trash Bin Styles
+   ====================================================== */
+.trash-bin-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: var(--space-xl);
+}
+
+.trash-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-xl);
+}
+
+.trash-header h3 {
+    font-size: 1.4rem;
+    margin: 0;
+}
+
+.trash-count {
+    font-size: 0.8rem;
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: #ef4444;
+    border-radius: 12px;
+    padding: 2px 10px;
+    margin-left: var(--space-sm);
+}
+
+.trash-empty {
+    text-align: center;
+    padding: var(--space-xl) * 2;
+    color: var(--vscode-descriptionForeground);
+    font-size: 1rem;
+    opacity: 0.6;
+}
+
+.trash-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.trash-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    transition: all var(--transition-fast);
+}
+
+.trash-item.deleted {
+    background: rgba(239,68,68,0.06);
+    border-color: rgba(239,68,68,0.25);
+}
+
+.trash-item.modified {
+    background: rgba(245,158,11,0.06);
+    border-color: rgba(245,158,11,0.25);
+}
+
+.trash-item:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.trash-type-badge {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.deleted .trash-type-badge  { background: #ef4444; }
+.modified .trash-type-badge { background: #f59e0b; }
+
+.trash-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+
+.trash-key {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.trash-value-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 0.78rem;
+    color: var(--vscode-descriptionForeground);
+    font-family: var(--font-mono);
+    overflow: hidden;
+}
+
+.trash-old-val {
+    color: #ef4444;
+    text-decoration: line-through;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trash-arrow { opacity: 0.5; }
+
+.trash-new-val {
+    color: #10b981;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trash-meta {
+    font-size: 0.72rem;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.7;
+}
+
+.btn-restore {
+    padding: var(--space-xs) var(--space-md);
+    border: 1px solid rgba(16,185,129,0.4);
+    border-radius: 8px;
+    background: rgba(16,185,129,0.1);
+    color: #10b981;
+    font-size: 0.82rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.btn-restore:hover {
+    background: rgba(16,185,129,0.2);
+    border-color: rgba(16,185,129,0.7);
+    transform: translateY(-1px);
+}
+

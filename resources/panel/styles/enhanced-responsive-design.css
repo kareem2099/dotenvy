@@ -1,0 +1,15 @@
+/* Enhanced responsive design */
+@media (max-width: 768px) {
+
+    .history-item,
+    .timeline-node {
+        animation-duration: 0.2s;
+        animation-delay: 0s;
+    }
+
+    .btn:active::before {
+        width: 200px;
+        height: 200px;
+    }
+}
+

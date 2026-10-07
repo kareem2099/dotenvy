@@ -39,380 +39,26 @@
     // Timeline state removed
     let currentView = 'list';
 
-    // Advanced filtering functions
-    function toggleAdvancedFilters(show) {
-        const isVisible = advancedFiltersPanel.classList.contains('is-open');
-        const shouldShow = show !== undefined ? show : !isVisible;
 
-        advancedFiltersPanel.classList.toggle('is-open', shouldShow);
-        if (advancedFiltersBackdrop) {
-            advancedFiltersBackdrop.classList.toggle('is-open', shouldShow);
-        }
-        advancedFiltersBtn.classList.toggle('active', shouldShow);
-
-        if (shouldShow && !isVisible) {
-            loadFilterOptions();
-            if (window.dotenvyI18n && window.dotenvyI18n.applyTranslations) {
-                window.dotenvyI18n.applyTranslations();
-            }
-        }
-    }
-
-    function loadFilterOptions() {
-        if (!currentWorkspace) return;
-
-        vscode.postMessage({
-            type: 'getFilterOptions',
-            workspacePath: currentWorkspace
-        });
-    }
-
-    function applyAdvancedFilters(keepOpen = false) {
-        if (!currentWorkspace) return;
-
-        const filters = {
-            searchQuery: advancedSearchInput.value.trim() || undefined,
-            searchRegex: regexToggle.checked,
-            searchScope: searchScopeSelect.value,
-            dateRange: getDateRangeFromInputs(),
-            users: getSelectedValues(userFilterSelect),
-            environments: getSelectedValues(environmentFilterSelect),
-            actions: getSelectedValues(actionFilterSelect),
-            variables: getSelectedValues(variableFilterSelect)
-        };
-
-        vscode.postMessage({
-            type: 'applyFilters',
-            workspacePath: currentWorkspace,
-            filters: filters
-        });
-
-        // Close the filter panel only if not live update
-        if (keepOpen !== true) {
-            toggleAdvancedFilters(false);
-        }
-    }
-
-    // Debounce function for live updates
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
-
-    const liveUpdateFilters = debounce(() => applyAdvancedFilters(true), 300);
-
-    function clearAdvancedFilters() {
-        // Clear all inputs
-        advancedSearchInput.value = '';
-        regexToggle.checked = false;
-        searchScopeSelect.value = 'all';
-        datePresetSelect.value = '';
-        dateFromInput.value = '';
-        dateToInput.value = '';
-
-        // Clear all multi-selects
-        clearMultiSelect(userFilterSelect);
-        clearMultiSelect(actionFilterSelect);
-        clearMultiSelect(environmentFilterSelect);
-        clearMultiSelect(variableFilterSelect);
-
-        // Apply empty filters to show all results
-        applyAdvancedFilters();
-    }
-
-    function getDateRangeFromInputs() {
-        const fromDate = dateFromInput.value;
-        const toDate = dateToInput.value;
-
-        if (!fromDate && !toDate) return undefined;
-
-        return {
-            start: fromDate ? new Date(fromDate) : undefined,
-            end: toDate ? new Date(toDate + 'T23:59:59') : undefined
-        };
-    }
-
-    function handleDatePresetChange() {
-        const preset = datePresetSelect.value;
-        if (!preset) {
-            dateFromInput.value = '';
-            dateToInput.value = '';
-            return;
-        }
-
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-        let startDate, endDate;
-
-        switch (preset) {
-            case 'today':
-                startDate = today;
-                endDate = new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1);
-                break;
-            case 'last7days':
-                startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-                break;
-            case 'last30days':
-                startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-                break;
-            case 'last3months':
-                startDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
-                break;
-            case 'last6months':
-                startDate = new Date(today.getTime() - 180 * 24 * 60 * 60 * 1000);
-                break;
-            case 'lastyear':
-                startDate = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
-                break;
-        }
-
-        dateFromInput.value = startDate ? startDate.toISOString().split('T')[0] : '';
-        dateToInput.value = endDate ? endDate.toISOString().split('T')[0] : '';
-    }
-
-    function validateRegexInput() {
-        const pattern = advancedSearchInput.value;
-        const useRegex = regexToggle.checked;
-
-        if (!pattern || !useRegex) {
-            advancedSearchInput.classList.remove('invalid');
-            return;
-        }
-
-        vscode.postMessage({
-            type: 'validateRegex',
-            pattern: pattern
-        });
-    }
-
-    function getSelectedValues(selectElement) {
-        const selected = Array.from(selectElement.selectedOptions).map(option => option.value);
-        return selected.length > 0 ? selected : undefined;
-    }
-
-    function clearMultiSelect(selectElement) {
-        Array.from(selectElement.options).forEach(option => {
-            option.selected = false;
-        });
-    }
-
-    function populateMultiSelect(selectElement, options) {
-        if (!selectElement) { return; }
-        selectElement.innerHTML = '';
-
-        if (!options || options.length === 0) {
-            const empty = document.createElement('option');
-            empty.value = '';
-            empty.textContent = tr('history.noFilterOptions', {}, 'No items available');
-            empty.disabled = true;
-            selectElement.appendChild(empty);
-            return;
-        }
-
-        options.forEach(option => {
-            const optionElement = document.createElement('option');
-            optionElement.value = option;
-            optionElement.textContent = option;
-            selectElement.appendChild(optionElement);
-        });
-    }
-
-    function displayFilteredHistory(result) {
-        filteredHistory = result.entries;
-        currentHistory = result.entries; // Update current history to filtered results
-
-        // Update stats
-        updateStats({
-            totalEntries: result.totalCount,
-            storageSize: 0 // We don't have storage size for filtered results
-        });
-
-        // Render appropriate view
-        if (currentView === 'list') {
-            renderHistoryList();
-        } else if (currentView === 'timeline') {
-            renderTimeline();
-        }
-    }
-
-    function formatSearchScope(scope) {
-        const scopeKeys = {
-            all: 'history.scopeAll',
-            environments: 'history.scopeEnvs',
-            variables: 'history.scopeVars',
-            values: 'history.scopeVals',
-        };
-        const key = scopeKeys[scope] || scopeKeys.all;
-        return tr(key, {}, scope);
-    }
-
-    function formatAppliedFilterTag(tag) {
-        if (!tag || !tag.kind) { return ''; }
-        switch (tag.kind) {
-            case 'dateRange':
-                return tr('history.appliedTagDateRange', {}, 'Date range');
-            case 'search':
-                return tr(
-                    'history.appliedTagSearch',
-                    { scope: formatSearchScope(tag.scope || 'all') },
-                    `Search (${tag.scope || 'all'})`
-                );
-            case 'users':
-                return tr('history.appliedTagUsers', { count: tag.count }, `Users (${tag.count})`);
-            case 'environments':
-                return tr('history.appliedTagEnvironments', { count: tag.count }, `Environments (${tag.count})`);
-            case 'actions':
-                return tr('history.appliedTagActions', { count: tag.count }, `Actions (${tag.count})`);
-            case 'variables':
-                return tr('history.appliedTagVariables', { count: tag.count }, `Variables (${tag.count})`);
-            default:
-                return '';
-        }
-    }
-
-    function getAppliedFilterLabels(result) {
-        const tags = result.appliedFilterTags || [];
-        if (tags.length > 0) {
-            return tags.map(formatAppliedFilterTag).filter(Boolean);
-        }
-        if (result.appliedFilters && result.appliedFilters.length > 0) {
-            return result.appliedFilters;
-        }
-        return [];
-    }
-
-    function updateFilterStats(result) {
-        if (!result || result.totalCount === undefined) {
-            if (filterStats) { filterStats.innerHTML = ''; }
-            return;
-        }
-        const labels = getAppliedFilterLabels(result);
-
-        const showing = tr(
-            'history.filterStatsShowing',
-            { filtered: result.filteredCount, total: result.totalCount },
-            `Showing ${result.filteredCount} of ${result.totalCount} entries`
-        );
-        const applied = labels.length > 0
-            ? tr(
-                'history.filterStatsApplied',
-                { list: labels.join(', ') },
-                `Filters: ${labels.join(', ')}`
-            )
-            : '';
-        filterStats.innerHTML = `
-            <div class="filter-stats-content">
-                <span class="filter-count">${showing}</span>
-                ${applied ? `<span class="applied-filters">${applied}</span>` : ''}
-            </div>
-        `;
-    }
-
-    function presetLabel(presetId) {
-        const key = 'history.preset.' + presetId;
-        const fallbacks = {
-            today: 'Today',
-            last7days: 'Last 7 days',
-            last30days: 'Last 30 days',
-            last3months: 'Last 3 months',
-            last6months: 'Last 6 months',
-            lastyear: 'Last year',
-        };
-        return tr(key, {}, fallbacks[presetId] || presetId);
-    }
-
-    function populateFilterOptions(options) {
-        // Populate date presets
-        const datePresets = options.dateRangePresets || [];
-        const previousPreset = datePresetSelect ? datePresetSelect.value : '';
-        datePresetSelect.innerHTML = `<option value="">${tr('history.presetCustomRange', {}, 'Custom range')}</option>`;
-        datePresets.forEach(preset => {
-            const option = document.createElement('option');
-            const id = preset.id || (preset.label ? preset.label.toLowerCase().replace(/\s+/g, '') : '');
-            option.value = id;
-            option.textContent = presetLabel(id);
-            datePresetSelect.appendChild(option);
-        });
-        if (previousPreset && datePresetSelect.querySelector(`option[value="${previousPreset}"]`)) {
-            datePresetSelect.value = previousPreset;
-        }
-
-        // Populate users
-        populateMultiSelect(userFilterSelect, options.users || []);
-
-        // Populate environments
-        populateMultiSelect(environmentFilterSelect, options.environments || []);
-
-        // Populate variables
-        populateMultiSelect(variableFilterSelect, options.variables || []);
-
-        if (window.dotenvyI18n && window.dotenvyI18n.applyTranslations) {
-            window.dotenvyI18n.applyTranslations();
-        }
-    }
-
-    function handleRegexValidation(message) {
-        const input = advancedSearchInput;
-        if (message.valid) {
-            input.classList.remove('invalid');
-            input.title = '';
-        } else {
-            input.classList.add('invalid');
-            input.title = tr('history.invalidRegex', { error: message.error }, `Invalid regex: ${message.error}`);
-        }
-    }
-
-    function formatAction(action) {
-        const map = {
-            switch: tr('history.actionSwitch', {}, 'Switch'),
-            rollback: tr('history.actionRollback', {}, 'Rollback'),
-            manual_edit: tr('history.actionEdit', {}, 'Edit'),
-            import: tr('history.actionImport', {}, 'Import'),
-            initial: tr('history.actionInitial', {}, 'Initial'),
-        };
-        return map[action] || action.replace(/_/g, ' ');
-    }
-
-    function displayVariableHistory(variableName, history) {
-        if (typeof detailContent === 'undefined' || !detailContent) { return; }
-        if (history.length === 0) {
-            detailContent.innerHTML = `<div class="empty-state">${tr('history.varHistoryEmpty', { name: variableName }, `No history found for variable "${variableName}"`)}</div>`;
-            return;
-        }
-
-        const html = `
-            <div class="variable-history">
-                <h4>${tr('history.varHistoryTitle', { name: variableName }, `Change history for "${variableName}"`)}</h4>
-                <div class="variable-timeline">
-                    ${history.map(item => `
-                        <div class="variable-change-item">
-                            <div class="variable-change-header">
-                                <span class="variable-value">"${escapeHtml(item.value)}"</span>
-                                <span class="variable-timestamp">${formatTimestamp(item.timestamp)}</span>
-                            </div>
-                            <div class="variable-change-details">
-                                <span class="variable-environment">${item.entry.environmentName}</span>
-                                ${item.entry.user ? `<span class="variable-user">${tr('history.byUser', { user: item.entry.user }, `by ${item.entry.user}`)}</span>` : ''}
-                                ${item.entry.metadata.reason ? `<span class="variable-reason">${item.entry.metadata.reason}</span>` : ''}
-                            </div>
-                            <div class="variable-change-actions">
-                                <button type="button" class="btn-small" data-action="view" data-entry-id="${item.entry.id}">${tr('history.viewEntryBtn', {}, 'View entry')}</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-
-    }
+    const filters = window.dotenvyHistoryFilters.create({
+        getWorkspace: () => currentWorkspace,
+        vscode,
+        tr,
+        escapeHtml,
+        formatTimestamp,
+        elements: {
+            advancedFiltersPanel, advancedFiltersBackdrop, advancedFiltersBtn, advancedSearchInput,
+            regexToggle, searchScopeSelect, datePresetSelect, dateFromInput, dateToInput,
+            userFilterSelect, actionFilterSelect, environmentFilterSelect, variableFilterSelect, filterStats,
+        },
+        setFilteredEntries(entries) {
+            filteredHistory = entries;
+            currentHistory = entries;
+        },
+        updateStats,
+        renderHistoryList,
+        getCurrentView: () => currentView,
+    });
 
     // Initialize
     function init() {
@@ -422,12 +68,12 @@
         if (filterSelect) filterSelect.addEventListener('change', filterHistory);
 
         // Advanced filter listeners with null checks
-        if (advancedFiltersBtn) advancedFiltersBtn.addEventListener('click', () => toggleAdvancedFilters());
-        if (applyFiltersBtn) applyFiltersBtn.addEventListener('click', () => applyAdvancedFilters(false));
-        if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', clearAdvancedFilters);
-        if (closeFiltersBtn) closeFiltersBtn.addEventListener('click', () => toggleAdvancedFilters(false));
-        if (closeFiltersBtnIcon) closeFiltersBtnIcon.addEventListener('click', () => toggleAdvancedFilters(false));
-        if (advancedFiltersBackdrop) advancedFiltersBackdrop.addEventListener('click', () => toggleAdvancedFilters(false));
+        if (advancedFiltersBtn) advancedFiltersBtn.addEventListener('click', () => filters.toggleAdvancedFilters());
+        if (applyFiltersBtn) applyFiltersBtn.addEventListener('click', () => filters.applyAdvancedFilters(false));
+        if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', filters.clearAdvancedFilters);
+        if (closeFiltersBtn) closeFiltersBtn.addEventListener('click', () => filters.toggleAdvancedFilters(false));
+        if (closeFiltersBtnIcon) closeFiltersBtnIcon.addEventListener('click', () => filters.toggleAdvancedFilters(false));
+        if (advancedFiltersBackdrop) advancedFiltersBackdrop.addEventListener('click', () => filters.toggleAdvancedFilters(false));
 
         // Live update listeners
         const filterInputs = [
@@ -439,15 +85,15 @@
         filterInputs.forEach(input => {
             if (input) {
                 const eventType = input.tagName === 'SELECT' || input.type === 'checkbox' || input.type === 'date' ? 'change' : 'input';
-                input.addEventListener(eventType, liveUpdateFilters);
+                input.addEventListener(eventType, filters.liveUpdateFilters);
             }
         });
 
         // Date preset listener with null check
         if (datePresetSelect) {
             datePresetSelect.addEventListener('change', () => {
-                handleDatePresetChange();
-                liveUpdateFilters();
+                filters.handleDatePresetChange();
+                filters.liveUpdateFilters();
             });
         }
         // analytics tab removed – analytics now lives in the sidebar panel
@@ -508,7 +154,7 @@
                 currentStats = message.stats;
                 updateStats(message.stats);
                 filterHistory();
-                loadFilterOptions();
+                filters.loadFilterOptions();
                 break;
             case 'localeChanged':
                 if (window.dotenvyI18n && window.dotenvyI18n.applyTranslations) {
@@ -516,11 +162,11 @@
                 }
                 if (currentStats) updateStats(currentStats);
                 filterHistory();
-                if (lastFilterResult) updateFilterStats(lastFilterResult);
+                if (lastFilterResult) filters.updateFilterStats(lastFilterResult);
                 if (lastErrorDetail !== null) {
                     showError(lastErrorDetail);
                 } else if (currentWorkspace) {
-                    loadFilterOptions();
+                    filters.loadFilterOptions();
                 }
                 break;
             case 'analyticsLoaded':
@@ -530,17 +176,17 @@
                 break;
             case 'filtersApplied':
                 lastFilterResult = message.result;
-                displayFilteredHistory(message.result);
-                updateFilterStats(message.result);
+                filters.displayFilteredHistory(message.result);
+                filters.updateFilterStats(message.result);
                 break;
             case 'filterOptionsLoaded':
-                populateFilterOptions(message.options);
+                filters.populateFilterOptions(message.options);
                 break;
             case 'regexValidated':
-                handleRegexValidation(message);
+                filters.handleRegexValidation(message);
                 break;
             case 'variableHistoryLoaded':
-                displayVariableHistory(message.variableName, message.history);
+                filters.displayVariableHistory(message.variableName, message.history);
                 break;
             case 'error':
                 showError(message.errorMessage || message.message || '');
@@ -614,7 +260,7 @@
                     <span class="env-pill">${escapeHtml(entry.environmentName)}</span>
                     <span class="env-file">${escapeHtml(getDisplayFileName(entry))}</span>
                 </td>
-                <td class="col-action"><span class="action-badge action-${entry.action}">${formatAction(entry.action)}</span></td>
+                <td class="col-action"><span class="action-badge action-${entry.action}">${filters.formatAction(entry.action)}</span></td>
                 <td class="col-note">${note}</td>
                 <td class="col-actions">
                     <button type="button" class="btn-table" data-action="diff" data-entry-id="${entry.id}" title="${tr('history.diffTitle', {}, 'Open native VS Code diff')}">${tr('history.diffBtn', {}, '⟷ Diff')}</button>

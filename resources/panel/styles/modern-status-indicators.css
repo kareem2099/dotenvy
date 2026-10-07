@@ -1,0 +1,50 @@
+/* Modern Status Indicators */
+.status-indicator {
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    position: relative;
+    overflow: hidden;
+}
+
+.status-indicator::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    background: currentColor;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0.3;
+}
+
+.status-connected,
+.status-active,
+.status-valid {
+    background: var(--success-gradient);
+    color: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.status-error,
+.status-disconnected,
+.status-invalid {
+    background: var(--danger-gradient);
+    color: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.status-warning {
+    background: var(--warning-gradient);
+    color: #8b4513;
+    box-shadow: var(--shadow-sm);
+}
+

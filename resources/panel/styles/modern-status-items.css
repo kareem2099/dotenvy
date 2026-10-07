@@ -1,0 +1,26 @@
+/* Modern Status Items */
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-sm);
+    padding: var(--space-sm);
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.status-label {
+    color: var(--vscode-descriptionForeground);
+    font-weight: 500;
+}
+
+.status-value {
+    font-weight: 700;
+    color: var(--vscode-foreground);
+    background: var(--glass-bg);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+}
+

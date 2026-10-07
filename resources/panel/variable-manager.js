@@ -10,6 +10,15 @@
     let allVariables = [];
     let currentFile = '.env';
     let lastErrorDetail = null;
+    const modal = window.dotenvyVariableModal.bind({
+        tr,
+        vscode,
+        escHtml,
+        escAttr,
+        getCurrentFile: () => currentFile,
+        getAllVariables: () => allVariables,
+    });
+
 
     function tr(key, params, fallback) {
         if (window.dotenvyI18n && typeof window.dotenvyI18n.tr === 'function') {
@@ -69,7 +78,7 @@
     });
 
     if (addBtn) addBtn.addEventListener('click', () => {
-        showAddVariableModal();
+        modal.showAddVariableModal();
     });
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -124,7 +133,7 @@
                     ${!isFiltered ? `<button type="button" class="btn btn-primary" id="empty-add-btn">${tr('variableManager.addFirst', {}, '＋ Add First Variable')}</button>` : ''}
                 </div>`;
             const emptyAdd = document.getElementById('empty-add-btn');
-            if (emptyAdd) emptyAdd.addEventListener('click', showAddVariableModal);
+            if (emptyAdd) emptyAdd.addEventListener('click', modal.showAddVariableModal);
             return;
         }
 
@@ -188,9 +197,9 @@
             const variable = allVariables.find(v => v.key === key);
 
             if (action === 'edit') {
-                startEditingModal(variable);
+                modal.startEditingModal(variable);
             } else if (action === 'delete') {
-                showDeleteConfirm(key);
+                modal.showDeleteConfirm(key);
             } else if (action === 'toggle') {
                 vscode.postMessage({ type: 'toggleVarEncryption', key, fileName: currentFile });
             }
@@ -215,163 +224,6 @@
                 peekBtn.title = tr('variableManager.hideValue', {}, 'Hide value');
             }
         });
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // 5. MODALS
-    // ──────────────────────────────────────────────────────────────────────────
-
-    function showAddVariableModal() {
-        showVariableModal({
-            title: tr('variableManager.addModalTitle', {}, '＋ Add Variable'),
-            keyValue: '',
-            valueValue: '',
-            keyEditable: true,
-            submitLabel: tr('variableManager.addBtn', {}, '＋ Add Variable'),
-            onSubmit: ({ key, value }) => {
-                if (!key.trim()) return tr('variableManager.keyEmpty', {}, 'Key cannot be empty');
-                if (allVariables.find(v => v.key === key.trim())) return tr('variableManager.keyExists', { key }, `Key "${key}" already exists`);
-                vscode.postMessage({ type: 'updateVariable', key: key.trim(), value, fileName: currentFile });
-            }
-        });
-    }
-
-    function startEditingModal(variable) {
-        showVariableModal({
-            title: tr('variableManager.editModalTitle', { key: variable.key }, `✏️ Edit  ${variable.key}`),
-            keyValue: variable.key,
-            valueValue: variable.encrypted ? '' : variable.value,
-            keyEditable: false,
-            submitLabel: tr('variableManager.saveChanges', {}, 'Save Changes'),
-            valuePlaceholder: variable.encrypted
-                ? tr('variableManager.encryptedValuePlaceholder', {}, 'Enter new value for encrypted variable')
-                : '',
-            onSubmit: ({ value }) => {
-                vscode.postMessage({
-                    type: 'updateVariable',
-                    key: variable.key,
-                    value,
-                    fileName: currentFile,
-                    encrypted: variable.encrypted
-                });
-            }
-        });
-    }
-
-    function showVariableModal({ title, keyValue, valueValue, keyEditable, submitLabel, valuePlaceholder = '', onSubmit }) {
-        removeModal();
-        const overlay = document.createElement('div');
-        overlay.className = 'vm-overlay';
-        overlay.id = 'vm-modal-overlay';
-        overlay.innerHTML = `
-            <div class="vm-modal" role="dialog" aria-modal="true">
-                <div class="vm-modal-header">
-                    <h3 class="vm-modal-title">${title}</h3>
-                    <button type="button" class="vm-modal-close" id="vm-modal-close" aria-label="${escAttr(tr('variableManager.closeAria', {}, 'Close'))}">✕</button>
-                </div>
-                <div class="vm-modal-body">
-                    <div class="vm-form-group">
-                        <label class="vm-form-label" for="modal-key">${tr('variableManager.keyLabel', {}, 'KEY')}</label>
-                        <input
-                            id="modal-key"
-                            class="vm-form-input vm-mono"
-                            type="text"
-                            value="${escAttr(keyValue)}"
-                            placeholder="${escAttr(tr('variableManager.keyPlaceholder', {}, 'VARIABLE_NAME'))}"
-                            ${keyEditable ? '' : 'readonly'}
-                            autocomplete="off"
-                            spellcheck="false"
-                        >
-                    </div>
-                    <div class="vm-form-group">
-                        <label class="vm-form-label" for="modal-value">${tr('variableManager.valueLabel', {}, 'VALUE')}</label>
-                        <textarea
-                            id="modal-value"
-                            class="vm-form-input vm-form-textarea vm-mono"
-                            placeholder="${escAttr(valuePlaceholder || tr('variableManager.valuePlaceholder', {}, 'Enter value…'))}"
-                            autocomplete="off"
-                            spellcheck="false"
-                            rows="3"
-                        >${escHtml(valueValue)}</textarea>
-                    </div>
-                    <div class="vm-form-error" id="vm-form-error"></div>
-                </div>
-                <div class="vm-modal-footer">
-                    <button class="btn btn-secondary" id="vm-modal-cancel">${tr('variableManager.cancel', {}, 'Cancel')}</button>
-                    <button class="btn btn-primary" id="vm-modal-submit">${submitLabel}</button>
-                </div>
-            </div>`;
-
-        document.body.appendChild(overlay);
-
-        const keyInput = overlay.querySelector('#modal-key');
-        const valInput = overlay.querySelector('#modal-value');
-        const errorEl = overlay.querySelector('#vm-form-error');
-        const submitBtn = overlay.querySelector('#vm-modal-submit');
-
-        // Focus
-        setTimeout(() => (keyEditable ? keyInput : valInput).focus(), 50);
-
-        const doSubmit = () => {
-            const key = keyInput.value;
-            const value = valInput.value;
-            const err = onSubmit({ key, value });
-            if (err) {
-                errorEl.textContent = err;
-                errorEl.style.display = 'block';
-                return;
-            }
-            removeModal();
-        };
-
-        submitBtn.addEventListener('click', doSubmit);
-        overlay.querySelector('#vm-modal-cancel').addEventListener('click', removeModal);
-        overlay.querySelector('#vm-modal-close').addEventListener('click', removeModal);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) removeModal(); });
-
-        // Keyboard submit
-        overlay.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') removeModal();
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) doSubmit();
-        });
-    }
-
-    function showDeleteConfirm(key) {
-        removeModal();
-        const overlay = document.createElement('div');
-        overlay.className = 'vm-overlay';
-        overlay.id = 'vm-modal-overlay';
-        overlay.innerHTML = `
-            <div class="vm-modal vm-modal--sm" role="dialog" aria-modal="true">
-                <div class="vm-modal-header">
-                    <h3 class="vm-modal-title">🗑 ${tr('variableManager.deleteConfirmTitle', {}, 'Delete Variable')}</h3>
-                    <button type="button" class="vm-modal-close" id="vm-modal-close" aria-label="${escAttr(tr('variableManager.closeAria', {}, 'Close'))}">✕</button>
-                </div>
-                <div class="vm-modal-body">
-                    <p class="vm-delete-msg">${tr('variableManager.deleteConfirmDesc', { key: escHtml(key) }, `Delete ${escHtml(key)}?`)}</p>
-                    <p class="vm-delete-hint">${tr('variableManager.deleteTrashHint', {}, 'This will be saved to the Trash Bin and can be restored.')}</p>
-                </div>
-                <div class="vm-modal-footer">
-                    <button class="btn btn-secondary" id="vm-modal-cancel">${tr('variableManager.cancel', {}, 'Cancel')}</button>
-                    <button class="btn btn-danger" id="vm-modal-confirm">${tr('variableManager.deleteConfirmBtn', {}, 'Delete')}</button>
-                </div>
-            </div>`;
-
-        document.body.appendChild(overlay);
-        overlay.querySelector('#vm-modal-cancel').addEventListener('click', removeModal);
-        overlay.querySelector('#vm-modal-close').addEventListener('click', removeModal);
-        overlay.querySelector('#vm-modal-confirm').addEventListener('click', () => {
-            vscode.postMessage({ type: 'deleteVariable', key, fileName: currentFile });
-            removeModal();
-        });
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) removeModal(); });
-        overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') removeModal(); });
-        setTimeout(() => overlay.querySelector('#vm-modal-confirm').focus(), 50);
-    }
-
-    function removeModal() {
-        const existing = document.getElementById('vm-modal-overlay');
-        if (existing) existing.remove();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -406,7 +258,7 @@
     }
 
     // Expose for global usage
-    window.addVariable = showAddVariableModal;
+    window.addVariable = modal.showAddVariableModal;
 
     const backupBtn = document.getElementById('backup-selected-btn');
     const restoreBtn = document.getElementById('restore-backup-btn');

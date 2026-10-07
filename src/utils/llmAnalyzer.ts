@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 
 import { FeatureExtractor, NUM_FEATURES } from './featureExtractor';
 import { logger } from './logger';
+import { makeRequest, makeSignedGetRequest, makeSignedRequest, signRequest as signRequestBody } from './llmSignedTransport';
 
 export interface LLMAnalysisRequest {
     secret_value: string;
@@ -165,15 +166,7 @@ export class LLMAnalyzer {
     public isConfigured(): boolean { return !!this.sharedSecret; }
 
     private signRequest(body: string): { timestamp: string; signature: string } {
-        if (!this.sharedSecret) {
-            throw new Error('[DotEnvy] Cannot sign — secret not loaded.');
-        }
-        const timestamp = String(Math.floor(Date.now() / 1000));
-        const signature = crypto
-            .createHmac('sha256', this.sharedSecret)
-            .update(`${timestamp}.${body}`)
-            .digest('hex');
-        return { timestamp, signature };
+        return signRequestBody(this.sharedSecret, body);
     }
 
     private getMachineId(): string {
@@ -206,7 +199,7 @@ export class LLMAnalyzer {
 
     public async testConnection(): Promise<boolean> {
         try {
-            const res = await this.makeRequest('/health', 'GET') as LLMHealthResponse;
+            const res = await makeRequest(this.serviceUrl, '/health', 'GET') as LLMHealthResponse;
             this.isConnected = res?.status === 'ok';
             if (this.isConnected) { this.recordSuccess(); }
             return this.isConnected;
@@ -248,9 +241,9 @@ export class LLMAnalyzer {
         }
 
         try {
-            const response = await this.makeSignedRequest('/extension/analyze', {
+            const response = await makeSignedRequest(this.serviceUrl, this.sharedSecret, 'POST', '/extension/analyze', {
                 secret_value: secretValue, context, variable_name: variableName,
-            }) as LLMAnalysisResponse;
+            }, this.getMachineId()) as LLMAnalysisResponse;
 
             if (response) {
                 this.recordSuccess();
@@ -283,7 +276,7 @@ export class LLMAnalyzer {
     }
 
     public async sendFeedback(payload: unknown[]): Promise<void> {
-        await this.makeSignedRequest('/extension/feedback', { samples: payload });
+        await makeSignedRequest(this.serviceUrl, this.sharedSecret, 'POST', '/extension/feedback', { samples: payload }, this.getMachineId());
     }
 
     // ✅ الآن يستخدم FeatureExtractor — carbon copy من feature_extractor.py
@@ -304,7 +297,7 @@ export class LLMAnalyzer {
         if (!this.sharedSecret) { return; }
         const hash = this.hashEntry(variableName, value);
         try {
-            await this.makeSignedRequest('/extension/blacklist/add', { hash });
+            await makeSignedRequest(this.serviceUrl, this.sharedSecret, 'POST', '/extension/blacklist/add', { hash }, this.getMachineId());
         } catch (e) {
             logger.warn(`Hash sync failed: ${e instanceof Error ? e.message : 'Unknown'}`, 'LLMAnalyzer');
         }
@@ -314,7 +307,7 @@ export class LLMAnalyzer {
         if (!this.sharedSecret) { return; }
         const hash = this.hashEntry(variableName, value);
         try {
-            const res = await this.makeSignedRequest('/extension/blacklist/report_fp', { hash }) as { status?: string };
+            const res = await makeSignedRequest(this.serviceUrl, this.sharedSecret, 'POST', '/extension/blacklist/report_fp', { hash }, this.getMachineId()) as { status?: string };
             if (res && res.status === 'removed') {
                 this.communityBlacklist.delete(hash);
                 logger.info('[DotEnvy] 🚀 False positive threshold met. Hash removed from blacklist.', 'LLMAnalyzer');
@@ -327,7 +320,7 @@ export class LLMAnalyzer {
     private async syncBlacklist(): Promise<void> {
         if (!this.sharedSecret) { return; }
         try {
-            const res = await this.makeSignedGetRequest('/extension/blacklist') as { hashes: string[] };
+            const res = await makeSignedGetRequest(this.serviceUrl, this.sharedSecret, 'GET', '/extension/blacklist', this.getMachineId()) as { hashes: string[] };
             if (res && res.hashes) {
                 this.communityBlacklist = new Set(res.hashes);
                 logger.info(`[DotEnvy] 🔄 Community Blacklist synced (${this.communityBlacklist.size} hashes).`, 'LLMAnalyzer');
@@ -335,100 +328,6 @@ export class LLMAnalyzer {
         } catch (e) {
             logger.warn(`Blacklist sync failed: ${e instanceof Error ? e.message : 'Unknown'}`, 'LLMAnalyzer');
         }
-    }
-
-    private async makeSignedGetRequest(endpoint: string): Promise<unknown> {
-        if (!this.sharedSecret) {
-            throw new Error('[DotEnvy] Cannot sign — secret not loaded.');
-        }
-        const body = '';
-        const timestamp = String(Math.floor(Date.now() / 1000));
-        const signature = crypto
-            .createHmac('sha256', this.sharedSecret)
-            .update(`${timestamp}.${body}`)
-            .digest('hex');
-
-        return new Promise((resolve, reject) => {
-            const url = new URL(endpoint, this.serviceUrl);
-            const client = url.protocol === 'https:' ? https : http;
-            const req = client.request({
-                hostname: url.hostname,
-                port: url.port || (url.protocol === 'https:' ? 443 : 80),
-                path: url.pathname,
-                method: 'GET',
-                headers: {
-                    'User-Agent': 'DotEnvy-Extension/2.0',
-                    'X-Extension-Timestamp': timestamp,
-                    'X-Extension-Signature': signature,
-                    'X-Machine-ID': this.getMachineId(),
-                },
-            }, (res) => {
-                let b = '';
-                res.on('data', (c) => { b += c.toString(); });
-                res.on('end', () => { try { resolve(JSON.parse(b)); } catch { resolve(b); } });
-            });
-            req.on('error', reject);
-            req.setTimeout(5000, () => { req.destroy(); reject(new Error('Timeout')); });
-            req.end();
-        });
-    }
-
-    private async makeSignedRequest(endpoint: string, data: unknown): Promise<unknown> {
-        const body = JSON.stringify(data);
-        const { timestamp, signature } = this.signRequest(body);
-        const machineId = this.getMachineId();
-
-        return new Promise((resolve, reject) => {
-            const url = new URL(endpoint, this.serviceUrl);
-            const client = url.protocol === 'https:' ? https : http;
-            const req = client.request({
-                hostname: url.hostname,
-                port: url.port || (url.protocol === 'https:' ? 443 : 80),
-                path: url.pathname,
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Content-Length': Buffer.byteLength(body),
-                    'User-Agent': 'DotEnvy-Extension/2.0',
-                    'X-Extension-Timestamp': timestamp,
-                    'X-Extension-Signature': signature,
-                    'X-Machine-ID': machineId,
-                },
-            }, (res) => {
-                let rb = '';
-                res.on('data', (c) => { rb += c.toString(); });
-                res.on('end', () => {
-                    if (res.statusCode && res.statusCode >= 400) {
-                        reject(new Error(`HTTP ${res.statusCode}: ${rb}`)); return;
-                    }
-                    try { resolve(JSON.parse(rb)); } catch { resolve(rb); }
-                });
-            });
-            req.on('error', reject);
-            req.setTimeout(5000, () => { req.destroy(); reject(new Error('Timeout')); });
-            req.write(body);
-            req.end();
-        });
-    }
-
-    private async makeRequest(endpoint: string, method = 'GET'): Promise<unknown> {
-        return new Promise((resolve, reject) => {
-            const url = new URL(endpoint, this.serviceUrl);
-            const client = url.protocol === 'https:' ? https : http;
-            const req = client.request({
-                hostname: url.hostname,
-                port: url.port || (url.protocol === 'https:' ? 443 : 80),
-                path: url.pathname, method,
-                headers: { 'User-Agent': 'DotEnvy-Extension/2.0' },
-            }, (res) => {
-                let b = '';
-                res.on('data', (c) => { b += c.toString(); });
-                res.on('end', () => { try { resolve(JSON.parse(b)); } catch { resolve(b); } });
-            });
-            req.on('error', reject);
-            req.setTimeout(5000, () => { req.destroy(); reject(new Error('Timeout')); });
-            req.end();
-        });
     }
 
     private fallbackAnalysis(

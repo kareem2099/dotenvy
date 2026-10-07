@@ -1,0 +1,6 @@
+/* Enhanced Hook Actions */
+.hook-actions {
+    display: flex;
+    gap: var(--space-sm);
+}
+

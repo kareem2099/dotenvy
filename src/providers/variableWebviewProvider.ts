@@ -238,6 +238,7 @@ export class VariableWebviewProvider {
             tokens: {
                 styleUri:  webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css')).toString(),
                 scriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'variable-manager.js')).toString(),
+                modalScriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'variable-manager-modal.js')).toString(),
                 i18nScriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'webview-i18n.js')).toString(),
             },
         });

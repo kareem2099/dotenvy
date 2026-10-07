@@ -1,0 +1,6 @@
+/* Filter Keyboard Navigation */
+.advanced-filters-panel:focus-within {
+    border-color: rgba(102, 126, 234, 0.5);
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+

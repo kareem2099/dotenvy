@@ -1,0 +1,67 @@
+/* ======================================================
+   Compact History Table
+   ====================================================== */
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-lg) var(--space-xl);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.history-header .header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+}
+
+.history-header .header-actions {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.btn-icon-pill {
+    padding: var(--space-xs) var(--space-md);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    background: rgba(255,255,255,0.05);
+    color: var(--vscode-foreground);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.btn-icon-pill:hover {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: rgba(102, 126, 234, 0.5);
+    transform: translateY(-1px);
+}
+
+.history-search-bar {
+    display: flex;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-xl);
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(255,255,255,0.02);
+}
+
+.search-input-inline {
+    flex: 1;
+    padding: var(--space-xs) var(--space-md);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    color: var(--vscode-foreground);
+    font-size: 0.875rem;
+}
+
+.filter-select-inline {
+    padding: var(--space-xs) var(--space-sm);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    color: var(--vscode-foreground);
+    font-size: 0.875rem;
+}
+

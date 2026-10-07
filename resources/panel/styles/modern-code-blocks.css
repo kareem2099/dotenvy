@@ -1,0 +1,25 @@
+/* Modern Code Blocks */
+.env-content {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    background: var(--vscode-editor-background);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: var(--space-lg);
+    box-shadow: inset var(--shadow-sm);
+    position: relative;
+}
+
+.env-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--primary-gradient);
+    border-radius: 12px 12px 0 0;
+}
+
