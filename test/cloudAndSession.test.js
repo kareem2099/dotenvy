@@ -118,11 +118,38 @@ describe('cloud payload and session', { concurrency: 1 }, () => {
             ...cloud.pushed,
             [CLOUD_SYNC_ENCRYPTED_KEY]: flipTag(payload),
         };
+        const rejectCalls = queuePassphrases([PASSPHRASE]);
         const rejected = await manager.fetchSecrets(harness.context);
         assert.equal(rejected.success, false);
-        assert.equal(fetchCalls(), 0);
+        assert.equal(rejectCalls(), 1);
+        assert.match(rejected.error ?? '', /corrupt|authentication failed/i);
         assert.equal(await harness.secrets.get(CACHE_KEY), cacheBefore);
         assert.equal(harness.workspaceState.get(CLOUD_KEY_STORAGE), undefined);
+    });
+
+    test('stale envelope cache falls back to the sync passphrase', async () => {
+        await resetLocalKey();
+        const cloud = fakeCloud();
+        const origin = managerFor(cloud);
+        queuePassphrases([PASSPHRASE, PASSPHRASE]);
+        const secrets = { DB: 'postgres' };
+        const pushed = await origin.pushSecrets(secrets, harness.context);
+        assert.equal(pushed.success, true);
+
+        await resetLocalKey();
+        const staleDek = crypto.randomBytes(32);
+        await harness.secrets.store(CACHE_KEY, JSON.stringify({
+            dek: staleDek.toString('base64'),
+            salt: cloud.pushed[CLOUD_SYNC_KEY_SALT],
+            wrappedKey: cloud.pushed[CLOUD_SYNC_WRAPPED_KEY],
+            iterations: 310000,
+        }));
+
+        const calls = queuePassphrases([PASSPHRASE]);
+        const fetched = await managerFor(cloud).fetchSecrets(harness.context);
+        assert.equal(fetched.success, true);
+        assert.deepEqual(fetched.secrets, secrets);
+        assert.equal(calls(), 1);
     });
 
     test('a second machine decrypts version 3 after the passphrase and stores a cache', async () => {

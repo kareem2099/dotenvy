@@ -36,30 +36,30 @@ type SecretMap = { [key: string]: string };
 
 export function findEncryptedPayload(secrets: SecretMap): string | null {
     if (secrets[CLOUD_SYNC_ENCRYPTED_KEY]) {
-        return secrets[CLOUD_SYNC_ENCRYPTED_KEY];
+        return secrets[CLOUD_SYNC_ENCRYPTED_KEY].trim();
     }
     if (secrets[LEGACY_CLOUD_SYNC_ENCRYPTED_KEY]) {
-        return secrets[LEGACY_CLOUD_SYNC_ENCRYPTED_KEY];
+        return secrets[LEGACY_CLOUD_SYNC_ENCRYPTED_KEY].trim();
     }
     return null;
 }
 
 export function readRemoteWrap(secrets: SecretMap): WrappedDataKey | null {
-    const wrappedKey = secrets[CLOUD_SYNC_WRAPPED_KEY];
+    const wrappedKey = secrets[CLOUD_SYNC_WRAPPED_KEY]?.trim();
     if (!wrappedKey) {
         return null;
     }
 
-    const salt = secrets[CLOUD_SYNC_KEY_SALT];
+    const salt = secrets[CLOUD_SYNC_KEY_SALT]?.trim();
     const iterationsRaw = secrets[CLOUD_SYNC_KDF_ITERATIONS];
-    if (!salt || iterationsRaw === undefined || iterationsRaw === '') {
+    if (!salt || iterationsRaw === undefined || String(iterationsRaw).trim() === '') {
         throw new CloudWrapRejectedError('Cloud key wrap is incomplete');
     }
 
     return {
         wrappedKey,
         salt,
-        iterations: acceptedIterations(iterationsRaw, salt),
+        iterations: acceptedIterations(String(iterationsRaw).trim(), salt),
     };
 }
 

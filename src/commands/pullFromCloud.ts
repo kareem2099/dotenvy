@@ -110,7 +110,12 @@ export class PullFromCloudCommand implements vscode.Disposable {
 			const result = await cloudManager.fetchSecrets(extensionContext);
 
 			if (!result.success || !result.secrets) {
-				showSyncToast(t('pull.downloadFailed', { error: result.error ?? t('pull.noSecrets') }), 'error');
+				const errorText = result.error ?? t('pull.noSecrets');
+				if (errorText.includes('Failed to decrypt cloud secrets')) {
+					showSyncToast(t('pull.legacyLocalKeyDecrypt'), 'error');
+					return;
+				}
+				showSyncToast(t('pull.downloadFailed', { error: errorText }), 'error');
 				return;
 			}
 

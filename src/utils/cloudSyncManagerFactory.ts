@@ -8,6 +8,7 @@ import { CloudSyncConfig } from '../types/environment';
 import { CloudSyncManager } from './cloudSyncManager';
 import { EncryptedCloudSyncManager } from './encryptedCloudSyncManager';
 import { t } from '../i18n';
+import { normalizeDopplerProjectSlug } from './dopplerProjectSlug';
 
 export class CloudEncryptionUtils {
     static async isCloudEncryptionEnabled(context?: vscode.ExtensionContext): Promise<boolean> {
@@ -27,8 +28,9 @@ export class CloudEncryptionUtils {
         const cloudConfig = vscode.workspace.getConfiguration('dotenvy').get<Partial<CloudSyncConfig>>('cloudSync');
         let envelope: string | undefined;
         if (cloudConfig?.project && cloudConfig?.config) {
+            const project = normalizeDopplerProjectSlug(cloudConfig.project);
             envelope = await context.secrets.get(
-                `${CLOUD_ENVELOPE_STORAGE_PREFIX}:${cloudConfig.project}:${cloudConfig.config}`,
+                `${CLOUD_ENVELOPE_STORAGE_PREFIX}:${project}:${cloudConfig.config}`,
             );
         }
         const lastSync = context.workspaceState.get<string>(LAST_SYNC_STORAGE);

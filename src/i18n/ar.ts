@@ -144,6 +144,8 @@ export const ar: Record<keyof typeof en, string> = {
 	'pull.cancelled': 'تم إلغاء السحب.',
 	'pull.connectionFailed': 'فشل الاتصال بعد تحديد المشروع.',
 	'pull.downloadFailed': 'فشل التنزيل: {error}',
+	'pull.legacyLocalKeyDecrypt':
+		'فشل سحب السحابة لأن مساحة العمل تستخدم مفتاح تشفير محلي فقط من إصدار أقدم من Dotenvy. شغّل الإضافة من Extension Development Host (F5) أو ثبّت build يدعم عبارة مرور المزامنة، ارفع مرة من الجهاز الذي يفك التشفير، ثم أعد السحب هنا بنفس عبارة المرور.',
 	'pull.noSecrets': 'لم تُستلم أسرار.',
 	'pull.noEnvFiles': 'لم يتم العثور على ملفات .env. أضف ملفات env أو اضبط البيئات في .dotenvy.json.',
 	'pull.alreadySynced': 'البيئة المحلية متزامنة بالفعل مع السحابة!',

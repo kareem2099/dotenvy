@@ -154,6 +154,8 @@ export const en = {
 	'pull.cancelled': 'Pull cancelled.',
 	'pull.connectionFailed': 'Connection failed after project selection.',
 	'pull.downloadFailed': 'Download failed: {error}',
+	'pull.legacyLocalKeyDecrypt':
+		'Cloud pull failed because this workspace uses a local-only encryption key from an older Dotenvy build. Run this repo from Extension Development Host (F5) or install a build with passphrase wrap, push once from the machine that can decrypt, then pull here with the same sync passphrase.',
 	'pull.noSecrets': 'No secrets received.',
 	'pull.noEnvFiles': 'No .env files found. Add env files or configure environments in .dotenvy.json.',
 	'pull.alreadySynced': 'Local environment is already synced with the cloud!',

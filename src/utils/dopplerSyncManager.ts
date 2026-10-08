@@ -58,11 +58,16 @@ export class DopplerSyncManager extends CloudSyncManager {
 			const secrets: CloudSecrets = {};
 
 			for (const [key, secretData] of Object.entries(parsed) as [string, DopplerSecretData][]) {
+				let value: string | undefined;
 				if (secretData && typeof secretData === 'object' && 'computed' in secretData) {
-					secrets[key] = secretData.computed;
+					value = secretData.computed;
 				} else if (typeof secretData === 'string') {
-					secrets[key] = secretData;
+					value = secretData;
 				}
+				if (value === undefined) {
+					continue;
+				}
+				secrets[key] = isCloudMetadataKey(key) ? value.trim() : value;
 			}
 
 			return {

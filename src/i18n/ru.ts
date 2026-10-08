@@ -144,6 +144,8 @@ export const ru: Record<keyof typeof en, string> = {
 	'pull.cancelled': 'Загрузка отменена.',
 	'pull.connectionFailed': 'Ошибка подключения после выбора проекта.',
 	'pull.downloadFailed': 'Ошибка загрузки: {error}',
+	'pull.legacyLocalKeyDecrypt':
+		'Загрузка из облака не удалась: в workspace остался локальный ключ шифрования от старой сборки Dotenvy. Запустите расширение через Extension Development Host (F5) или установите сборку с парольной фразой синхронизации, сделайте push с машины, где расшифровка работает, затем повторите pull здесь с той же фразой.',
 	'pull.noSecrets': 'Секреты не получены.',
 	'pull.noEnvFiles': 'Файлы .env не найдены. Добавьте файлы env или настройте окружения в .dotenvy.json.',
 	'pull.alreadySynced': 'Локальное окружение уже синхронизировано с облаком!',

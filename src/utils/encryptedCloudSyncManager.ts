@@ -32,6 +32,7 @@ import {
     wrapDataKey,
 } from './cloudKeyEnvelope';
 import { promptCreatePassphrase, promptUnlockPassphrase } from './cloudSyncPassphrasePrompt';
+import { normalizeDopplerProjectSlug } from './dopplerProjectSlug';
 
 interface StoredCloudEnvelope {
     dek: string;
@@ -205,16 +206,15 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
         raw: CloudSecrets,
         payload: string,
     ): Promise<UnlockedPayload | { error: string }> {
-        const remoteWrappedKey = raw[CLOUD_SYNC_WRAPPED_KEY] ?? '';
+        const remoteWrappedKey = raw[CLOUD_SYNC_WRAPPED_KEY]?.trim() ?? '';
         const cache = await this.readCache(context);
 
         if (cache && remoteWrappedKey && cache.wrappedKey === remoteWrappedKey) {
             const dataKey = Buffer.from(cache.dek, 'base64');
             const secrets = this.tryDecrypt(payload, dataKey);
-            if (!secrets) {
-                return { error: t('cloudSync.corruptPayload') };
+            if (secrets) {
+                return { secrets, dataKey };
             }
-            return { secrets, dataKey };
         }
 
         const cachedKey = cache ? Buffer.from(cache.dek, 'base64') : null;
@@ -316,7 +316,10 @@ export class EncryptedCloudSyncManager extends CloudSyncManager {
     }
 
     private envelopeStorageKey(): string {
-        return `${CLOUD_ENVELOPE_STORAGE_PREFIX}:${this.config.project}:${this.config.config}`;
+        const project = this.config.project?.trim()
+            ? normalizeDopplerProjectSlug(this.config.project)
+            : this.config.project;
+        return `${CLOUD_ENVELOPE_STORAGE_PREFIX}:${project}:${this.config.config}`;
     }
 
     private async readCache(context: vscode.ExtensionContext): Promise<StoredCloudEnvelope | null> {

@@ -150,6 +150,8 @@ export const it: Record<keyof typeof en, string> = {
 	'pull.cancelled': 'Pull annullato.',
 	'pull.connectionFailed': 'Connessione fallita dopo la selezione del progetto.',
 	'pull.downloadFailed': 'Download fallito: {error}',
+	'pull.legacyLocalKeyDecrypt':
+		'Il pull cloud è fallito perché questo workspace usa una chiave di cifratura solo locale di una versione precedente di Dotenvy. Avvia l’estensione da Extension Development Host (F5) o installa una build con passphrase di sync, fai un push dalla macchina che riesce a decifrare, poi ripeti il pull qui con la stessa passphrase.',
 	'pull.noSecrets': 'Nessun secret ricevuto.',
 	'pull.noEnvFiles': 'Nessun file .env trovato. Aggiungi file env o configura environments in .dotenvy.json.',
 	'pull.alreadySynced': 'L\'ambiente locale è già sincronizzato con il cloud!',
