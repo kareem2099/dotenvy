@@ -157,10 +157,10 @@ export class VariableWebviewProvider {
                         
                         await EncryptedEnvironmentFile.writeEnvFile(filePath, varsMap, context);
                         await VariableWebviewProvider.loadVariables(envFile);
-                        vscode.window.showInformationMessage(`Variable ${message.key} updated`);
+                        vscode.window.showInformationMessage(t('vars.webviewUpdated', { key: message.key }));
                     }
                 } catch (err) {
-                    vscode.window.showErrorMessage(`Update failed: ${(err as Error).message}`);
+                    vscode.window.showErrorMessage(t('vars.updateFailed', { message: (err as Error).message }));
                 }
                 break;
             }
@@ -185,10 +185,10 @@ export class VariableWebviewProvider {
                         varsMap.delete(message.key);
                         await EncryptedEnvironmentFile.writeEnvFile(filePath, varsMap, context);
                         await VariableWebviewProvider.loadVariables(envFile);
-                        vscode.window.showInformationMessage(`Variable ${message.key} deleted`);
+                        vscode.window.showInformationMessage(t('vars.webviewDeleted', { key: message.key }));
                     }
                 } catch (err) {
-                    vscode.window.showErrorMessage(`Delete failed: ${(err as Error).message}`);
+                    vscode.window.showErrorMessage(t('vars.deleteFailed', { message: (err as Error).message }));
                 }
                 break;
             }
@@ -205,7 +205,7 @@ export class VariableWebviewProvider {
                         await VariableWebviewProvider.loadVariables(envFile);
                     }
                 } catch (err) {
-                    vscode.window.showErrorMessage(`Encryption toggle failed: ${(err as Error).message}`);
+                    vscode.window.showErrorMessage(t('vars.encryptionToggleFailed', { message: (err as Error).message }));
                 }
                 break;
             }

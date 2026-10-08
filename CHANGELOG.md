@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### ☁️ Doppler & cloud sync
+
+- **Portable cloud encryption key**: The Doppler payload key is wrapped with a sync passphrase (PBKDF2 + AES-256-GCM). Salt and wrapped key are stored as Doppler metadata, so another machine can pull with the same passphrase. Pull no longer generates a new key, and a push refuses to overwrite a payload this machine cannot decrypt. The previous workspace key is left in place so another Doppler config in the same workspace can still be opened.
+
 ## [2.2.3] - 2026-10-08
 
 ### ☁️ Doppler & cloud sync

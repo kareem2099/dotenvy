@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { EnvironmentProvider } from './environmentProvider';
-import { LocalizationService } from '../i18n';
+import { LocalizationService, t } from '../i18n';
 import { ConfigUtils } from '../utils/configUtils';
 import { DopplerSyncManager } from '../utils/dopplerSyncManager';
 import {
@@ -121,14 +121,14 @@ export async function handleEnvironmentPanelMessage(message: WebviewMessage, hos
                         const warnings = SecretsGuard.checkFile(selectedEnv.filePath);
                         if (warnings.length > 0) {
                             vscode.window.showWarningMessage(
-                                `⚠️ Selected environment contains potential secrets: ${warnings.join(', ')}`
+                                t('envSwitch.secretsInFile', { warnings: warnings.join(', ') })
                             );
                         }
 
-                        vscode.window.showInformationMessage(`Environment switched to ${selectedEnv.name}`);
+                        vscode.window.showInformationMessage(t('envSwitch.switched', { name: selectedEnv.name }));
                         await host.refreshEnvironments();
                     } catch (error) {
-                        vscode.window.showErrorMessage(`Failed to switch environment: ${(error as Error).message}`);
+                        vscode.window.showErrorMessage(t('envSwitch.failed', { message: (error as Error).message }));
                     }
                 }
                 break;
@@ -158,7 +158,7 @@ export async function handleEnvironmentPanelMessage(message: WebviewMessage, hos
                             });
                             await vscode.window.showTextDocument(doc, { preview: true });
                         } catch (error) {
-                            vscode.window.showErrorMessage(`Failed to show diff: ${(error as Error).message}`);
+                            vscode.window.showErrorMessage(t('webview.diffFailed', { message: (error as Error).message }));
                         }
                     }
                 } else {
@@ -171,12 +171,12 @@ export async function handleEnvironmentPanelMessage(message: WebviewMessage, hos
 
             case 'createEnvironment':
                 const fileName = await vscode.window.showInputBox({
-                    prompt: 'Enter environment file name (e.g., .env.staging)',
-                    placeHolder: '.env.newenv',
+                    prompt: t('webview.createEnvPrompt'),
+                    placeHolder: t('webview.createEnvPlaceholder'),
                     value: '.env.',
                     validateInput: (value: string) => {
-                        if (!value.startsWith('.env.')) return 'Must start with .env.';
-                        if (fs.existsSync(path.join(rootPath, value))) return 'File already exists';
+                        if (!value.startsWith('.env.')) return t('webview.mustStartWithEnv');
+                        if (fs.existsSync(path.join(rootPath, value))) return t('webview.fileExists');
                         return null;
                     }
                 });
@@ -194,14 +194,14 @@ DEBUG=false
 `.replace(/\r?\n/g, '\n');
 
                         fs.writeFileSync(path.join(rootPath, fileName), templateContent, 'utf8');
-                        vscode.window.showInformationMessage(`Created ${fileName}`);
+                        vscode.window.showInformationMessage(t('webview.envCreated', { fileName }));
                         await host.refreshEnvironments();
 
                         // Open the new file for editing
                         const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(rootPath, fileName)));
                         await vscode.window.showTextDocument(doc);
                     } catch (error) {
-                        vscode.window.showErrorMessage(`Failed to create environment file: ${(error as Error).message}`);
+                        vscode.window.showErrorMessage(t('webview.createFailed', { message: (error as Error).message }));
                     }
                 }
                 break;

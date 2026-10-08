@@ -6,6 +6,7 @@ import { SessionManager } from './sessionManager';
 import { logger } from './logger';
 import { decryptValue as decryptCipherValue, encryptValue as encryptCipherValue, isEncrypted as isEncryptedValue } from './encryptionCipher';
 import { EncryptedEnvironmentFile } from './encryptedEnvironmentFile';
+import { t } from '../i18n';
 export { EncryptedEnvironmentFile };
 export { EncryptionHealthUtils } from './encryptionHealth';
 
@@ -176,7 +177,7 @@ export class EncryptedVarsManager {
         const secretsKey = `${this.SECRET_STORAGE_KEY_PREFIX}${workspace}`;
 
         await context.secrets.store(secretsKey, key.toString('base64'));
-        vscode.window.showInformationMessage('Master password set successfully');
+        vscode.window.showInformationMessage(t('master.set'));
     }
 
     /**
@@ -190,7 +191,7 @@ export class EncryptedVarsManager {
         try {
             const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             if (!workspace) {
-                return { success: false, migratedCount: 0, error: 'No workspace found' };
+                return { success: false, migratedCount: 0, error: t('users.noWorkspace') };
             }
 
             const envPath = path.join(workspace, '.env');
@@ -206,13 +207,13 @@ export class EncryptedVarsManager {
             try {
                 parsedVars = await EncryptedEnvironmentFile.parseEnvFile(envPath, context, oldKey);
             } catch {
-                return { success: false, migratedCount: 0, error: 'Old password is incorrect or cannot decrypt existing variables' };
+                return { success: false, migratedCount: 0, error: t('master.oldPasswordWrong') };
             }
 
             // Verify all encrypted vars were actually decrypted
             for (const [, data] of parsedVars) {
                 if (data.encrypted && data.value === data.raw) {
-                    return { success: false, migratedCount: 0, error: 'Old password is incorrect - cannot decrypt existing variables' };
+                    return { success: false, migratedCount: 0, error: t('master.oldPasswordCannotDecrypt') };
                 }
             }
 
@@ -228,32 +229,32 @@ export class EncryptedVarsManager {
 
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Re-encrypting environment variables...',
+                title: t('master.reencryptTitle'),
                 cancellable: false,
             }, async (progress) => {
-                progress.report({ increment: 0, message: 'Deriving new key...' });
+                progress.report({ increment: 0, message: t('master.progressDerive') });
                 const newKey = await this.deriveKeyFromPassword(newPassword, context, workspaceName);
 
-                progress.report({ increment: 25, message: 'Re-encrypting variables...' });
+                progress.report({ increment: 25, message: t('master.progressReencrypt') });
                 const reEncryptedVars = new Map<string, { value: string; encrypted: boolean }>();
                 for (const [k, data] of parsedVars) {
                     reEncryptedVars.set(k, { value: data.value, encrypted: data.encrypted });
                 }
 
-                progress.report({ increment: 75, message: 'Saving changes...' });
+                progress.report({ increment: 75, message: t('master.progressSave') });
                 await EncryptedEnvironmentFile.writeEnvFile(envPath, reEncryptedVars, context, newKey);
 
                 // Store new key in SecretStorage
                 const secretsKey = `${this.SECRET_STORAGE_KEY_PREFIX}${workspaceName}`;
                 await context.secrets.store(secretsKey, newKey.toString('base64'));
 
-                progress.report({ increment: 100, message: 'Complete!' });
+                progress.report({ increment: 100, message: t('master.progressDone') });
             });
 
             return { success: true, migratedCount: encryptedCount };
 
         } catch (error) {
-            return { success: false, migratedCount: 0, error: `Password change failed: ${(error as Error).message}` };
+            return { success: false, migratedCount: 0, error: t('master.passwordChangeFailed', { message: (error as Error).message }) };
         }
     }
 
@@ -267,7 +268,7 @@ export class EncryptedVarsManager {
         try {
             const workspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             if (!workspace) {
-                return { success: false, migratedCount: 0, error: 'No workspace found' };
+                return { success: false, migratedCount: 0, error: t('users.noWorkspace') };
             }
 
             const envPath = path.join(workspace, '.env');
@@ -281,12 +282,12 @@ export class EncryptedVarsManager {
             try {
                 parsedVars = await EncryptedEnvironmentFile.parseEnvFile(envPath, context, currentKey);
             } catch {
-                return { success: false, migratedCount: 0, error: 'Could not decrypt variables with existing master key' };
+                return { success: false, migratedCount: 0, error: t('master.cannotDecryptWithKey') };
             }
 
             for (const [, data] of parsedVars) {
                 if (data.encrypted && data.value === data.raw) {
-                    return { success: false, migratedCount: 0, error: 'Failed to decrypt some encrypted variables with current master key' };
+                    return { success: false, migratedCount: 0, error: t('master.decryptSomeFailed') };
                 }
             }
 
@@ -303,32 +304,32 @@ export class EncryptedVarsManager {
             const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name || 'default';
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Migrating environment variables to master password...',
+                title: t('master.migrateTitle'),
                 cancellable: false,
             }, async (progress) => {
-                progress.report({ increment: 0, message: 'Deriving new key from password...' });
+                progress.report({ increment: 0, message: t('master.progressDerivePassword') });
                 const newKey = await this.deriveKeyFromPassword(newPassword, context, workspaceName);
 
-                progress.report({ increment: 25, message: 'Re-encrypting variables...' });
+                progress.report({ increment: 25, message: t('master.progressReencrypt') });
                 const reEncryptedVars = new Map<string, { value: string; encrypted: boolean }>();
                 for (const [k, data] of parsedVars) {
                     reEncryptedVars.set(k, { value: data.value, encrypted: data.encrypted });
                 }
 
-                progress.report({ increment: 75, message: 'Saving changes...' });
+                progress.report({ increment: 75, message: t('master.progressSave') });
                 await EncryptedEnvironmentFile.writeEnvFile(envPath, reEncryptedVars, context, newKey);
 
                 // Store new key in SecretStorage
                 const secretsKey = `${this.SECRET_STORAGE_KEY_PREFIX}${workspaceName}`;
                 await context.secrets.store(secretsKey, newKey.toString('base64'));
 
-                progress.report({ increment: 100, message: 'Complete!' });
+                progress.report({ increment: 100, message: t('master.progressDone') });
             });
 
             return { success: true, migratedCount: encryptedCount };
 
         } catch (error) {
-            return { success: false, migratedCount: 0, error: `Migration failed: ${(error as Error).message}` };
+            return { success: false, migratedCount: 0, error: t('master.migrationFailed', { message: (error as Error).message }) };
         }
     }
 

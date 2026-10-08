@@ -7,6 +7,7 @@ import { HistoryWebviewProvider } from '../providers/historyWebviewProvider';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { t } from '../i18n';
 
 export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 	private disposables: vscode.Disposable[] = [];
@@ -32,7 +33,7 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 		const allWorkspaces = workspaceManager.getAllWorkspaces();
 
 		if (allWorkspaces.length === 0) {
-			vscode.window.showErrorMessage('No workspace folder open.');
+			vscode.window.showErrorMessage(t('common.noWorkspace'));
 			return;
 		}
 
@@ -43,7 +44,7 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 		} else {
 			const workspaceItems = workspaceManager.getWorkspaceQuickPickItems();
 			const selectedItem = await vscode.window.showQuickPick(workspaceItems, {
-				placeHolder: 'Select workspace to view history for'
+				placeHolder: t('history.workspacePlaceholder')
 			});
 
 			if (!selectedItem) return;
@@ -63,7 +64,7 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 			const history = await HistoryManager.getHistory(rootPath, 50); // Limit to last 50 entries
 
 			if (history.length === 0) {
-				vscode.window.showInformationMessage(`No environment history found for workspace "${workspace.name}".`);
+				vscode.window.showInformationMessage(t('history.noneForWorkspace', { name: workspace.name }));
 				return;
 			}
 
@@ -76,7 +77,7 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 			}));
 
 			const selectedHistory = await vscode.window.showQuickPick(historyItems, {
-				placeHolder: `Select history entry (${history.length} total)`,
+				placeHolder: t('history.entryPlaceholder', { count: history.length }),
 				matchOnDescription: true
 			});
 
@@ -86,7 +87,7 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 			await this.showHistoryEntryDetails(selectedHistory.entry, rootPath);
 
 		} catch (error) {
-			vscode.window.showErrorMessage(`Failed to load environment history: ${(error as Error).message}`);
+			vscode.window.showErrorMessage(t('history.loadCommandFailed', { message: (error as Error).message }));
 		}
 	}
 
@@ -97,10 +98,10 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 		const diffHours = Math.floor(diffMinutes / 60);
 		const diffDays = Math.floor(diffHours / 24);
 
-		if (diffMinutes < 1) return 'Just now';
-		if (diffMinutes < 60) return `${diffMinutes}m ago`;
-		if (diffHours < 24) return `${diffHours}h ago`;
-		if (diffDays < 7) return `${diffDays}d ago`;
+		if (diffMinutes < 1) return t('history.justNow');
+		if (diffMinutes < 60) return t('history.minutesAgo', { count: diffMinutes });
+		if (diffHours < 24) return t('history.hoursAgo', { count: diffHours });
+		if (diffDays < 7) return t('history.daysAgo', { count: diffDays });
 
 		return timestamp.toLocaleDateString();
 	}
@@ -109,13 +110,13 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 		let detail = '';
 
 		if (entry.previousEnvironment) {
-			detail += `From: ${entry.previousEnvironment} → To: ${entry.environmentName}`;
+			detail += t('history.fromTo', { from: entry.previousEnvironment, to: entry.environmentName });
 		} else {
-			detail += `Environment: ${entry.environmentName}`;
+			detail += t('history.environmentDetail', { name: entry.environmentName });
 		}
 
 		if (entry.user) {
-			detail += ` | User: ${entry.user}`;
+			detail += ` | ${t('history.userDetail', { user: entry.user })}`;
 		}
 
 		if (entry.metadata.reason) {
@@ -127,14 +128,14 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 
 	private async showHistoryEntryDetails(entry: HistoryEntry, rootPath: string): Promise<void> {
 		const actions = [
-			{ label: 'View Content', description: 'Show the .env file content at this point', action: 'view' },
-			{ label: 'View Diff', description: 'Compare with current environment', action: 'diff' },
-			{ label: 'Rollback', description: 'Restore this environment state', action: 'rollback' },
-			{ label: 'Copy Content', description: 'Copy content to clipboard', action: 'copy' }
+			{ label: t('history.viewContent'), description: t('history.viewContentDesc'), action: 'view' },
+			{ label: t('history.viewDiff'), description: t('history.viewDiffDesc'), action: 'diff' },
+			{ label: t('history.rollback'), description: t('history.rollbackDesc'), action: 'rollback' },
+			{ label: t('history.copyContent'), description: t('history.copyContentDesc'), action: 'copy' }
 		];
 
 		const selectedAction = await vscode.window.showQuickPick(actions, {
-			placeHolder: `What would you like to do with this history entry?`
+			placeHolder: t('history.actionPlaceholder')
 		});
 
 		if (!selectedAction) return;
@@ -151,7 +152,7 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 				break;
 			case 'copy':
 				await vscode.env.clipboard.writeText(entry.fileContent);
-				vscode.window.showInformationMessage('Environment content copied to clipboard');
+				vscode.window.showInformationMessage(t('history.copied'));
 				break;
 		}
 	}
@@ -191,25 +192,27 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 			await vscode.window.showTextDocument(doc, { preview: true });
 
 		} catch (error) {
-			vscode.window.showErrorMessage(`Failed to generate diff: ${(error as Error).message}`);
+			vscode.window.showErrorMessage(t('history.generateDiffFailed', { message: (error as Error).message }));
 		}
 	}
 
 	private async rollbackToHistoryEntry(entry: HistoryEntry, rootPath: string): Promise<void> {
+		const rollbackAction = t('history.rollbackAction');
 		const confirm = await vscode.window.showWarningMessage(
-			`Are you sure you want to rollback to the environment state from ${entry.timestamp.toLocaleString()}?\n\n` +
-			`This will replace your current .env file with the historical version.`,
+			t('history.rollbackConfirm', {
+				time: entry.timestamp.toLocaleString(),
+				environment: entry.environmentName
+			}),
 			{ modal: true },
-			'Rollback',
-			'Cancel'
+			rollbackAction,
+			t('common.cancel')
 		);
 
-		if (confirm !== 'Rollback') return;
+		if (confirm !== rollbackAction) return;
 
-		// Ask for rollback reason
 		const reason = await vscode.window.showInputBox({
-			prompt: 'Optional: Enter a reason for this rollback',
-			placeHolder: 'e.g., Reverting accidental changes'
+			prompt: t('history.rollbackReasonPrompt'),
+			placeHolder: t('history.rollbackReasonPlaceholder')
 		});
 
 		try {
@@ -217,7 +220,7 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 
 			if (success) {
 				vscode.window.showInformationMessage(
-					`Successfully rolled back to environment state from ${entry.timestamp.toLocaleString()}`
+					t('history.rollbackSuccess', { time: entry.timestamp.toLocaleString() })
 				);
 
 				// Refresh status bar and other UI elements
@@ -230,10 +233,10 @@ export class ViewEnvironmentHistoryCommand implements vscode.Disposable {
 					workspaceData.statusBarProvider.forceRefresh();
 				}
 			} else {
-				vscode.window.showErrorMessage('Failed to rollback to the selected environment state');
+				vscode.window.showErrorMessage(t('history.rollbackFailed'));
 			}
 		} catch (error) {
-			vscode.window.showErrorMessage(`Rollback failed: ${(error as Error).message}`);
+			vscode.window.showErrorMessage(t('history.rollbackCommandFailed', { message: (error as Error).message }));
 		}
 	}
 

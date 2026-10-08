@@ -125,7 +125,7 @@ export class HistoryWebviewProvider {
             logger.error('Failed to load analytics:', error, 'HistoryWebviewProvider');
             HistoryWebviewProvider._post({
                 type: 'error',
-                message: `Failed to load analytics: ${(error as Error).message}`
+                message: t('analytics.loadFailed', { message: (error as Error).message })
             });
         }
     }
@@ -136,7 +136,7 @@ export class HistoryWebviewProvider {
             HistoryWebviewProvider._post({ type: 'filtersApplied', result, workspacePath });
         } catch (error) {
             logger.error('Failed to apply filters:', error, 'HistoryWebviewProvider');
-            HistoryWebviewProvider._post({ type: 'error', message: `Failed to apply filters: ${(error as Error).message}` });
+            HistoryWebviewProvider._post({ type: 'error', message: t('history.errorPrefix', { message: (error as Error).message }) });
         }
     }
 
@@ -146,7 +146,7 @@ export class HistoryWebviewProvider {
             HistoryWebviewProvider._post({ type: 'filterOptionsLoaded', options, workspacePath });
         } catch (error) {
             logger.error('Failed to get filter options:', error, 'HistoryWebviewProvider');
-            HistoryWebviewProvider._post({ type: 'error', message: `Failed to get filter options: ${(error as Error).message}` });
+            HistoryWebviewProvider._post({ type: 'error', message: t('history.errorPrefix', { message: (error as Error).message }) });
         }
     }
 
@@ -156,7 +156,7 @@ export class HistoryWebviewProvider {
             HistoryWebviewProvider._post({ type: 'variableHistoryLoaded', variableName, history, workspacePath });
         } catch (error) {
             logger.error('Failed to get variable history:', error, 'HistoryWebviewProvider');
-            HistoryWebviewProvider._post({ type: 'error', message: `Failed to get variable history: ${(error as Error).message}` });
+            HistoryWebviewProvider._post({ type: 'error', message: t('history.errorPrefix', { message: (error as Error).message }) });
         }
     }
 
@@ -238,11 +238,11 @@ export class HistoryWebviewProvider {
             if (entry) {
                 HistoryWebviewProvider._post({ type: 'entryContent', entry });
             } else {
-                HistoryWebviewProvider._post({ type: 'error', message: 'Entry not found' });
+                HistoryWebviewProvider._post({ type: 'error', message: t('history.entryNotFound') });
             }
         } catch (error) {
             logger.error('Failed to load entry:', error, 'HistoryWebviewProvider');
-            HistoryWebviewProvider._post({ type: 'error', message: `Failed to load entry: ${(error as Error).message}` });
+            HistoryWebviewProvider._post({ type: 'error', message: t('history.errorPrefix', { message: (error as Error).message }) });
         }
     }
 
@@ -262,7 +262,7 @@ export class HistoryWebviewProvider {
             }
         } catch (error) {
             logger.error('Failed to rollback:', error, 'HistoryWebviewProvider');
-            HistoryWebviewProvider._post({ type: 'error', message: `Rollback failed: ${(error as Error).message}` });
+            HistoryWebviewProvider._post({ type: 'error', message: t('history.rollbackCommandFailed', { message: (error as Error).message }) });
         }
     }
 
@@ -319,7 +319,7 @@ export class HistoryWebviewProvider {
             }, 60_000);
         } catch (error) {
             logger.error('Failed to open diff:', error, 'HistoryWebviewProvider');
-            vscode.window.showErrorMessage(`Failed to open diff: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(t('history.openDiffFailed', { message: (error as Error).message }));
         }
     }
 
@@ -328,11 +328,11 @@ export class HistoryWebviewProvider {
             const entry = await HistoryManager.getEntry(workspacePath, entryId);
             if (entry) {
                 await vscode.env.clipboard.writeText(entry.fileContent);
-                vscode.window.showInformationMessage('Environment content copied to clipboard');
+                vscode.window.showInformationMessage(t('history.copied'));
             }
         } catch (error) {
             logger.error('Failed to copy content:', error, 'HistoryWebviewProvider');
-            vscode.window.showErrorMessage('Failed to copy environment content to clipboard');
+            vscode.window.showErrorMessage(t('history.copyFailed'));
         }
     }
 
@@ -341,22 +341,24 @@ export class HistoryWebviewProvider {
     ): Promise<void> {
         try {
             const timestampDate = new Date(timestamp);
-            const message = `Are you sure you want to rollback to the environment state from ${timestampDate.toLocaleString()}?\n\nThis will replace your current .env file with the historical version for environment "${environmentName}".`;
-
+            const rollbackAction = t('history.rollbackAction');
             const result = await vscode.window.showWarningMessage(
-                message, { modal: true }, 'Rollback', 'Cancel'
+                t('history.rollbackConfirm', { time: timestampDate.toLocaleString(), environment: environmentName }),
+                { modal: true },
+                rollbackAction,
+                t('common.cancel')
             );
 
-            if (result === 'Rollback') {
+            if (result === rollbackAction) {
                 const reason = await vscode.window.showInputBox({
-                    prompt: 'Optional: Enter a reason for this rollback',
-                    placeHolder: 'e.g., Reverting to stable configuration'
+                    prompt: t('history.rollbackReasonPrompt'),
+                    placeHolder: t('history.rollbackReasonPlaceholder')
                 });
                 await HistoryWebviewProvider._rollbackToEntry(entryId, workspacePath, reason);
             }
         } catch (error) {
             logger.error('Failed to confirm rollback:', error, 'HistoryWebviewProvider');
-            vscode.window.showErrorMessage('Failed to process rollback confirmation');
+            vscode.window.showErrorMessage(t('history.rollbackConfirmFailed'));
         }
     }
 

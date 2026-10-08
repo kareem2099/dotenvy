@@ -14,6 +14,13 @@ import { t } from '../i18n';
 
 const DOTENVY_HOOK_MARKER = 'dotenvy pre-commit hook';
 
+export class NonDotenvyHookError extends Error {
+	constructor() {
+		super(t('gitHook.foreignHook'));
+		this.name = 'NonDotenvyHookError';
+	}
+}
+
 export class GitHookManager {
 	/**
 	 * Show install/remove menu for the git hook.
@@ -66,7 +73,7 @@ export class GitHookManager {
 	static async installHook(workspacePath: string): Promise<void> {
 		const gitRoot = this.resolveGitRoot(workspacePath);
 		if (!gitRoot) {
-			throw new Error('Git repository not found. Open the folder that contains the repository root.');
+			throw new Error(t('gitHook.repoNotFound'));
 		}
 
 		const gitHooksPath = this.resolveHooksDirectory(gitRoot);
@@ -81,7 +88,7 @@ export class GitHookManager {
 		try {
 			await fs.promises.writeFile(hookPath, hookScript, { mode: 0o755 });
 		} catch (error) {
-			throw new Error(`Failed to install hook: ${error}`, { cause: error });
+			throw new Error(t('gitHook.installError', { message: String(error) }), { cause: error });
 		}
 	}
 
@@ -91,7 +98,7 @@ export class GitHookManager {
 	static async removeHook(workspacePath: string): Promise<void> {
 		const gitRoot = this.resolveGitRoot(workspacePath);
 		if (!gitRoot) {
-			throw new Error('Git repository not found. Open the folder that contains the repository root.');
+			throw new Error(t('gitHook.repoNotFound'));
 		}
 
 		const hookPath = path.join(this.resolveHooksDirectory(gitRoot), 'pre-commit');
@@ -103,17 +110,15 @@ export class GitHookManager {
 
 			const content = fs.readFileSync(hookPath, 'utf8');
 			if (!this.isDotenvyHookContent(content)) {
-				throw new Error(
-					'A pre-commit hook exists but it was not installed by dotenvy. Remove it manually to avoid deleting another tool\'s hook.'
-				);
+				throw new NonDotenvyHookError();
 			}
 
 			await fs.promises.unlink(hookPath);
 		} catch (error) {
-			if (error instanceof Error && error.message.includes('not installed by dotenvy')) {
+			if (error instanceof NonDotenvyHookError) {
 				throw error;
 			}
-			throw new Error(`Failed to remove hook: ${error}`, { cause: error });
+			throw new Error(t('gitHook.removeError', { message: String(error) }), { cause: error });
 		}
 	}
 

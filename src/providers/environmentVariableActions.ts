@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { EncryptedVarsManager, EncryptedEnvironmentFile } from '../utils/encryptedVars';
 import { TrashBinManager } from '../utils/trashBinManager';
+import { t } from '../i18n';
 
 /**
  * Collaborators variable actions need from the environment panel.
@@ -24,7 +25,7 @@ export async function toggleEnvironmentVariableEncryption(
     host: EnvironmentVariableHost,
 ): Promise<void> {
     if (!key) {
-        vscode.window.showErrorMessage('No variable key provided for encryption toggle');
+        vscode.window.showErrorMessage(t('vars.noKey'));
         return;
     }
 
@@ -36,7 +37,7 @@ export async function toggleEnvironmentVariableEncryption(
 
         const varData = currentVars.get(key);
         if (!varData) {
-            vscode.window.showErrorMessage(`Variable '${key}' not found in .env file`);
+            vscode.window.showErrorMessage(t('vars.notFound', { key }));
             return;
         }
 
@@ -46,11 +47,11 @@ export async function toggleEnvironmentVariableEncryption(
         await EncryptedEnvironmentFile.writeEnvFile(envFilePath, currentVars, host.context, cryptoKey);
         await host.refreshEnvironments();
 
-        const action = varData.encrypted ? 'Encrypted' : 'Decrypted';
-        const icon = varData.encrypted ? '🔒' : '🔓';
-        vscode.window.showInformationMessage(`${icon} ${action} variable '${key}'`);
+        vscode.window.showInformationMessage(
+            varData.encrypted ? t('vars.encrypted', { key }) : t('vars.decrypted', { key })
+        );
     } catch (error) {
-        vscode.window.showErrorMessage(`Failed to toggle encryption for '${key}': ${(error as Error).message}`);
+        vscode.window.showErrorMessage(t('vars.toggleFailed', { key, message: (error as Error).message }));
     }
 }
 
@@ -70,12 +71,12 @@ export async function updateEnvironmentVariable(
 
         const varData = currentVars.get(key);
         if (!varData) {
-            vscode.window.showErrorMessage(`Variable '${key}' not found.`);
+            vscode.window.showErrorMessage(t('vars.notFoundShort', { key }));
             return;
         }
 
         const newValue = await vscode.window.showInputBox({
-            prompt: `Enter new value for ${key}`,
+            prompt: t('vars.newValuePrompt', { key }),
             value: varData.value,
             ignoreFocusOut: true
         });
@@ -94,10 +95,10 @@ export async function updateEnvironmentVariable(
             currentVars.set(key, varData);
             await EncryptedEnvironmentFile.writeEnvFile(envFilePath, currentVars, host.context, cryptoKey);
             await host.refreshEnvironments();
-            vscode.window.showInformationMessage(`✅ Updated ${key}`);
+            vscode.window.showInformationMessage(t('vars.updated', { key }));
         }
     } catch (error) {
-        vscode.window.showErrorMessage(`Update failed: ${(error as Error).message}`);
+        vscode.window.showErrorMessage(t('vars.updateFailed', { message: (error as Error).message }));
     }
 }
 
@@ -118,11 +119,12 @@ export async function deleteEnvironmentVariable(
         const varData = currentVars.get(key);
         if (!varData) return;
 
+        const deleteAction = t('vars.deleteAction');
         const confirm = await vscode.window.showWarningMessage(
-            `Delete variable '${key}'?`, { modal: true }, 'Delete'
+            t('vars.deleteConfirm', { key }), { modal: true }, deleteAction
         );
 
-        if (confirm === 'Delete') {
+        if (confirm === deleteAction) {
             TrashBinManager.getInstance().push({
                 key,
                 oldValue: varData.value,
@@ -134,9 +136,9 @@ export async function deleteEnvironmentVariable(
             currentVars.delete(key);
             await EncryptedEnvironmentFile.writeEnvFile(envFilePath, currentVars, host.context, cryptoKey);
             await host.refreshEnvironments();
-            vscode.window.showInformationMessage(`🗑️ Deleted ${key}`);
+            vscode.window.showInformationMessage(t('vars.deleted', { key }));
         }
     } catch (error) {
-        vscode.window.showErrorMessage(`Delete failed: ${(error as Error).message}`);
+        vscode.window.showErrorMessage(t('vars.deleteFailed', { message: (error as Error).message }));
     }
 }

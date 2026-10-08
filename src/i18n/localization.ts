@@ -24,7 +24,7 @@ export function isSupportedLocale(locale: string): locale is Locale {
 }
 
 export function resolveDefaultLocale(): Locale {
-	const lang = vscode.env.language.toLowerCase();
+	const lang = (vscode.env.language ?? 'en').toLowerCase();
 	if (lang.startsWith('ar')) {
 		return 'ar';
 	}

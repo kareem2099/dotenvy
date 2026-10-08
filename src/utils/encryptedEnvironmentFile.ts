@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { EncryptedVarsManager } from './encryptedVars';
 import { logger } from './logger';
+import { t } from '../i18n';
 
 let decryptionWarningShown = false;
 
@@ -55,11 +56,12 @@ export class EncryptedEnvironmentFile {
 
                     if (!decryptionWarningShown) {
                         decryptionWarningShown = true;
+                        const setPasswordAction = t('master.setPasswordAction');
                         vscode.window.showWarningMessage(
-                            'DotEnvy: Some encrypted variables could not be decrypted. Master key may have changed.',
-                            'Set Master Password',
+                            t('master.decryptWarning'),
+                            setPasswordAction,
                         ).then(action => {
-                            if (action === 'Set Master Password') {
+                            if (action === setPasswordAction) {
                                 vscode.commands.executeCommand('dotenvy.setMasterPassword');
                                 decryptionWarningShown = false;
                             }

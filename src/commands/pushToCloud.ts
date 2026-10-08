@@ -7,7 +7,7 @@ import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { FileUtils } from '../utils/fileUtils';
 import { EnvSyncUtils } from '../utils/envSyncUtils';
 import { extensionContext } from '../extension';
-import { createCloudSyncManager } from '../utils/encryptedCloudSyncManager';
+import { createCloudSyncManager } from '../utils/cloudSyncManagerFactory';
 import { showActionStart, showSyncToast } from '../utils/panelNotification';
 import { t } from '../i18n';
 

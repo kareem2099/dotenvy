@@ -9,6 +9,7 @@ import { Environment, EnvSyncTarget, QuickEnvConfig } from '../types/environment
 import { EnvironmentProvider } from '../providers/environmentProvider';
 import { ConfigUtils } from './configUtils';
 import type { ResolvedEnvFile, ResolvedSyncTarget } from './envSyncUtils';
+import { t } from '../i18n';
 
 const CONFIG_ENV_ALIASES: Record<string, string[]> = {
 	dev: ['dev', 'development', 'develop'],
@@ -255,7 +256,7 @@ async function resolveFallbackSingleTarget(
 			description: env.fileName,
 			env
 		})),
-		{ placeHolder: 'Select environment file to sync with cloud' }
+		{ placeHolder: t('envSwitch.syncFilePlaceholder') }
 	);
 
 	if (!selected) {

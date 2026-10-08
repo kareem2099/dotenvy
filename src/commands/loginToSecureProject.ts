@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { UserManager } from '../utils/userManager';
 import { SessionManager } from '../utils/sessionManager';
 import { UserCredentials } from '../types/user';
+import { t } from '../i18n';
 
 export class LoginToSecureProjectCommand implements vscode.Disposable {
 
@@ -9,20 +10,21 @@ export class LoginToSecureProjectCommand implements vscode.Disposable {
         try {
             // 1. Check if project is secured
             if (!await UserManager.isSecureProjectInitialized()) {
-                vscode.window.showInformationMessage('This project is not secured via DotEnvy yet.');
+                vscode.window.showInformationMessage(t('login.notSecured'));
                 return;
             }
 
             // 2. Check if already logged in
             const session = SessionManager.getInstance();
             if (session.isLoggedIn()) {
+                const logoutLabel = t('login.logout');
                 const choice = await vscode.window.showInformationMessage(
-                    `You are already logged in as '${session.getCurrentUser()}'. Logout?`,
-                    'Logout', 'Cancel'
+                    t('login.alreadyIn', { user: session.getCurrentUser() ?? '' }),
+                    logoutLabel, t('common.cancel')
                 );
-                if (choice === 'Logout') {
+                if (choice === logoutLabel) {
                     session.logout();
-                    vscode.window.showInformationMessage('Logged out successfully.');
+                    vscode.window.showInformationMessage(t('login.loggedOut'));
                 }
                 return;
             }
@@ -30,23 +32,23 @@ export class LoginToSecureProjectCommand implements vscode.Disposable {
             // 3. Get List of Users (To make it easy)
             const users = await UserManager.listUsers();
             if (users.length === 0) {
-                vscode.window.showErrorMessage('No users found in lock file. Corrupt file?');
+                vscode.window.showErrorMessage(t('login.noUsers'));
                 return;
             }
 
             // 4. Select Username
             const selectedUser = await vscode.window.showQuickPick(
                 users.map(u => u.username),
-                { placeHolder: 'Select your username to login 🔐' }
+                { placeHolder: t('login.selectUser') }
             );
 
             if (!selectedUser) return;
 
             // 5. Enter Password
             const password = await vscode.window.showInputBox({
-                prompt: `Enter password for ${selectedUser}`,
+                prompt: t('login.passwordPrompt', { user: selectedUser }),
                 password: true,
-                placeHolder: 'Your secure password',
+                placeHolder: t('login.passwordPlaceholder'),
                 ignoreFocusOut: true
             });
 
@@ -55,7 +57,7 @@ export class LoginToSecureProjectCommand implements vscode.Disposable {
             // 6. Attempt Decryption
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Unlocking Secure Vault...',
+                title: t('login.unlocking'),
             }, async () => {
                 const credentials: UserCredentials = {
                     username: selectedUser,
@@ -68,14 +70,14 @@ export class LoginToSecureProjectCommand implements vscode.Disposable {
                 if (result.success && result.projectKey) {
                     // Store session information securely in memory
                     session.setSession(selectedUser, result.projectKey);
-                    vscode.window.showInformationMessage(`🔓 Welcome back, ${selectedUser}! Environment unlocked.`);
+                    vscode.window.showInformationMessage(t('login.welcome', { user: selectedUser }));
                 } else {
-                    vscode.window.showErrorMessage(`⛔ Login failed: ${result.message}`);
+                    vscode.window.showErrorMessage(t('login.failed', { message: result.message ?? '' }));
                 }
             });
 
         } catch (error) {
-            vscode.window.showErrorMessage(`Login error: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(t('login.error', { message: (error as Error).message }));
         }
     }
 

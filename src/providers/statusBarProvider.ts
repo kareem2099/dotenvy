@@ -8,7 +8,7 @@ import { DopplerSyncManager } from '../utils/dopplerSyncManager';
 import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { EnvironmentValidator } from '../utils/environmentValidator';
 import { FileUtils } from '../utils/fileUtils';
-import { CloudEncryptionUtils } from '../utils/encryptedCloudSyncManager';
+import { CloudEncryptionUtils } from '../utils/cloudSyncManagerFactory';
 import {
 	EnvironmentStatus,
 	CloudSyncStatus,

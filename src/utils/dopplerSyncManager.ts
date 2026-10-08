@@ -73,7 +73,7 @@ export class DopplerSyncManager extends CloudSyncManager {
 		} catch (error) {
 			return {
 				success: false,
-				error: `Failed to fetch from Doppler: ${(error as Error).message}`
+				error: t('doppler.fetchFailed', { message: (error as Error).message })
 			};
 		}
 	}
@@ -166,7 +166,7 @@ export class DopplerSyncManager extends CloudSyncManager {
 		} catch (error) {
 			return {
 				success: false,
-				error: `Failed to push to Doppler: ${(error as Error).message}`
+				error: t('doppler.pushFailed', { message: (error as Error).message })
 			};
 		}
 	}
@@ -223,12 +223,12 @@ export class DopplerSyncManager extends CloudSyncManager {
 					return {
 						success: false,
 						errorCode: 'INVALID_PROJECT',
-						error: `Invalid Doppler project "${this.config.project}". Select the correct project slug from your Doppler workplace.`
+						error: t('doppler.invalidProject', { project: this.config.project })
 					};
 				}
 
 				if (!DopplerSyncManager.isConfigNotFoundError(errorMessage)) {
-					return { success: false, error: `Authentication failed: ${errorMessage}` };
+					return { success: false, error: t('doppler.authFailed', { message: errorMessage }) };
 				}
 			}
 		}

@@ -6,7 +6,7 @@ import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { EnvSyncUtils } from '../utils/envSyncUtils';
 import { StatusBarProvider } from '../providers/statusBarProvider';
 import { extensionContext } from '../extension';
-import { createCloudSyncManager } from '../utils/encryptedCloudSyncManager';
+import { createCloudSyncManager } from '../utils/cloudSyncManagerFactory';
 import { showActionStart, showSyncToast } from '../utils/panelNotification';
 import { t } from '../i18n';
 import { GitUtils } from '../utils/gitUtils';
@@ -110,7 +110,7 @@ export class PullFromCloudCommand implements vscode.Disposable {
 			const result = await cloudManager.fetchSecrets(extensionContext);
 
 			if (!result.success || !result.secrets) {
-				showSyncToast(t('pull.downloadFailed', { error: result.error ?? 'no secrets received' }), 'error');
+				showSyncToast(t('pull.downloadFailed', { error: result.error ?? t('pull.noSecrets') }), 'error');
 				return;
 			}
 

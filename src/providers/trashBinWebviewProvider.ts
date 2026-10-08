@@ -82,17 +82,18 @@ export class TrashBinWebviewProvider {
             case 'restore': {
                 const entry = TrashBinManager.getInstance().getAll().find(e => e.id === msg.id);
                 if (!entry) {
-                    vscode.window.showErrorMessage('Entry no longer in trash bin.');
+                    vscode.window.showErrorMessage(t('trash.missing'));
                     return;
                 }
                 await TrashBinWebviewProvider._restoreEntry(entry);
                 break;
             }
             case 'clearAll': {
+                const clearAction = t('trash.clearAction');
                 const confirm = await vscode.window.showWarningMessage(
-                    'Clear all entries from the Trash Bin?', { modal: true }, 'Clear All'
+                    t('trash.clearConfirm'), { modal: true }, clearAction
                 );
-                if (confirm === 'Clear All') {
+                if (confirm === clearAction) {
                     TrashBinManager.getInstance().clearAll();
                 }
                 break;
@@ -104,7 +105,7 @@ export class TrashBinWebviewProvider {
         try {
             const filePath = path.join(entry.workspacePath, entry.environmentFile);
             if (!fs.existsSync(filePath)) {
-                vscode.window.showErrorMessage(`Cannot restore: ${entry.environmentFile} not found.`);
+                vscode.window.showErrorMessage(t('trash.fileMissing', { file: entry.environmentFile }));
                 return;
             }
 
@@ -115,7 +116,7 @@ export class TrashBinWebviewProvider {
                 // Re-append the deleted line
                 lines.push(`${entry.key}=${entry.oldValue}`);
                 fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
-                vscode.window.showInformationMessage(`✅ Restored: ${entry.key}`);
+                vscode.window.showInformationMessage(t('trash.restored', { key: entry.key }));
             } else {
                 // Revert to old value
                 const idx = lines.findIndex(l => l.startsWith(`${entry.key}=`));
@@ -125,13 +126,13 @@ export class TrashBinWebviewProvider {
                     lines.push(`${entry.key}=${entry.oldValue}`);
                 }
                 fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
-                vscode.window.showInformationMessage(`✅ Reverted: ${entry.key}`);
+                vscode.window.showInformationMessage(t('trash.reverted', { key: entry.key }));
             }
 
             TrashBinManager.getInstance().remove(entry.id);
         } catch (error) {
             logger.error('Restore failed:', error, 'TrashBinWebviewProvider');
-            vscode.window.showErrorMessage(`Restore failed: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(t('trash.restoreFailed', { message: (error as Error).message }));
         }
     }
 

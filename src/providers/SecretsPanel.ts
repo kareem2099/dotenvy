@@ -105,11 +105,11 @@ export class SecretsPanel {
             await FeedbackManager.recordConfirmed(secret);
 
             this._remove(secret);
-            vscode.window.showInformationMessage(`✅ ${secret.suggestedEnvVar} added to .env`);
+            vscode.window.showInformationMessage(t('secrets.addedToEnv', { name: secret.suggestedEnvVar }));
 
         } catch (error) {
             logger.error('Failed to move secret to .env', error, 'SecretsPanel');
-            vscode.window.showErrorMessage(`Failed: ${error instanceof Error ? error.message : String(error)}`);
+            vscode.window.showErrorMessage(t('common.failed', { message: error instanceof Error ? error.message : String(error) }));
         }
     }
 

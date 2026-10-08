@@ -10,7 +10,7 @@ import { WorkspaceManager } from '../providers/workspaceManager';
 import { diffCloudSecrets } from '../utils/cloudSecretDiff';
 import { CloudSecrets } from '../utils/cloudSyncManager';
 import { ConfigUtils } from '../utils/configUtils';
-import { createCloudSyncManager } from '../utils/encryptedCloudSyncManager';
+import { createCloudSyncManager } from '../utils/cloudSyncManagerFactory';
 import { EnvSyncUtils } from '../utils/envSyncUtils';
 import { logger } from '../utils/logger';
 import { showSyncToast } from '../utils/panelNotification';

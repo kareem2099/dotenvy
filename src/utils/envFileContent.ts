@@ -9,6 +9,7 @@ import { EnvironmentProvider } from '../providers/environmentProvider';
 import { CloudSecrets } from './cloudSyncManager';
 import { EnvSyncUtils, ResolvedEnvFile, ResolvedSyncTarget } from './envSyncUtils';
 import { findEnvironmentForConfig, resolveSyncTargets, toResolvedEnvFile } from './syncTargetResolver';
+import { t } from '../i18n';
 
 /**
  * Serializes secrets as KEY=value lines.
@@ -218,7 +219,7 @@ export async function resolveEnvFileForSync(
 			description: env.fileName,
 			env
 		})),
-		{ placeHolder: 'Select environment file to sync with cloud' }
+		{ placeHolder: t('envSwitch.syncFilePlaceholder') }
 	);
 
 	if (!selected) {
