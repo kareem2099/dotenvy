@@ -2,9 +2,11 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { DetectedSecret } from '../utils/secretScannerTypes';
 import { FeedbackManager } from '../utils/feedbackManager';
+import { LLMAnalyzer } from '../utils/llmAnalyzer';
 import { logger } from '../utils/logger';
 import { loadWebviewHtml } from '../utils/webviewUtils';
 import { t } from '../i18n';
+import { readDetectedValue, encodeEnvValue } from '../utils/detectedSecretValue';
 
 export class SecretsPanel {
     public static currentPanel: SecretsPanel | undefined;
@@ -58,10 +60,12 @@ export class SecretsPanel {
     // ─── Messages ──────────────────────────────────────────────────────────────
 
     private async _handleMessage(message: { type: string; secret?: DetectedSecret }): Promise<void> {
+        const detection = this._secrets.find(s => s.file === message.secret?.file &&
+            s.line === message.secret?.line && s.column === message.secret?.column);
         switch (message.type) {
-            case 'viewLocation': if (message.secret) { await this._viewLocation(message.secret); } break;
-            case 'moveToEnv':    if (message.secret) { await this._moveToEnv(message.secret); }    break;
-            case 'ignore':       if (message.secret) { await this._ignore(message.secret); }       break;
+            case 'viewLocation': if (detection) { await this._viewLocation(detection); } break;
+            case 'moveToEnv':    if (detection) { await this._moveToEnv(detection); } break;
+            case 'ignore':       if (detection) { await this._ignore(detection); } break;
         }
     }
 
@@ -84,8 +88,12 @@ export class SecretsPanel {
 
     private async _moveToEnv(secret: DetectedSecret): Promise<void> {
         try {
-            const workspaceUri = vscode.workspace.workspaceFolders?.[0]?.uri;
-            if (!workspaceUri) { return; }
+            const { value, workspace } = await readDetectedValue(secret);
+            const workspaceUri = workspace.uri;
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(secret.suggestedEnvVar)) {
+                throw new Error('Invalid environment variable name.');
+            }
+            const encoded = encodeEnvValue(value);
 
             const envUri = vscode.Uri.joinPath(workspaceUri, '.env');
             let envContent = '';
@@ -93,11 +101,15 @@ export class SecretsPanel {
                 envContent = Buffer.from(await vscode.workspace.fs.readFile(envUri)).toString('utf8');
             } catch { /* new file */ }
 
-            if (!envContent.split('\n').some(l => l.trim().startsWith(`${secret.suggestedEnvVar}=`))) {
+            const existing = envContent.split('\n').find(l => l.trim().startsWith(`${secret.suggestedEnvVar}=`));
+            if (existing && existing.trim() !== `${secret.suggestedEnvVar}=${encoded}`) {
+                throw new Error('An environment variable with this name already has a different value.');
+            }
+            if (!existing) {
                 const ts = new Date().toISOString();
                 const newContent = envContent
-                    ? `${envContent.trimEnd()}\n\n# Added by DotEnvy on ${ts}\n${secret.suggestedEnvVar}=${secret.content}\n`
-                    : `# Added by DotEnvy on ${ts}\n${secret.suggestedEnvVar}=${secret.content}\n`;
+                    ? `${envContent.trimEnd()}\n\n# Added by DotEnvy on ${ts}\n${secret.suggestedEnvVar}=${encoded}\n`
+                    : `# Added by DotEnvy on ${ts}\n${secret.suggestedEnvVar}=${encoded}\n`;
                 await vscode.workspace.fs.writeFile(envUri, Buffer.from(newContent, 'utf8'));
             }
 
@@ -106,6 +118,7 @@ export class SecretsPanel {
 
             this._remove(secret);
             vscode.window.showInformationMessage(t('secrets.addedToEnv', { name: secret.suggestedEnvVar }));
+            await FeedbackManager.offerAfterCorrection(secret, 'high');
 
         } catch (error) {
             logger.error('Failed to move secret to .env', error, 'SecretsPanel');
@@ -114,9 +127,16 @@ export class SecretsPanel {
     }
 
     private async _ignore(secret: DetectedSecret): Promise<void> {
-        // ✅ Training signal: false positive
-            await FeedbackManager.recordFalsePositive(secret);
+        await FeedbackManager.recordFalsePositive(secret);
         this._remove(secret);
+
+        const stats = await FeedbackManager.getStats();
+        if (stats.falsePositives > 0 && stats.falsePositives % 5 === 0) {
+            vscode.window.showInformationMessage(
+                t('secretsScanner.correctionsSaved', { count: stats.falsePositives })
+            );
+        }
+        await FeedbackManager.offerAfterCorrection(secret, 'false_positive');
     }
 
     private _remove(secret: DetectedSecret): void {
@@ -174,8 +194,10 @@ export class SecretsPanel {
 
         const json = JSON.stringify(secrets).replace(/</g, '\\u003c');
         
+        const hintText = LLMAnalyzer.getInstance().isModelAvailable()
+            ? t('secretsScanner.hintLocal') : t('secretsScanner.hintFallback');
         const statsHint = secrets.length > 0 
-            ? `<div class="hint">${t('secretsScanner.hint')}</div>`
+            ? `<div class="hint">${hintText}</div>`
             : '';
             
         const secretsContent = secrets.length === 0
@@ -201,7 +223,7 @@ export class SecretsPanel {
                 feedbackPendingLabel: t('secretsScanner.feedbackPending'),
                 feedbackConfirmed: feedback.confirmed.toString(),
                 feedbackFalsePositives: feedback.falsePositives.toString(),
-                feedbackPending: feedback.pending.toString(),
+                feedbackPending: Math.max(0, feedback.total - feedback.confirmed - feedback.falsePositives).toString(),
                 allCount:       secrets.length.toString(),
                 highCount:      high.length.toString(),
                 mediumCount:    medium.length.toString(),

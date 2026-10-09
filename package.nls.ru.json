@@ -10,7 +10,9 @@
   "config.history.autoCleanup": "Автоматически очищать старые записи истории.",
   "config.cloudSync.encryptCloudSync": "Шифровать секреты перед облачной синхронизацией (сквозное E2EE шифрование).",
   "config.cloudSync.provider": "Облачный провайдер для синхронизации секретов.",
+  "config.secrets.enableCloudAnalysis": "Устаревшая настройка игнорируется. Классификация локальна; числовые отзывы добровольны.",
   "command.scanSecrets": "DotEnvy: Сканировать секреты",
+  "command.toggleCloudAnalysis": "DotEnvy: Переключить облачный ИИ-анализ секретов",
   "command.switchEnvironment": "DotEnvy: Переключить окружение",
   "command.initDotenvyIgnore": "DotEnvy: Инициализировать .dotenvyignore",
   "command.addToIgnore": "DotEnvy: Игнорировать этот путь",
@@ -40,5 +42,10 @@
   "command.openTrashBin": "DotEnvy: Открыть корзину сессии",
   "views.container.title": "DotEnvy",
   "views.environments.name": "Переключатель окружений",
-  "views.commands.name": "Безопасные команды"
+  "views.commands.name": "Безопасные команды",
+  "config.secrets.cloudAnalysisDeprecated": "Устаревшая настройка игнорируется. Классификация локальна; числовые отзывы добровольны.",
+  "command.resetSecretCorrections": "DotEnvy: Сбросить локальные исправления секретов",
+  "command.toggleCommunityLearning": "DotEnvy: Переключить совместное обучение",
+  "config.secrets.enableCommunityLearning": "Помочь улучшить DotAegis? Новые подтверждения и исправления отправляют 35 числовых признаков и метку с ID установки. Ключи, код, пути, имена и отпечатки не отправляются. Сервер хранит признаки для проверки и общего обучения; анонимность не гарантируется. Старые исправления не загружаются.",
+  "config.secrets.enableModelUpdates": "Загружать веса DotAegis при запуске и ежечасно. Только запрос версии, без данных сканирования. Для офлайн-режима отключите также обучение."
 }

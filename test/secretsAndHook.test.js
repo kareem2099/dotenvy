@@ -248,20 +248,19 @@ describe('secret patterns, ignore, and hook', { concurrency: 1 }, () => {
         }
     });
 
-    test('getStats counts confirmed and false positives still waiting to send', async () => {
+    test('getStats counts confirmed and false-positive local corrections', async () => {
         FeedbackManager.init(harness.context);
-        await harness.context.globalState.update('dotenvy.feedback.entries', [
-            { user_action: 'confirmed_secret', sent: false },
-            { user_action: 'marked_false_positive', sent: false },
+        await harness.context.globalState.update('dotenvy.corrections.local.v1', [
+            { fingerprint: 'a', timestamp: new Date().toISOString(), label: 'high', user_action: 'confirmed_secret' },
+            { fingerprint: 'b', timestamp: new Date().toISOString(), label: 'false_positive', user_action: 'marked_false_positive' },
         ]);
         try {
             const stats = await FeedbackManager.getStats();
             assert.equal(stats.confirmed, 1);
             assert.equal(stats.falsePositives, 1);
-            assert.equal(stats.pending, 2);
             assert.equal(stats.total, 2);
         } finally {
-            await harness.context.globalState.update('dotenvy.feedback.entries', []);
+            await harness.context.globalState.update('dotenvy.corrections.local.v1', []);
         }
     });
 });

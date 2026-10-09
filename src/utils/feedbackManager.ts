@@ -1,185 +1,170 @@
-/**
- * FeedbackManager
- * ===============
- * Collects user feedback on secret detections.
- * Stores locally + sends to Railway server for model retraining.
- */
-
+/** Immediate local corrections and a separate opt-in numeric feedback queue. */
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { DetectedSecret } from './secretScannerTypes';
-import { FeatureExtractor } from './featureExtractor';
+import { CacheManager } from './cacheManager';
 import { LLMAnalyzer } from './llmAnalyzer';
+import { CommunitySample, validSample, wireSample } from './aegisClient';
+import { t } from '../i18n';
 import { logger } from './logger';
 
-export type UserAction   = 'confirmed_secret' | 'ignored_warning' | 'marked_false_positive';
-export type FeedbackLabel = 'high' | 'medium' | 'low' | 'false_positive';
-
 export interface FeedbackEntry {
-    id:                   string;
-    timestamp:            string;
-    secret_value:         string;     // already redacted
-    context:              string;
-    variable_name?:       string;
-    user_action:          UserAction;
-    label:                FeedbackLabel;
-    features:             number[];   // 35-element vector
-    original_confidence:  string;
-    file_type:            string;     // extension only
-    sent:                 boolean;
+    fingerprint: string;
+    timestamp: string;
+    user_action: 'confirmed_secret' | 'marked_false_positive';
+    label: 'high' | 'false_positive';
 }
 
 export class FeedbackManager {
-
-    private static readonly STORAGE_KEY = 'dotenvy.feedback.entries';
+    private static readonly STORAGE_KEY = 'dotenvy.corrections.local.v1';
     private static readonly MAX_ENTRIES = 500;
-    private static context: vscode.ExtensionContext;
+    private static readonly QUEUE_KEY = 'dotenvy.feedback.features.v3';
+    private static readonly CONSENT_KEY = 'dotenvy.community.consentPrompted.v1';
+    private static consentPending?: Promise<boolean>;
+    private static uploading?: Promise<void>;
+    private static context?: vscode.ExtensionContext;
+    private static saving: Promise<void> = Promise.resolve();
 
-    public static init(context: vscode.ExtensionContext): void {
-        FeedbackManager.context = context;
+    public static async init(context: vscode.ExtensionContext): Promise<void> {
+        this.context = context;
+        await context.globalState.update('dotenvy.feedback.entries', undefined);
+        await context.globalState.update('dotenvy.feedback.features.v2', undefined);
+        if (!LLMAnalyzer.isCommunityLearningEnabled()) { await this.clearQueue(); }
     }
 
-    // ─── Public API ────────────────────────────────────────────────────────────
-
-    /** Call when user clicks "Not a Secret" */
-    public static async recordFalsePositive(secret: DetectedSecret): Promise<void> {
-        await FeedbackManager.record(secret, 'marked_false_positive', 'false_positive');
+    private static fingerprint(sourceFile: string, variableName: string | undefined, valueDigest: string): string {
+        return crypto.createHash('sha256').update(JSON.stringify([sourceFile, variableName || '', valueDigest])).digest('hex');
     }
 
-    /** Call when user clicks "Move to .env" */
-    public static async recordConfirmed(secret: DetectedSecret): Promise<void> {
-        const label: FeedbackLabel =
-            secret.confidence === 'high'   ? 'high'   :
-            secret.confidence === 'medium' ? 'medium' : 'low';
-        await FeedbackManager.record(secret, 'confirmed_secret', label);
+    public static decision(sourceFile: string, variableName: string | undefined, valueDigest: string): FeedbackEntry['label'] | undefined {
+        const key = this.fingerprint(sourceFile, variableName, valueDigest);
+        return this.load().find(entry => entry.fingerprint === key)?.label;
     }
 
-    // ─── Core ──────────────────────────────────────────────────────────────────
+    public static async recordFalsePositive(secret: DetectedSecret): Promise<void> { await this.record(secret, 'false_positive'); }
+    public static async recordConfirmed(secret: DetectedSecret): Promise<void> { await this.record(secret, 'high'); }
 
-    private static async record(
-        secret: DetectedSecret,
-        action: UserAction,
-        label:  FeedbackLabel
-    ): Promise<void> {
-        if (!FeedbackManager.context) { return; }
-
-        try {
-            const variableName = FeedbackManager.extractVariableName(secret.context);
-            const features     = FeatureExtractor.extract(secret.content, secret.context, variableName);
-
-            const entry: FeedbackEntry = {
-                id:                  crypto.randomUUID(),
-                timestamp:           new Date().toISOString(),
-                secret_value:        secret.content,
-                context:             secret.context,
-                variable_name:       variableName,
-                user_action:         action,
-                label,
-                features,
-                original_confidence: secret.confidence,
-                file_type:           FeedbackManager.getExt(secret.file),
-                sent:                false,
-            };
-
-            await FeedbackManager.save(entry);
-            logger.info(`Feedback: ${action} → ${label}`, 'FeedbackManager');
-
-            // Non-blocking flush
-            FeedbackManager.flush().catch((_error) => {
-                logger.error('Failed to flush feedback', _error, 'FeedbackManager');
-            });
-
-        } catch (error) {
-            logger.error('Failed to record feedback', error, 'FeedbackManager');
-        }
+    private static load(): FeedbackEntry[] {
+        return this.context?.globalState.get<FeedbackEntry[]>(this.STORAGE_KEY, []) || [];
     }
 
-    // ─── Storage ───────────────────────────────────────────────────────────────
-
-    private static async save(entry: FeedbackEntry): Promise<void> {
-        const all = await FeedbackManager.load();
-        all.push(entry);
-        await FeedbackManager.context.globalState.update(
-            FeedbackManager.STORAGE_KEY,
-            all.slice(-FeedbackManager.MAX_ENTRIES)
-        );
-    }
-
-    private static async load(): Promise<FeedbackEntry[]> {
-        return FeedbackManager.context.globalState.get<FeedbackEntry[]>(
-            FeedbackManager.STORAGE_KEY, []
-        );
-    }
-
-    // ─── Flush to server ───────────────────────────────────────────────────────
-
-    public static async flush(): Promise<void> {
-        if (!FeedbackManager.context) { return; }
-
-        const all     = await FeedbackManager.load();
-        const pending = all.filter(e => !e.sent);
-        if (pending.length === 0) { return; }
-
-        try {
-            const analyzer = LLMAnalyzer.getInstance();
-            if (!analyzer.isConfigured()) { return; }
-
-            // Batch of 20
-            for (let i = 0; i < pending.length; i += 20) {
-                const batch = pending.slice(i, i + 20);
-                await analyzer.sendFeedback(batch.map(e => ({
-                    secret_value:  e.secret_value,
-                    context:       e.context,
-                    variable_name: e.variable_name,
-                    features:      e.features,
-                    user_action:   e.user_action,
-                    label:         e.label,
-                    timestamp:     e.timestamp,
-                })));
-                batch.forEach(e => { e.sent = true; });
+    private static async record(secret: DetectedSecret, label: FeedbackEntry['label']): Promise<void> {
+        if (!this.context || !secret.sourceFile || !secret.valueDigest) { return; }
+        const fingerprint = this.fingerprint(secret.sourceFile, secret.variableName, secret.valueDigest);
+        const operation = this.saving.then(async () => {
+            const all = this.load().filter(e => e.fingerprint !== fingerprint);
+            all.push({fingerprint, timestamp: new Date().toISOString(), label,
+                      user_action: label === 'high' ? 'confirmed_secret' : 'marked_false_positive'});
+            await this.context?.globalState.update(this.STORAGE_KEY, all.slice(-this.MAX_ENTRIES));
+            CacheManager.invalidateFileCache(secret.sourceFile!);
+            if (LLMAnalyzer.isCommunityLearningEnabled() && secret.features) {
+                const sample: CommunitySample = {id: crypto.randomUUID(), feature_schema: 2,
+                    features: [...secret.features], label, user_action: label === 'high' ? 'confirmed_secret' : 'marked_false_positive'};
+                if (validSample(sample)) {
+                    const queue = this.queue();
+                    queue.push(wireSample(sample));
+                    await this.context?.globalState.update(this.QUEUE_KEY, queue.slice(-this.MAX_ENTRIES));
+                }
             }
+        });
+        this.saving = operation.catch(() => {});
+        await operation;
+        void this.flush();
+    }
 
-            await FeedbackManager.context.globalState.update(
-                FeedbackManager.STORAGE_KEY, all
-            );
-
-            logger.info(`Feedback flushed: ${pending.length} entries`, 'FeedbackManager');
-
-        } catch (error) {
-            logger.warn(
-                `Feedback flush failed (will retry): ${error instanceof Error ? error.message : 'Unknown'}`,
-                'FeedbackManager'
-            );
+    /** The local action has already completed before the panel calls this. */
+    public static async offerAfterCorrection(secret: DetectedSecret, label: FeedbackEntry['label']): Promise<void> {
+        if (LLMAnalyzer.isCommunityLearningEnabled() || !secret.sourceFile || !secret.valueDigest || !secret.features) { return; }
+        const sample: CommunitySample = {id: crypto.randomUUID(), feature_schema: 2, features: [...secret.features],
+            label, user_action: label === 'high' ? 'confirmed_secret' : 'marked_false_positive'};
+        if (!validSample(sample)) { return; }
+        try {
+            if (!await this.requestCommunityConsent(false, true)) { return; }
+            const operation = this.saving.then(async () => {
+                // Share this explicitly consented correction only; never backfill local history.
+                if (!LLMAnalyzer.isCommunityLearningEnabled() ||
+                    this.decision(secret.sourceFile!, secret.variableName, secret.valueDigest!) !== label) { return; }
+                const queue = this.queue();
+                queue.push(wireSample(sample));
+                await this.context?.globalState.update(this.QUEUE_KEY, queue.slice(-this.MAX_ENTRIES));
+            });
+            this.saving = operation.catch(() => {});
+            await operation;
+            void this.flush();
+        } catch {
+            // An optional sharing/prompt failure must never undo a successful local action.
+            logger.warn('Community sharing unavailable; correction remains local.', 'FeedbackManager');
         }
     }
 
-    // ─── Stats ─────────────────────────────────────────────────────────────────
-
-    public static async getStats(): Promise<{
-        total: number; confirmed: number; falsePositives: number; pending: number;
-    }> {
-        const all = await FeedbackManager.load();
-        return {
-            total:          all.length,
-            confirmed:      all.filter(e => e.user_action === 'confirmed_secret').length,
-            falsePositives: all.filter(e => e.user_action === 'marked_false_positive').length,
-            pending:        all.filter(e => !e.sent).length,
-        };
+    public static async markCommunityChoice(): Promise<void> {
+        await this.context?.globalState.update(this.CONSENT_KEY, true);
     }
 
-    public static async clearAll(): Promise<void> {
-        await FeedbackManager.context.globalState.update(FeedbackManager.STORAGE_KEY, []);
+    public static async requestCommunityConsent(force = true, includeCurrent = false): Promise<boolean> {
+        if (!this.context) { return false; }
+        if (LLMAnalyzer.isCommunityLearningEnabled()) { return true; }
+        if (this.consentPending) { return this.consentPending; }
+        const config = vscode.workspace.getConfiguration('dotenvy');
+        if (!force && (this.context.globalState.get<boolean>(this.CONSENT_KEY, false) ||
+            config.inspect<boolean>('secrets.enableCommunityLearning')?.globalValue === false)) { return false; }
+        this.consentPending = (async () => {
+            // Remember display/dismissal too: do not ask again after every secret or restart.
+            await this.markCommunityChoice();
+            const enable = t('extension.community.enable');
+            const local = t('extension.community.keepLocal');
+            const answer = await vscode.window.showInformationMessage(t('extension.community.prompt'),
+                {modal: true, detail: t(includeCurrent ? 'extension.community.consentAfterCorrection' : 'extension.community.consent')},
+                enable, local);
+            if (answer !== enable) { return false; }
+            await config.update('secrets.enableCommunityLearning', true, vscode.ConfigurationTarget.Global);
+            return LLMAnalyzer.isCommunityLearningEnabled();
+        })().finally(() => { this.consentPending = undefined; });
+        return this.consentPending;
     }
 
-    // ─── Helpers ───────────────────────────────────────────────────────────────
-
-    private static extractVariableName(context: string): string | undefined {
-        const m = context.match(/(?:const|let|var)\s+(\w+)|(\w+)\s*[:=]/);
-        return m ? (m[1] || m[2]) : undefined;
+    private static queue(): CommunitySample[] {
+        return (this.context?.globalState.get<CommunitySample[]>(this.QUEUE_KEY, []) || []).filter(validSample).map(wireSample);
     }
 
-    private static getExt(filePath: string): string {
-        const parts = filePath.split('.');
-        return parts.length > 1 ? `.${parts[parts.length - 1]}` : 'unknown';
+    public static flush(): Promise<void> {
+        if (this.uploading) { return this.uploading; }
+        this.uploading = (async () => {
+            try {
+                await this.saving;
+                if (!LLMAnalyzer.isCommunityLearningEnabled()) { return; }
+                const batch = this.queue().slice(0, 20);
+                if (!batch.length) { return; }
+                const ids = await LLMAnalyzer.getInstance().sendFeedback(batch);
+                const operation = this.saving.then(async () => {
+                    const remaining = this.queue().filter(sample => !ids.includes(sample.id));
+                    await this.context?.globalState.update(this.QUEUE_KEY, remaining);
+                });
+                this.saving = operation.catch(() => {});
+                await operation;
+            } catch { /* Keep stable IDs for a later acknowledged retry. */ }
+        })().finally(() => {this.uploading = undefined;});
+        return this.uploading;
+    }
+
+    public static async clearQueue(): Promise<void> {
+        const operation = this.saving.then(() => this.context?.globalState.update(this.QUEUE_KEY, undefined));
+        this.saving = operation.then(() => {}, () => {});
+        await operation;
+    }
+
+    public static async getStats() {
+        const all = this.load();
+        return {total: all.length, falsePositives: all.filter(e => e.label === 'false_positive').length,
+                confirmed: all.filter(e => e.label === 'high').length};
+    }
+
+    public static async clear(): Promise<void> {
+        const operation = this.saving.then(async () => {
+            await this.context?.globalState.update(this.STORAGE_KEY, undefined);
+            CacheManager.clearCache();
+        });
+        this.saving = operation.catch(() => {});
+        await operation;
     }
 }

@@ -10,7 +10,9 @@
   "config.history.autoCleanup": "Automatically clean up old history entries.",
   "config.cloudSync.encryptCloudSync": "Encrypt secrets before syncing to cloud (End-to-End Encryption).",
   "config.cloudSync.provider": "Cloud provider to sync secrets with.",
+  "config.secrets.enableCloudAnalysis": "Legacy setting; ignored. Classification is local. Use community learning to share numeric corrections.",
   "command.scanSecrets": "DotEnvy: Scan for Secrets",
+  "command.toggleCloudAnalysis": "DotEnvy: Toggle AI Cloud Secret Analysis",
   "command.switchEnvironment": "DotEnvy: Switch Environment",
   "command.initDotenvyIgnore": "DotEnvy: Init .dotenvyignore",
   "command.addToIgnore": "DotEnvy: Ignore this path",
@@ -40,5 +42,10 @@
   "command.openTrashBin": "DotEnvy: Open Session Trash Bin",
   "views.container.title": "DotEnvy",
   "views.environments.name": "Environment Switcher",
-  "views.commands.name": "Secure Commands"
+  "views.commands.name": "Secure Commands",
+  "config.secrets.cloudAnalysisDeprecated": "Legacy setting; ignored. Classification is local. Use community learning to share numeric corrections.",
+  "command.resetSecretCorrections": "DotEnvy: Reset Local Secret Corrections",
+  "command.toggleCommunityLearning": "DotEnvy: Toggle Community Learning (Numeric Feedback)",
+  "config.secrets.enableCommunityLearning": "Help improve DotAegis? New secret confirmations and false-positive corrections will send 35 numeric properties and your chosen label, authenticated with a device ID. Keys, code, file paths, variable names and fingerprints are never sent. The server retains these properties for review and shared model training; they are not guaranteed anonymous. Previous local corrections are not uploaded.",
+  "config.secrets.enableModelUpdates": "Download shared inference weights from DotAegis at startup and hourly. Only a release request/revision is sent, never scanner inputs. Disable along with community learning for an offline scanner."
 }

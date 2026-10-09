@@ -10,7 +10,9 @@
   "config.history.autoCleanup": "Pulizia automatica delle voci di cronologia obsolete.",
   "config.cloudSync.encryptCloudSync": "Cifra i secret prima della sincronizzazione cloud (crittografia end-to-end).",
   "config.cloudSync.provider": "Provider cloud per la sincronizzazione dei secret.",
+  "config.secrets.enableCloudAnalysis": "Impostazione obsoleta ignorata. Classificazione locale; apprendimento opzionale per correzioni numeriche.",
   "command.scanSecrets": "DotEnvy: Scansiona secret",
+  "command.toggleCloudAnalysis": "DotEnvy: Attiva/Disattiva analisi cloud IA dei segreti",
   "command.switchEnvironment": "DotEnvy: Cambia ambiente",
   "command.initDotenvyIgnore": "DotEnvy: Init .dotenvyignore",
   "command.addToIgnore": "DotEnvy: Ignora questo percorso",
@@ -40,5 +42,10 @@
   "command.openTrashBin": "DotEnvy: Apri cestino sessione",
   "views.container.title": "DotEnvy",
   "views.environments.name": "Cambio ambiente",
-  "views.commands.name": "Comandi sicuri"
+  "views.commands.name": "Comandi sicuri",
+  "config.secrets.cloudAnalysisDeprecated": "Impostazione obsoleta ignorata. Classificazione locale; apprendimento opzionale per correzioni numeriche.",
+  "command.resetSecretCorrections": "DotEnvy: Cancella correzioni locali dei segreti",
+  "command.toggleCommunityLearning": "DotEnvy: Attiva/disattiva apprendimento comunitario",
+  "config.secrets.enableCommunityLearning": "Migliorare DotAegis? Le nuove conferme e correzioni inviano 35 proprietà numeriche e una etichetta con un ID di installazione. Chiavi, codice, percorsi, nomi e impronte non vengono inviati. Il server conserva le proprietà per revisione e addestramento condiviso; non sono garantite anonime. Le correzioni precedenti non vengono caricate.",
+  "config.secrets.enableModelUpdates": "Scarica pesi da DotAegis all’avvio e ogni ora. Solo richiesta/revisione, mai dati di scansione. Disattiva anche l’apprendimento per modalità offline."
 }

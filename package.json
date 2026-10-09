@@ -31,7 +31,7 @@
       ]
     }
   ],
-  "version": "2.2.3",
+  "version": "2.2.4",
   "icon": "resources/icons/icon.png",
   "publisher": "FreeRave",
   "author": "Kareem Ehab",
@@ -138,6 +138,24 @@
             "aws"
           ],
           "description": "%config.cloudSync.provider%"
+        },
+        "dotenvy.secrets.enableCloudAnalysis": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.secrets.enableCloudAnalysis%",
+          "deprecationMessage": "%config.secrets.cloudAnalysisDeprecated%"
+        },
+        "dotenvy.secrets.enableCommunityLearning": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.secrets.enableCommunityLearning%",
+          "scope": "application"
+        },
+        "dotenvy.secrets.enableModelUpdates": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.secrets.enableModelUpdates%",
+          "scope": "application"
         }
       }
     },
@@ -169,11 +187,6 @@
         "command": "dotenvy.openVariableManager",
         "title": "%command.openVariableManager%",
         "icon": "$(edit)"
-      },
-      {
-        "command": "dotenvy.setupLLMSecret",
-        "title": "%command.setupLLMSecret%",
-        "icon": "$(key)"
       },
       {
         "command": "dotenvy.validateEnvironment",
@@ -269,6 +282,15 @@
         "command": "dotenvy.openTrashBin",
         "title": "%command.openTrashBin%",
         "icon": "$(trash)"
+      },
+      {
+        "command": "dotenvy.resetSecretCorrections",
+        "title": "%command.resetSecretCorrections%",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "dotenvy.toggleCommunityLearning",
+        "title": "%command.toggleCommunityLearning%"
       }
     ],
     "viewsContainers": {
@@ -297,12 +319,7 @@
       ]
     },
     "menus": {
-      "commandPalette": [
-        {
-          "command": "dotenvy.setupLLMSecret",
-          "when": "false"
-        }
-      ],
+      "commandPalette": [],
       "view/title": [
         {
           "command": "dotenvy.openVariableManager",

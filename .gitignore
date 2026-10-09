@@ -139,3 +139,7 @@ test/**
 
 # --- Articles (local drafts, not published) ---
 articles/
+
+!test/e2e-community-learning.js
+!test/e2e-community-consent.js
+!test/e2e-init-actions.js

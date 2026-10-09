@@ -247,12 +247,24 @@ DEBUG=false
             }
 
             case 'initSecureProject':
-                await vscode.commands.executeCommand('dotenvy.initSecureProject');
-                await host.refreshEnvironments();
+                try {
+                    await vscode.commands.executeCommand('dotenvy.initSecureProject');
+                    await host.refreshEnvironments();
+                } catch (error) {
+                    const { showSyncToast } = await import('../utils/panelNotification');
+                    const { t } = await import('../i18n');
+                    showSyncToast(t('initSecure.error', { message: (error as Error).message }), 'error');
+                }
                 break;
 
             case 'initDotenvyIgnore':
-                await vscode.commands.executeCommand('dotenvy.initDotenvyIgnore');
+                try {
+                    await vscode.commands.executeCommand('dotenvy.initDotenvyIgnore');
+                } catch (error) {
+                    const { showSyncToast } = await import('../utils/panelNotification');
+                    const { t } = await import('../i18n');
+                    showSyncToast(t('initIgnore.error', { message: (error as Error).message }), 'error');
+                }
                 break;
 
             case 'openWorkspace':

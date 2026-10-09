@@ -14,7 +14,7 @@ export class InitDotenvyIgnoreCommand implements vscode.Disposable {
     constructor() {
         this.commandDisposable = vscode.commands.registerCommand(
             'dotenvy.initDotenvyIgnore',
-            () => { this.execute(); }
+            () => this.execute()
         );
     }
 
@@ -22,36 +22,24 @@ export class InitDotenvyIgnoreCommand implements vscode.Disposable {
         showActionStart(t('initIgnore.actionStart'));
 
         const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) {
+        if (!workspaceFolders?.length) {
             showSyncToast(t('common.noWorkspace'), 'error');
             return;
         }
 
-        const rootPath = workspaceFolders[0].uri.fsPath;
-
-        if (DotenvyIgnore.exists(rootPath)) {
+        try {
+            const rootPath = workspaceFolders[0].uri.fsPath;
+            const created = DotenvyIgnore.createDefault(rootPath);
             const uri = vscode.Uri.joinPath(workspaceFolders[0].uri, DotenvyIgnore.FILENAME);
             const doc = await vscode.workspace.openTextDocument(uri);
             await vscode.window.showTextDocument(doc);
-            showSyncToast(
-                t('initIgnore.alreadyExists'),
-                'info'
-            );
-            return;
-        }
-
-        const created = DotenvyIgnore.createDefault(rootPath);
-
-        if (created) {
-            const uri = vscode.Uri.joinPath(workspaceFolders[0].uri, DotenvyIgnore.FILENAME);
-            const doc = await vscode.workspace.openTextDocument(uri);
-            await vscode.window.showTextDocument(doc);
-
-            logger.info(`${DotenvyIgnore.FILENAME} created`, 'InitDotenvyIgnore');
-            showSyncToast(
-                t('initIgnore.created'),
-                'success'
-            );
+            if (created) {
+                logger.info(`${DotenvyIgnore.FILENAME} created`, 'InitDotenvyIgnore');
+            }
+            showSyncToast(t(created ? 'initIgnore.created' : 'initIgnore.alreadyExists'), created ? 'success' : 'info');
+        } catch (error) {
+            logger.error('Could not initialize ignore file', error, 'InitDotenvyIgnore');
+            showSyncToast(t('initIgnore.error', { message: (error as Error).message }), 'error');
         }
     }
 

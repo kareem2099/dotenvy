@@ -10,7 +10,9 @@
   "config.history.autoCleanup": "تنظيف إدخالات السجل القديمة تلقائياً.",
   "config.cloudSync.encryptCloudSync": "تشفير الأسرار قبل مزامنتها مع السحابة (تشفير طرف إلى طرف E2EE).",
   "config.cloudSync.provider": "المزود السحابي لمزامنة الأسرار معه.",
+  "config.secrets.enableCloudAnalysis": "إعداد قديم لا يُستخدم. التصنيف محلي. التعلم الجماعي يشارك التصحيحات الرقمية فقط.",
   "command.scanSecrets": "DotEnvy: فحص الأسرار والبيانات الحساسة",
+  "command.toggleCloudAnalysis": "DotEnvy: تبديل التحليل السحابي الذكي للأسرار",
   "command.switchEnvironment": "DotEnvy: تبديل البيئة",
   "command.initDotenvyIgnore": "DotEnvy: إنشاء .dotenvyignore",
   "command.addToIgnore": "DotEnvy: تجاهل هذا المسار",
@@ -40,5 +42,10 @@
   "command.openTrashBin": "DotEnvy: فتح سلة مهملات الجلسة",
   "views.container.title": "DotEnvy",
   "views.environments.name": "مبدّل البيئات",
-  "views.commands.name": "الأوامر الآمنة"
+  "views.commands.name": "الأوامر الآمنة",
+  "config.secrets.cloudAnalysisDeprecated": "إعداد قديم لا يُستخدم. التصنيف محلي. التعلم الجماعي يشارك التصحيحات الرقمية فقط.",
+  "command.resetSecretCorrections": "DotEnvy: مسح التصحيحات المحلية للأسرار",
+  "command.toggleCommunityLearning": "DotEnvy: تبديل التعلم الجماعي (تصحيحات رقمية)",
+  "config.secrets.enableCommunityLearning": "تساعد في تحسين DotAegis؟ التأكيدات والتصحيحات الجديدة سترسل ٣٥ خاصية رقمية والتصنيف الذي اخترته، مع هوية تثبيت للمصادقة. لا نرسل المفاتيح أو الكود أو مسار الملفات أو اسم المتغير أو البصمة. السيرفر يحتفظ بالخصائص للمراجعة وتدريب النموذج المشترك؛ ليست مضمونة إخفاء الهوية. التصحيحات المحلية السابقة لن تُرسل.",
+  "config.secrets.enableModelUpdates": "تنزيل أوزان النموذج المشترك من DotAegis عند البدء وكل ساعة. يُرسل طلب الإصدار فقط دون بيانات الفحص. أوقف هذا الإعداد والتعلم الجماعي للفحص دون شبكة."
 }
