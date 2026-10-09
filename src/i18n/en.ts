@@ -486,4 +486,9 @@ export const en = {
 	'secretsScanner.methodAi': '🤖 AI + Pattern',
 	'secretsScanner.methodPattern': '🔎 Pattern',
 	'secretsScanner.methodStatistical': '📊 Statistical',
+	'secretsScanner.hintLocal': '🔒 Local Mode: Secret detection is running 100% on your machine. Cloud AI analysis is disabled.',
+	'extension.cloudAnalysis.consentPrompt': 'DotEnvy Cloud Secret Analysis sends candidates and sanitized context to DotSuite Aegis for analysis. Feedback stores numeric features for administrator review; raw keys and source code are not retained. Do you want to enable cloud analysis?',
+	'extension.cloudAnalysis.enableBtn': 'Enable Cloud Analysis',
+	'extension.cloudAnalysis.enabledMsg': 'DotEnvy: Cloud secret analysis enabled.',
+	'extension.cloudAnalysis.disabledMsg': 'DotEnvy: Cloud secret analysis disabled. Scanning runs 100% locally.',
 } as const;

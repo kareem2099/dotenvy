@@ -21,6 +21,8 @@ const assert = require('assert');
 
 // ─── Setup Temporary Workspace ────────────────────────────────────────────────
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dotenvy-test-'));
+// Confine backup writes and test cleanup to this isolated workspace.
+os.homedir = () => tempDir;
 const tempEnvFile = path.join(tempDir, '.env');
 fs.writeFileSync(tempEnvFile, 'API_KEY=initial-secret-value-12345\nDB_PASS=super-secure-db-password\n', 'utf8');
 

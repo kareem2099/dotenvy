@@ -474,4 +474,9 @@ export const it: Record<keyof typeof en, string> = {
 	'secretsScanner.methodAi': '🤖 IA + Pattern',
 	'secretsScanner.methodPattern': '🔎 Pattern',
 	'secretsScanner.methodStatistical': '📊 Statistico',
+	'secretsScanner.hintLocal': '🔒 Modalità locale: La scansione dei segreti viene eseguita al 100% sulla macchina locale. L\'analisi IA su cloud è disabilitata.',
+	'extension.cloudAnalysis.consentPrompt': 'L\'analisi cloud di DotEnvy utilizza DotSuite Aegis per verificare i potenziali segreti tramite IA senza conservare chiavi o codice sorgente. Il feedback conserva caratteristiche numeriche per la revisione amministrativa. Vuoi abilitare l\'analisi cloud?',
+	'extension.cloudAnalysis.enableBtn': 'Abilita',
+	'extension.cloudAnalysis.enabledMsg': 'DotEnvy: Analisi cloud dei segreti abilitata.',
+	'extension.cloudAnalysis.disabledMsg': 'DotEnvy: Analisi cloud disabilitata. La scansione è al 100% locale.',
 };

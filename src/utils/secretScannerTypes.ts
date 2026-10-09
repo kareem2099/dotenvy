@@ -15,6 +15,12 @@ export interface DetectedSecret {
     riskScore: number;
     detectionMethod: string;
     reasoning: string[];
+    /** Numeric properties of the ORIGINAL value, safe to use for feedback. */
+    features?: number[];
+    sourceFile?: string;
+    valueLength?: number;
+    valueDigest?: string;
+    variableName?: string;
 }
 
 export interface ScanProgress {

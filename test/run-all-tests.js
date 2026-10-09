@@ -9,6 +9,7 @@ const { spawnSync } = require('child_process');
 const path = require('path');
 
 const testSuites = [
+    { name: 'Security and Feedback Regressions', file: 'e2e-security-regressions.js' },
     { name: 'Encryption Algorithms & PBKDF2 Standalone', file: 'encryption-test-standalone.js' },
     { name: 'L1–L4 Multi-Layer AI Scanner & HMAC Logic', file: 'e2e-llm-logic.js' },
     { name: 'Master Key Lifecycle, Password Migration & Backups', file: 'e2e-master-key-and-backup.js' }

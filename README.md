@@ -1,7 +1,7 @@
 # dotenvy – VS Code Environment Manager
 
-[![Version](https://img.shields.io/badge/version-2.2.1-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
-[![Codename](https://img.shields.io/badge/codename-Aegis-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.2.1)
+[![Version](https://img.shields.io/badge/version-2.2.2-blue.svg)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Codename](https://img.shields.io/badge/codename-Aegis-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.2.2)
 [![Publisher](https://img.shields.io/badge/publisher-FreeRave-red.svg)](https://marketplace.visualstudio.com/publishers/FreeRave)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![VS Code Marketplace](https://img.shields.io/badge/vscode-marketplace-007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
@@ -87,20 +87,22 @@ Production-grade secret detection powered by a **custom ML model** with HMAC-sec
 
 #### Key Engine Features:
 - **🔐 OS-Encrypted Secret Storage** — Shared secret stored in VS Code SecretStorage (Keychain / libsecret / Credential Manager), never in the compiled bundle
-- **35-Feature ML Model (fixed)** — Feature count corrected from 31 → 35, entropy normalization fixed to match Python backend exactly
+- **35-Feature ML Model (fixed)** — Feature count corrected from 31 → 35, entropy normalization verified against shared Python/TypeScript fixtures
 - **📋 Secrets Panel** — Full WebviewPanel shows all detected secrets (no more 5-item cap) with filter by confidence, search, View / Move to .env / Not a Secret buttons
-- **🧠 AI Training Feedback** — "Not a Secret" and "Move to .env" send labeled training samples to the Railway model — it learns from your corrections
+- **🧠 Reviewed AI Feedback** — "Not a Secret" and "Move to .env" record numeric properties of the original candidate. With cloud analysis enabled, observations enter an administrator review queue before training.
 - **🚫 .dotenvyignore** — New file (same syntax as `.gitignore`) lets you exclude files and folders from secret scanning
 - **📝 Centralized Logging** — All extension logs visible in VS Code Output panel → DotEnvy
 - **🔄 Smart Fallback** — Local fallback analysis uses all 35 features including variable name signals (e.g. `DB_PASS` increases risk even with low entropy)
 
 ### 🔒 Data Privacy & Security (Secrets Guard)
-We take your code's security seriously. Here is exactly how DotEnvy handles your data during AI secret scanning:
+We take your code's privacy and security with absolute seriousness:
 
-* **Targeted Analysis:** DotEnvy does NOT upload your entire workspace. Only the specific line containing a suspected secret (and its immediate surrounding context) is sent to our LLM engine for verification.
-* **Zero Retention (Ephemeral Processing):** The `secret_value` and `context` sent for analysis are processed exclusively in-memory. **We do not store, log, or save your source code or secrets on our servers.**
-* **Opt-in Model Training:** We only use data to train our ML models when you explicitly provide feedback (e.g., clicking "Not a Secret" or "Move to .env"). This sends 35 anonymized numerical features and your action label.
-* **Secure Communication:** All API requests are strictly authenticated using a unique `X-Machine-ID` and an HMAC `X-Extension-Signature` to prevent abuse and secure data in transit.
+* **100% Local-First by Default:** All scanning (L1 Regex patterns, L2 Community Blacklist, and L3 Shannon Entropy) runs entirely on your local machine. By default, **zero candidate values or code snippets ever leave your computer**.
+* **Strict Opt-In for Cloud AI (`dotenvy.secrets.enableCloudAnalysis`):** Remote AI verification via DotSuite Aegis (`aegis.dotsuite.dev`) is completely disabled by default (`default: false`). It only activates if you explicitly enable it in Settings or run `DotEnvy: Toggle AI Cloud Secret Analysis`.
+* **Transient Candidate Processing:** Cloud analysis sends a candidate and sanitized context for analysis. Raw keys and code are not retained in analysis logs or feedback checkpoints. Numeric feedback features and device registration metadata are retained; this is not a zero-data-retention promise.
+* **Transparent Regex Patterns:** All secret pattern definitions across DotEnvy are 100% open, transparent, and non-obfuscated regular expressions.
+* **Opt-in Model Feedback:** Training telemetry is strictly dormant when cloud analysis is disabled, and only numeric feature vectors and action labels are submitted when you confirm a secret or mark a false positive. Numeric properties are not claimed to be anonymous.
+* **Secure Communication:** When cloud analysis is active, all API requests are strictly authenticated using HMAC `X-Extension-Signature`.
 
 ---
 
@@ -128,7 +130,8 @@ All commands are accessible via the Command Palette (`Ctrl+Shift+P` / `⌘+Shift
 - **`DotEnvy: Push Environment to Cloud`** — Push to Doppler
 
 ### 🔍 Security
-- **`DotEnvy: Scan for Secrets`** — Scan workspace with AI-powered detection; opens Secrets Panel with all findings
+- **`DotEnvy: Scan for Secrets`** — Scan workspace for secrets (runs 100% locally by default)
+- **`DotEnvy: Toggle AI Cloud Secret Analysis`** — Enable or disable remote AI verification (opt-in with consent)
 - **`DotEnvy: Init .dotenvyignore`** — Create a pre-populated `.dotenvyignore` file
 - **`DotEnvy: Setup LLM Secret`** — Store the HMAC shared secret securely in OS vault
 
@@ -272,3 +275,26 @@ Special thanks to **[@FaberVi](https://github.com/FaberVi)** for authoring the I
 ## 📜 License
 
 This project is licensed under the Apache License, Version 2.0 - see the [LICENSE](LICENSE) file for details.
+## Secret analysis protocol 2 (v2.2.3)
+
+- Detection keeps only a redacted display value, sanitized context, a source
+  location/digest, and 35 original-value features. Feedback storage never keeps
+  raw keys or source context; legacy queues containing context are purged.
+- "Move to .env" re-reads the source document and checks its digest before
+  writing the original value. Changed/stale detections and conflicting existing
+  environment values are rejected. The webview never receives plaintext keys.
+- Confirmed secrets receive a positive training label even when the previous
+  prediction was low. Concurrent records and uploads preserve new entries;
+  only sample IDs acknowledged by Aegis are marked sent.
+- Community fingerprints cover the complete value, use SHA-256, and are isolated
+  from legacy prefix hashes. Promotion requires administrator review in Aegis;
+  a community hit is not proof that a credential was leaked or remains active.
+- Lost cloud credentials start a new random installation identity. Existing
+  identities cannot be re-registered or reactivated without ownership proof.
+- Compatible backend: DotAegis 2.2.3+ with feature schema 2. Offline scanning and
+  cloud-disabled operation continue locally.
+
+Validation: `npm ci`, `npm run compile`, `npm run lint`, and
+`node test/run-all-tests.js`. The security suite covers privacy, feature parity,
+acknowledged retries, concurrent feedback, full-value hashes, original-value
+.env writes, and stale detection rejection.

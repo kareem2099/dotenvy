@@ -457,4 +457,9 @@ export const ru: Record<keyof typeof en, string> = {
 	'secretsScanner.methodAi': '🤖 ИИ + Паттерны',
 	'secretsScanner.methodPattern': '🔎 Паттерн',
 	'secretsScanner.methodStatistical': '📊 Статистический',
+	'secretsScanner.hintLocal': '🔒 Локальный режим: Сканирование секретов работает на 100% на вашей машине. Облачный ИИ-анализ выключен.',
+	'extension.cloudAnalysis.consentPrompt': 'Облачный анализ DotEnvy использует DotSuite Aegis для проверки секретов через ИИ без хранения исходных ключей и кода. Числовые признаки обратной связи сохраняются для проверки администратором. Включить облачный анализ?',
+	'extension.cloudAnalysis.enableBtn': 'Включить',
+	'extension.cloudAnalysis.enabledMsg': 'DotEnvy: Облачный анализ секретов включен.',
+	'extension.cloudAnalysis.disabledMsg': 'DotEnvy: Облачный анализ выключен. Сканирование работает на 100% локально.',
 };

@@ -457,4 +457,9 @@ export const ar: Record<keyof typeof en, string> = {
 	'secretsScanner.methodAi': '🤖 ذكاء اصطناعي + أنماط',
 	'secretsScanner.methodPattern': '🔎 نمط',
 	'secretsScanner.methodStatistical': '📊 إحصائي',
+	'secretsScanner.hintLocal': '🔒 الوضع المحلي: فحص الأسرار يعمل محلياً بالكامل على جهازك. التحليل السحابي الذكي معطل.',
+	'extension.cloudAnalysis.consentPrompt': 'يرسل التحليل السحابي القيم المرشحة وسياقاً منقحاً إلى DotSuite Aegis للتحليل. تُحفظ خصائص رقمية للملاحظات لمراجعتها، دون الاحتفاظ بالمفاتيح الأصلية أو الكود. هل تريد تفعيل التحليل السحابي؟',
+	'extension.cloudAnalysis.enableBtn': 'تفعيل التحليل السحابي',
+	'extension.cloudAnalysis.enabledMsg': 'DotEnvy: تم تفعيل التحليل السحابي للأسرار.',
+	'extension.cloudAnalysis.disabledMsg': 'DotEnvy: تم تعطيل التحليل السحابي. يعمل الفحص محلياً بنسبة 100%.',
 };

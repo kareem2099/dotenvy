@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.3] - 2026-10-09
+
+### Fixed
+- Capture features from original candidates instead of redacted display strings; consistently label user confirmations as positive evidence.
+- Remove keys and code context from persistent feedback; purge legacy raw-context queues and clarify cloud data retention in all consent translations.
+- Serialize feedback writes and uploads, preserve concurrent additions, and mark only server-acknowledged sample IDs as sent.
+- Re-read and verify original source values before writing .env; reject stale detections, conflicting values, and forged webview payloads.
+- Use full-value SHA-256 community fingerprints and v2 blacklist sync; report false positives with the correct original fingerprint.
+- Support new installation identities after lost credentials; retain existing registered-device identities.
+
+### Validation
+- Add privacy, Python/TypeScript feature parity, acknowledgment/retry, concurrency, and source-value regression tests.
+- Make existing LLM tests fail the process on failed assertions and isolate backup tests from real user backups.
+- Compatible with DotAegis 2.2.3 feature-only feedback and administrator-reviewed learning.
+
+## [2.2.2] - 2026-09-26
+
+### 🛡️ Privacy-First Local Architecture, Explicit Opt-In Cloud Analysis & Regex Transparency
+
+- **100% Local-First Scanning by Default**: All secret scanning layers (L1 Regex patterns, L2 Local Blacklist, L3 Shannon Entropy, and L4 Heuristic fallback) run exclusively on the local machine by default. Zero code or candidate secret data is transmitted externally.
+- **Explicit Cloud Analysis Opt-In (`dotenvy.secrets.enableCloudAnalysis`)**: Remote AI verification via DotSuite Aegis (`aegis.dotsuite.dev`) is now strictly disabled by default (`default: false`). It requires explicit opt-in via VS Code settings or the new interactive consent command (`DotEnvy: Toggle AI Cloud Secret Analysis`).
+- **Complete Reversal of Regex Obfuscation**: Eliminated all dynamic string assembly (`.join('')`) across `llmAnalyzer.ts`, `patternRegistry.ts`, and `featureExtractor.ts`. All detection rules are now 100% transparent, plain, and fully inspectable regex literals.
+- **Offline Startup & Lifecycle Isolation**: Startup initialization and device handshakes are completely isolated and skipped when cloud analysis is disabled. Zero background requests occur upon extension activation.
+- **Gated Feedback & Sync**: Community blacklist synchronization and feedback telemetry are strictly dormant unless cloud analysis is explicitly enabled.
+- **In-Editor Transparency Indicators**: Secrets scanner panel displays a clear privacy badge indicating whether the scan ran in 100% Local Mode or Opt-In Cloud Mode.
+
 ## [2.2.1] - 2026-09-24
 
 ### 🌐 Full Arabic (`ar`) & Russian (`ru`) Localization + Factory Function Decoupling

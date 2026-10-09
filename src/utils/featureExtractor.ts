@@ -40,13 +40,12 @@ export const NUM_FEATURES = 35;
  */
 const SECRET_PATTERNS: [RegExp, number, string][] = [
     [/^sk-[a-zA-Z0-9]{20,}/,                                              1.0, 'stripe_secret'  ],
-    [/^pk_live_[a-zA-Z0-9]{20,}/,                                         1.0, 'stripe_public'  ],
-    [new RegExp('^' + ['A', 'KIA', '[A-Z0-9]{16}'].join('')),             1.0, 'aws_access_key' ],
-    [new RegExp('^' + ['g', 'hp_', '[a-zA-Z0-9]{36}'].join('')),          1.0, 'github_pat'     ],
-    [new RegExp('^' + ['g', 'ho_', '[a-zA-Z0-9]{36}'].join('')),          1.0, 'github_oauth'   ],
+    [/^AKIA[A-Z0-9]{16}/,                                                 1.0, 'aws_access_key' ],
+    [/^ghp_[a-zA-Z0-9]{36}/,                                              1.0, 'github_pat'     ],
+    [/^gho_[a-zA-Z0-9]{36}/,                                              1.0, 'github_oauth'   ],
     [/^xox[baprs]-[a-zA-Z0-9-]+/,                                          1.0, 'slack_token'    ],
     [/^SG\.[a-zA-Z0-9\-_]{22,}/,                                           1.0, 'sendgrid'       ],
-    [new RegExp('^' + ['AI', 'za', '[0-9A-Za-z\\-_]{35}'].join('')),      1.0, 'google_api'     ],
+    [/^AIza[0-9A-Za-z\-_]{35}/,                                           1.0, 'google_api'     ],
     [/^ya29\.[0-9A-Za-z\-_]+/,                                             0.9, 'google_oauth'   ],
     [/^eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+$/,           1.0, 'jwt'            ],
     [/^-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY/m,                       1.0, 'private_key'    ],
@@ -89,7 +88,7 @@ export class FeatureExtractor {
             .trim();
 
         const f: number[] = [];
-        const len  = secret.length;
+        const len  = Array.from(secret).length;
         const ctx  = context.toLowerCase();
         const vn   = (variableName ?? '').toLowerCase();
 
@@ -146,7 +145,7 @@ export class FeatureExtractor {
         // 14: known pattern match score (float, not just 0/1)
         let bestScore = 0.0;
         for (const [pattern, score] of SECRET_PATTERNS) {
-            if (pattern.test(secret) && score > bestScore) {
+            if (new RegExp(pattern.source, 'im').test(secret) && score > bestScore) {
                 bestScore = score;
             }
         }
@@ -159,7 +158,7 @@ export class FeatureExtractor {
         f.push(isHexString(secret) ? 1.0 : 0.0);
 
         // 17: known prefix
-        const KNOWN_PREFIXES = ['sk-','pk_','A' + 'KIA','g' + 'hp_','xox','SG.','AI' + 'za','ya29.'];
+        const KNOWN_PREFIXES = ['sk-','pk_','AKIA','ghp_','xox','SG.','AIza','ya29.'];
         f.push(KNOWN_PREFIXES.some(p => secret.startsWith(p)) ? 1.0 : 0.0);
 
         // 18: base64 padding  →  endswith(('==','='))
@@ -202,7 +201,7 @@ export class FeatureExtractor {
         f.push(variableName && variableName.includes('_') ? 1.0 : 0.0);
 
         // 29: var name length  →  0.0 if not variable_name else min(1.0, len(variable_name)/30)
-        f.push(!variableName ? 0.0 : Math.min(1.0, variableName.length / 30.0));
+        f.push(!variableName ? 0.0 : Math.min(1.0, Array.from(variableName).length / 30.0));
 
         // ── GROUP 6: Structural analysis (5 features) [30–34] ────────────────
 
@@ -251,7 +250,7 @@ function shannonEntropy(text: string): number {
     if (!text) { return 0.0; }
     const freq: Record<string, number> = {};
     for (const c of text) { freq[c] = (freq[c] ?? 0) + 1; }
-    const n = text.length;
+    const n = Array.from(text).length;
     let h = 0;
     for (const v of Object.values(freq)) {
         const p = v / n;
@@ -265,13 +264,14 @@ function shannonEntropy(text: string): number {
  * Mirrors _ngram_entropy() / _bigram_entropy() / _trigram_entropy().
  */
 function ngramEntropy(text: string, n: number): number {
-    if (text.length < n) { return 0.0; }
+    const chars = Array.from(text);
+    if (chars.length < n) { return 0.0; }
     const freq: Record<string, number> = {};
-    for (let i = 0; i <= text.length - n; i++) {
-        const gram = text.slice(i, i + n);
+    for (let i = 0; i <= chars.length - n; i++) {
+        const gram = chars.slice(i, i + n).join('');
         freq[gram] = (freq[gram] ?? 0) + 1;
     }
-    const total = text.length - n + 1;
+    const total = chars.length - n + 1;
     let h = 0;
     for (const v of Object.values(freq)) {
         const p = v / total;
@@ -286,10 +286,11 @@ function ngramEntropy(text: string, n: number): number {
  */
 function maxRunLength(text: string): number {
     if (!text) { return 0; }
+    const chars = Array.from(text);
     let maxRun = 1;
     let curRun = 1;
-    for (let i = 1; i < text.length; i++) {
-        if (text[i] === text[i - 1]) {
+    for (let i = 1; i < chars.length; i++) {
+        if (chars[i] === chars[i - 1]) {
             curRun++;
             if (curRun > maxRun) { maxRun = curRun; }
         } else {
@@ -309,11 +310,12 @@ function maxRunLength(text: string): number {
  *   level       = min(1.0, mean / 4.0)
  */
 function localEntropyVariance(text: string, window = 8): number {
-    if (text.length < window) { return 0.0; }
+    const chars = Array.from(text);
+    if (chars.length < window) { return 0.0; }
 
     const entropies: number[] = [];
-    for (let i = 0; i <= text.length - window; i++) {
-        entropies.push(shannonEntropy(text.slice(i, i + window)));
+    for (let i = 0; i <= chars.length - window; i++) {
+        entropies.push(shannonEntropy(chars.slice(i, i + window).join('')));
     }
     if (entropies.length === 0) { return 0.0; }
 
@@ -355,18 +357,19 @@ function isHexString(text: string): boolean {
  *   switches / (len * 0.35)  capped at 1.0
  */
 function alternatingAlphaDigitScore(text: string): number {
-    if (text.length < 8) { return 0.0; }
+    const chars = Array.from(text);
+    if (chars.length < 8) { return 0.0; }
     let switches = 0;
-    for (let i = 0; i < text.length - 1; i++) {
-        const a = text[i];
-        const b = text[i + 1];
+    for (let i = 0; i < chars.length - 1; i++) {
+        const a = chars[i];
+        const b = chars[i + 1];
         const aAlpha = /[a-zA-Z]/.test(a);
         const bAlpha = /[a-zA-Z]/.test(b);
         const aDigit = /[0-9]/.test(a);
         const bDigit = /[0-9]/.test(b);
         if ((aAlpha && bDigit) || (aDigit && bAlpha)) { switches++; }
     }
-    return Math.min(1.0, switches / (text.length * 0.35));
+    return Math.min(1.0, switches / (chars.length * 0.35));
 }
 
 /**
@@ -382,7 +385,7 @@ function separatorStructureScore(text: string): number {
     for (const sep of SEPS) {
         if (text.includes(sep)) {
             const parts   = text.split(sep).filter(p => p.length > 0);
-            const lengths = parts.map(p => p.length);
+            const lengths = parts.map(p => Array.from(p).length);
             const maxLen  = Math.max(...lengths);
             const minLen  = Math.min(...lengths);
             if (maxLen > 0) {

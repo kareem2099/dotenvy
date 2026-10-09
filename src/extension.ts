@@ -109,6 +109,14 @@ export async function activate(context: vscode.ExtensionContext) {
             VariableWebviewProvider.refreshLocale();
             commandsTreeProvider.refresh();
         }),
+        vscode.workspace.onDidChangeConfiguration(async (e) => {
+            if (e.affectsConfiguration('dotenvy.secrets.enableCloudAnalysis')) {
+                if (LLMAnalyzer.isCloudAnalysisEnabled()) {
+                    await LLMAnalyzer.getInstance().onCloudAnalysisEnabled();
+                    await FeedbackManager.flush();
+                }
+            }
+        }),
     );
 
     // ─── Registrations ─────────────────────────────────────────────────────────
@@ -209,6 +217,29 @@ export async function activate(context: vscode.ExtensionContext) {
             }
         }),
 
+        // Toggle Cloud Secret Analysis (with explicit opt-in consent prompt)
+        vscode.commands.registerCommand('dotenvy.toggleCloudAnalysis', async () => {
+            const config = vscode.workspace.getConfiguration('dotenvy');
+            const current = config.get<boolean>('secrets.enableCloudAnalysis', false);
+            if (!current) {
+                const choice = await vscode.window.showInformationMessage(
+                    t('extension.cloudAnalysis.consentPrompt'),
+                    { modal: true },
+                    t('extension.cloudAnalysis.enableBtn'),
+                    t('common.cancel')
+                );
+                if (choice === t('extension.cloudAnalysis.enableBtn')) {
+                    await config.update('secrets.enableCloudAnalysis', true, vscode.ConfigurationTarget.Global);
+                    await LLMAnalyzer.getInstance().onCloudAnalysisEnabled();
+                    await FeedbackManager.flush();
+                    vscode.window.showInformationMessage(t('extension.cloudAnalysis.enabledMsg'));
+                }
+            } else {
+                await config.update('secrets.enableCloudAnalysis', false, vscode.ConfigurationTarget.Global);
+                vscode.window.showInformationMessage(t('extension.cloudAnalysis.disabledMsg'));
+            }
+        }),
+
         vscode.commands.registerCommand('dotenvy.addToIgnore', async (uri: vscode.Uri) => {
             const workspaceFolders = vscode.workspace.workspaceFolders;
             if (!workspaceFolders) { return; }
@@ -219,7 +250,7 @@ export async function activate(context: vscode.ExtensionContext) {
             const pattern = isDir ? `${relativePath}/**` : relativePath;
 
             const ignoreUri = vscode.Uri.joinPath(workspaceFolders[0].uri, '.dotenvyignore');
-            let content = '';
+            let content: string;
             try {
                 content = Buffer.from(await vscode.workspace.fs.readFile(ignoreUri)).toString('utf8');
             } catch {
@@ -288,7 +319,8 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     UpdateManager.checkNewVersion(context);
-    FeedbackManager.init(context);
+    await FeedbackManager.init(context);
+    await FeedbackManager.flush();
 
     // Start real-time secret monitoring
     SecretDetector.startFileWatcher();

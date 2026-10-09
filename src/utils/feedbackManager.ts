@@ -8,7 +8,6 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { DetectedSecret } from './secretScannerTypes';
-import { FeatureExtractor } from './featureExtractor';
 import { LLMAnalyzer } from './llmAnalyzer';
 import { logger } from './logger';
 
@@ -16,27 +15,27 @@ export type UserAction   = 'confirmed_secret' | 'ignored_warning' | 'marked_fals
 export type FeedbackLabel = 'high' | 'medium' | 'low' | 'false_positive';
 
 export interface FeedbackEntry {
-    id:                   string;
-    timestamp:            string;
-    secret_value:         string;     // already redacted
-    context:              string;
-    variable_name?:       string;
-    user_action:          UserAction;
-    label:                FeedbackLabel;
-    features:             number[];   // 35-element vector
-    original_confidence:  string;
-    file_type:            string;     // extension only
-    sent:                 boolean;
+    id: string;
+    timestamp: string;
+    feature_schema: 2;
+    user_action: UserAction;
+    label: FeedbackLabel;
+    features: number[];
+    sent: boolean;
 }
 
 export class FeedbackManager {
 
-    private static readonly STORAGE_KEY = 'dotenvy.feedback.entries';
+    private static readonly STORAGE_KEY = 'dotenvy.feedback.features.v2';
     private static readonly MAX_ENTRIES = 500;
     private static context: vscode.ExtensionContext;
+    private static saving: Promise<void> = Promise.resolve();
+    private static flushing: Promise<void> | undefined;
 
-    public static init(context: vscode.ExtensionContext): void {
+    public static async init(context: vscode.ExtensionContext): Promise<void> {
         FeedbackManager.context = context;
+        // Old queues contained source context. Purge rather than upload them later.
+        await context.globalState.update('dotenvy.feedback.entries', undefined);
     }
 
     // ─── Public API ────────────────────────────────────────────────────────────
@@ -48,10 +47,7 @@ export class FeedbackManager {
 
     /** Call when user clicks "Move to .env" */
     public static async recordConfirmed(secret: DetectedSecret): Promise<void> {
-        const label: FeedbackLabel =
-            secret.confidence === 'high'   ? 'high'   :
-            secret.confidence === 'medium' ? 'medium' : 'low';
-        await FeedbackManager.record(secret, 'confirmed_secret', label);
+        await FeedbackManager.record(secret, 'confirmed_secret', 'high');
     }
 
     // ─── Core ──────────────────────────────────────────────────────────────────
@@ -64,30 +60,25 @@ export class FeedbackManager {
         if (!FeedbackManager.context) { return; }
 
         try {
-            const variableName = FeedbackManager.extractVariableName(secret.context);
-            const features     = FeatureExtractor.extract(secret.content, secret.context, variableName);
-
+            if (!secret.features || secret.features.length !== 35 ||
+                secret.features.some(f => !Number.isFinite(f) || f < 0 || f > 1)) {
+                throw new Error('Scan the file again to collect valid original-value features');
+            }
             const entry: FeedbackEntry = {
-                id:                  crypto.randomUUID(),
-                timestamp:           new Date().toISOString(),
-                secret_value:        secret.content,
-                context:             secret.context,
-                variable_name:       variableName,
-                user_action:         action,
-                label,
-                features,
-                original_confidence: secret.confidence,
-                file_type:           FeedbackManager.getExt(secret.file),
-                sent:                false,
+                id: crypto.randomUUID(), timestamp: new Date().toISOString(),
+                feature_schema: 2, user_action: action, label,
+                features: [...secret.features], sent: false,
             };
 
             await FeedbackManager.save(entry);
             logger.info(`Feedback: ${action} → ${label}`, 'FeedbackManager');
 
-            // Non-blocking flush
-            FeedbackManager.flush().catch((_error) => {
-                logger.error('Failed to flush feedback', _error, 'FeedbackManager');
-            });
+            // Non-blocking flush (only if cloud analysis is explicitly enabled)
+            if (LLMAnalyzer.isCloudAnalysisEnabled()) {
+                FeedbackManager.flush().catch((_error) => {
+                    logger.error('Failed to flush feedback', _error, 'FeedbackManager');
+                });
+            }
 
         } catch (error) {
             logger.error('Failed to record feedback', error, 'FeedbackManager');
@@ -97,12 +88,14 @@ export class FeedbackManager {
     // ─── Storage ───────────────────────────────────────────────────────────────
 
     private static async save(entry: FeedbackEntry): Promise<void> {
-        const all = await FeedbackManager.load();
-        all.push(entry);
-        await FeedbackManager.context.globalState.update(
-            FeedbackManager.STORAGE_KEY,
-            all.slice(-FeedbackManager.MAX_ENTRIES)
-        );
+        const operation = FeedbackManager.saving.then(async () => {
+            const all = await FeedbackManager.load();
+            all.push(entry);
+            await FeedbackManager.context.globalState.update(
+                FeedbackManager.STORAGE_KEY, all.slice(-FeedbackManager.MAX_ENTRIES));
+        });
+        FeedbackManager.saving = operation.catch(() => {});
+        await operation;
     }
 
     private static async load(): Promise<FeedbackEntry[]> {
@@ -114,42 +107,37 @@ export class FeedbackManager {
     // ─── Flush to server ───────────────────────────────────────────────────────
 
     public static async flush(): Promise<void> {
-        if (!FeedbackManager.context) { return; }
+        if (!FeedbackManager.context || !LLMAnalyzer.isCloudAnalysisEnabled()) { return; }
+        if (FeedbackManager.flushing) { return FeedbackManager.flushing; }
+        FeedbackManager.flushing = FeedbackManager.flushPending().finally(() => {
+            FeedbackManager.flushing = undefined;
+        });
+        return FeedbackManager.flushing;
+    }
 
-        const all     = await FeedbackManager.load();
-        const pending = all.filter(e => !e.sent);
-        if (pending.length === 0) { return; }
-
+    private static async flushPending(): Promise<void> {
         try {
+            await FeedbackManager.saving;
             const analyzer = LLMAnalyzer.getInstance();
             if (!analyzer.isConfigured()) { return; }
-
-            // Batch of 20
+            const pending = (await FeedbackManager.load()).filter(e => !e.sent);
             for (let i = 0; i < pending.length; i += 20) {
                 const batch = pending.slice(i, i + 20);
                 await analyzer.sendFeedback(batch.map(e => ({
-                    secret_value:  e.secret_value,
-                    context:       e.context,
-                    variable_name: e.variable_name,
-                    features:      e.features,
-                    user_action:   e.user_action,
-                    label:         e.label,
-                    timestamp:     e.timestamp,
+                    id: e.id, feature_schema: e.feature_schema, features: e.features,
+                    user_action: e.user_action, label: e.label,
                 })));
-                batch.forEach(e => { e.sent = true; });
+                const ids = new Set(batch.map(e => e.id));
+                const operation = FeedbackManager.saving.then(async () => {
+                    const current = await FeedbackManager.load();
+                    current.forEach(e => { if (ids.has(e.id)) { e.sent = true; } });
+                    await FeedbackManager.context.globalState.update(FeedbackManager.STORAGE_KEY, current);
+                });
+                FeedbackManager.saving = operation.catch(() => {});
+                await operation;
             }
-
-            await FeedbackManager.context.globalState.update(
-                FeedbackManager.STORAGE_KEY, all
-            );
-
-            logger.info(`Feedback flushed: ${pending.length} entries`, 'FeedbackManager');
-
         } catch (error) {
-            logger.warn(
-                `Feedback flush failed (will retry): ${error instanceof Error ? error.message : 'Unknown'}`,
-                'FeedbackManager'
-            );
+            logger.warn(`Feedback flush deferred: ${error instanceof Error ? error.message : 'Unknown'}`, 'FeedbackManager');
         }
     }
 
@@ -171,15 +159,4 @@ export class FeedbackManager {
         await FeedbackManager.context.globalState.update(FeedbackManager.STORAGE_KEY, []);
     }
 
-    // ─── Helpers ───────────────────────────────────────────────────────────────
-
-    private static extractVariableName(context: string): string | undefined {
-        const m = context.match(/(?:const|let|var)\s+(\w+)|(\w+)\s*[:=]/);
-        return m ? (m[1] || m[2]) : undefined;
-    }
-
-    private static getExt(filePath: string): string {
-        const parts = filePath.split('.');
-        return parts.length > 1 ? `.${parts[parts.length - 1]}` : 'unknown';
-    }
 }

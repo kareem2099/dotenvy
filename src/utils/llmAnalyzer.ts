@@ -28,12 +28,12 @@ export interface LLMHealthResponse {
 const SECRET_STORAGE_KEY = 'dotenvy.llm.sharedSecret';
 
 const KNOWN_SECRET_PATTERNS: { name: string; regex: RegExp }[] = [
-    { name: 'AWS Access Key', regex: new RegExp(['A', 'KIA', '[0-9A-Z]{16}'].join('')) },
-    { name: 'Stripe Live Key', regex: new RegExp(['sk', '_live_', '[0-9a-zA-Z]{24,}'].join('')) },
-    { name: 'Stripe Test Key', regex: new RegExp(['sk', '_test_', '[0-9a-zA-Z]{24,}'].join('')) },
-    { name: 'GitHub Token', regex: new RegExp(['g', 'hp_', '[a-zA-Z0-9]{36}'].join('')) },
-    { name: 'OpenAI Key', regex: new RegExp(['sk', '-[a-zA-Z0-9]{48}'].join('')) },
-    { name: 'Google API Key', regex: new RegExp(['AI', 'za', '[0-9A-Za-z\\-_]{35}'].join('')) },
+    { name: 'AWS Access Key', regex: /^AKIA[0-9A-Z]{16}/ },
+    { name: 'Stripe Live Key', regex: /^sk_live_[0-9a-zA-Z]{24,}/ },
+    { name: 'Stripe Test Key', regex: /^sk_test_[0-9a-zA-Z]{24,}/ },
+    { name: 'GitHub Token', regex: /^ghp_[a-zA-Z0-9]{36}/ },
+    { name: 'OpenAI Key', regex: /^sk-[a-zA-Z0-9]{48}/ },
+    { name: 'Google API Key', regex: /^AIza[0-9A-Za-z\-_]{35}/ },
 ];
 
 export class LLMAnalyzer {
@@ -50,19 +50,34 @@ export class LLMAnalyzer {
     private lastFailureTime = 0;
     private readonly CIRCUIT_BREAKER_TIMEOUT = 60_000;
     private communityBlacklist: Set<string> = new Set();
+    private readonly state: vscode.Memento;
+    private machineId: string;
 
     private constructor(context: vscode.ExtensionContext) {
         this.secrets = context.secrets;
         this.extensionMode = context.extensionMode;
+        this.state = context.globalState;
+        this.machineId = this.state?.get<string>('dotenvy.llm.installationId') || vscode.env.machineId;
+    }
+
+    public static isCloudAnalysisEnabled(): boolean {
+        return vscode.workspace?.getConfiguration?.('dotenvy')?.get<boolean>('secrets.enableCloudAnalysis', false) ?? false;
     }
 
     public static async initialize(context: vscode.ExtensionContext): Promise<LLMAnalyzer> {
         if (!LLMAnalyzer.instance) {
             LLMAnalyzer.instance = new LLMAnalyzer(context);
         }
-        await LLMAnalyzer.instance.loadSecret();
-        await LLMAnalyzer.instance.syncBlacklist().catch(() => { });
+        if (LLMAnalyzer.isCloudAnalysisEnabled()) {
+            await LLMAnalyzer.instance.loadSecret();
+            await LLMAnalyzer.instance.syncBlacklist().catch(() => { });
+        }
         return LLMAnalyzer.instance;
+    }
+
+    public async onCloudAnalysisEnabled(): Promise<void> {
+        await this.loadSecret();
+        await this.syncBlacklist().catch(() => { });
     }
 
     public static getInstance(): LLMAnalyzer {
@@ -73,6 +88,10 @@ export class LLMAnalyzer {
     }
 
     private async loadSecret(): Promise<void> {
+        if (!LLMAnalyzer.isCloudAnalysisEnabled()) {
+            return;
+        }
+
         // 1. Try SecretStorage (Device-specific credential already stored)
         this.sharedSecret = await this.secrets.get(SECRET_STORAGE_KEY);
         if (this.sharedSecret) {
@@ -80,7 +99,13 @@ export class LLMAnalyzer {
             return;
         }
 
-        // 2. First run: Perform secure dynamic device registration with backend
+        // A lost credential starts a new installation; machine IDs are not ownership proof.
+        if (!this.state?.get<string>('dotenvy.llm.installationId')) {
+            this.machineId = crypto.randomUUID();
+            await this.state?.update('dotenvy.llm.installationId', this.machineId);
+        }
+
+        // 2. First run with cloud analysis enabled: Perform secure dynamic device registration with backend
         try {
             logger.info('[DotEnvy] 🔑 Initiating secure device handshake with backend...', 'LLMAnalyzer');
             await this.registerWithBackend();
@@ -92,7 +117,7 @@ export class LLMAnalyzer {
     public async registerWithBackend(): Promise<boolean> {
         return new Promise((resolve) => {
             const machineId = this.getMachineId();
-            const extVersion = vscode.extensions.getExtension('FreeRave.dotenvy')?.packageJSON?.version || '2.2.1';
+            const extVersion = vscode.extensions?.getExtension('FreeRave.dotenvy')?.packageJSON?.version || '2.2.2';
             const payload = JSON.stringify({
                 machine_id: machineId,
                 vscode_version: vscode.version || '',
@@ -110,7 +135,7 @@ export class LLMAnalyzer {
                 headers: {
                     'Content-Type': 'application/json',
                     'Content-Length': Buffer.byteLength(payload),
-                    'User-Agent': 'DotEnvy-Extension/2.1'
+                    'User-Agent': 'DotEnvy-Extension/2.2.2'
                 }
             }, (res) => {
                 let data = '';
@@ -177,8 +202,7 @@ export class LLMAnalyzer {
     }
 
     private getMachineId(): string {
-        try { return vscode.env.machineId || 'unknown-machine'; }
-        catch { return 'unknown-machine'; }
+        return this.machineId;
     }
 
     private shouldResetCircuitBreaker(): boolean {
@@ -205,6 +229,9 @@ export class LLMAnalyzer {
     }
 
     public async testConnection(): Promise<boolean> {
+        if (!LLMAnalyzer.isCloudAnalysisEnabled()) {
+            return false;
+        }
         try {
             const res = await this.makeRequest('/health', 'GET') as LLMHealthResponse;
             this.isConnected = res?.status === 'ok';
@@ -218,16 +245,18 @@ export class LLMAnalyzer {
     }
 
     public async analyzeSecret(secretValue: string, context: string, variableName?: string): Promise<string> {
-        // L1 — Regex (free, instant)
+        // L1 — Regex (free, instant, 100% local)
         const regexHit = KNOWN_SECRET_PATTERNS.find(p => p.regex.test(secretValue));
         if (regexHit) {
             logger.info(`[DotEnvy] Regex match: ${regexHit.name}`, 'LLMAnalyzer');
-            if (variableName) { this.syncHashToServer(variableName, secretValue).catch(() => { }); }
+            if (variableName && LLMAnalyzer.isCloudAnalysisEnabled()) {
+                this.syncHashToServer(variableName, secretValue).catch(() => { });
+            }
             return 'high';
         }
 
         // L2 — Community Blacklist (Local Cache - Fast Path)
-        if (variableName) {
+        if (variableName && this.communityBlacklist.size > 0) {
             const h = this.hashEntry(variableName, secretValue);
             if (this.communityBlacklist.has(h)) {
                 logger.info(`[DotEnvy] Community blacklist match: ${variableName}`, 'LLMAnalyzer');
@@ -239,6 +268,11 @@ export class LLMAnalyzer {
         const features = this.extractFeatures(secretValue, context, variableName);
         const entropy = features[7] * 8.0;   // f[7] = entropy/8
         if (entropy < 3.5) { return 'low'; }
+
+        // Local-First Gate: If Cloud Analysis is disabled, evaluate 100% locally
+        if (!LLMAnalyzer.isCloudAnalysisEnabled()) {
+            return this.fallbackAnalysis(secretValue, context, variableName);
+        }
 
         // L4 — LLM (The brain)
         this.shouldResetCircuitBreaker();
@@ -267,7 +301,7 @@ export class LLMAnalyzer {
                 }
 
                 // If LLM says "high", sync to server to help the community
-                if (result === 'high' && variableName) {
+                if (result === 'high' && variableName && LLMAnalyzer.isCloudAnalysisEnabled()) {
                     this.syncHashToServer(variableName, secretValue).catch(() => { });
                 }
                 return result;
@@ -283,7 +317,17 @@ export class LLMAnalyzer {
     }
 
     public async sendFeedback(payload: unknown[]): Promise<void> {
-        await this.makeSignedRequest('/extension/feedback', { samples: payload });
+        if (!LLMAnalyzer.isCloudAnalysisEnabled() || !this.sharedSecret) {
+            throw new Error('Cloud feedback is unavailable');
+        }
+        const response = await this.makeSignedRequest('/extension/feedback', { samples: payload }) as {
+            status?: string; accepted_sample_ids?: string[];
+        };
+        const ids = payload.map(p => (p as {id: string}).id);
+        if (response?.status !== 'queued' || !Array.isArray(response.accepted_sample_ids) ||
+            !ids.every(id => response.accepted_sample_ids?.includes(id))) {
+            throw new Error('Server did not acknowledge all feedback samples');
+        }
     }
 
     // ✅ الآن يستخدم FeatureExtractor — carbon copy من feature_extractor.py
@@ -292,29 +336,27 @@ export class LLMAnalyzer {
     }
 
     public hashEntry(variableName: string, value: string): string {
-        const prefix = value.slice(0, 8);
         return crypto
             .createHash('sha256')
-            .update(`${variableName}:${prefix}`)
-            .digest('hex')
-            .substring(0, 16);
+            .update(JSON.stringify([variableName, value]))
+            .digest('hex');
     }
 
     public async syncHashToServer(variableName: string, value: string): Promise<void> {
-        if (!this.sharedSecret) { return; }
+        if (!LLMAnalyzer.isCloudAnalysisEnabled() || !this.sharedSecret) { return; }
         const hash = this.hashEntry(variableName, value);
         try {
-            await this.makeSignedRequest('/extension/blacklist/add', { hash });
+            await this.makeSignedRequest('/extension/blacklist/add', { hash, hash_version: 2 });
         } catch (e) {
             logger.warn(`Hash sync failed: ${e instanceof Error ? e.message : 'Unknown'}`, 'LLMAnalyzer');
         }
     }
 
     public async reportFalsePositive(variableName: string, value: string): Promise<void> {
-        if (!this.sharedSecret) { return; }
+        if (!LLMAnalyzer.isCloudAnalysisEnabled() || !this.sharedSecret) { return; }
         const hash = this.hashEntry(variableName, value);
         try {
-            const res = await this.makeSignedRequest('/extension/blacklist/report_fp', { hash }) as { status?: string };
+            const res = await this.makeSignedRequest('/extension/blacklist/report_fp', { hash, hash_version: 2 }) as { status?: string };
             if (res && res.status === 'removed') {
                 this.communityBlacklist.delete(hash);
                 logger.info('[DotEnvy] 🚀 False positive threshold met. Hash removed from blacklist.', 'LLMAnalyzer');
@@ -325,11 +367,11 @@ export class LLMAnalyzer {
     }
 
     private async syncBlacklist(): Promise<void> {
-        if (!this.sharedSecret) { return; }
+        if (!LLMAnalyzer.isCloudAnalysisEnabled() || !this.sharedSecret) { return; }
         try {
-            const res = await this.makeSignedGetRequest('/extension/blacklist') as { hashes: string[] };
-            if (res && res.hashes) {
-                this.communityBlacklist = new Set(res.hashes);
+            const res = await this.makeSignedGetRequest('/extension/blacklist') as { hashes: string[]; hash_version: number };
+            if (res && res.hash_version === 2 && Array.isArray(res.hashes)) {
+                this.communityBlacklist = new Set(res.hashes.filter(h => /^[0-9a-f]{64}$/.test(h)));
                 logger.info(`[DotEnvy] 🔄 Community Blacklist synced (${this.communityBlacklist.size} hashes).`, 'LLMAnalyzer');
             }
         } catch (e) {
@@ -357,7 +399,7 @@ export class LLMAnalyzer {
                 path: url.pathname,
                 method: 'GET',
                 headers: {
-                    'User-Agent': 'DotEnvy-Extension/2.0',
+                    'User-Agent': 'DotEnvy-Extension/2.2.2',
                     'X-Extension-Timestamp': timestamp,
                     'X-Extension-Signature': signature,
                     'X-Machine-ID': this.getMachineId(),
@@ -365,7 +407,10 @@ export class LLMAnalyzer {
             }, (res) => {
                 let b = '';
                 res.on('data', (c) => { b += c.toString(); });
-                res.on('end', () => { try { resolve(JSON.parse(b)); } catch { resolve(b); } });
+                res.on('end', () => {
+                    if (!res.statusCode || res.statusCode >= 400) { reject(new Error(`HTTP ${res.statusCode}`)); return; }
+                    try { resolve(JSON.parse(b)); } catch { reject(new Error('Invalid server response')); }
+                });
             });
             req.on('error', reject);
             req.setTimeout(5000, () => { req.destroy(); reject(new Error('Timeout')); });
@@ -389,7 +434,7 @@ export class LLMAnalyzer {
                 headers: {
                     'Content-Type': 'application/json',
                     'Content-Length': Buffer.byteLength(body),
-                    'User-Agent': 'DotEnvy-Extension/2.0',
+                    'User-Agent': 'DotEnvy-Extension/2.2.2',
                     'X-Extension-Timestamp': timestamp,
                     'X-Extension-Signature': signature,
                     'X-Machine-ID': machineId,
@@ -419,7 +464,7 @@ export class LLMAnalyzer {
                 hostname: url.hostname,
                 port: url.port || (url.protocol === 'https:' ? 443 : 80),
                 path: url.pathname, method,
-                headers: { 'User-Agent': 'DotEnvy-Extension/2.0' },
+                headers: { 'User-Agent': 'DotEnvy-Extension/2.2.2' },
             }, (res) => {
                 let b = '';
                 res.on('data', (c) => { b += c.toString(); });

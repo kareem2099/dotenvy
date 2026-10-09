@@ -136,6 +136,8 @@ test/**
 !test/run-all-tests.js
 !test/e2e-master-key-and-backup.js
 !test/e2e-llm-logic.js
+!test/e2e-security-regressions.js
+!test/feature-parity.json
 !test/encryption-test-standalone.js
 
 # --- Articles (local drafts, not published) ---

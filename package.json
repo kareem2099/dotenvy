@@ -2,7 +2,7 @@
   "name": "dotenvy",
   "displayName": "DotEnvy – VS Code Environment Manager",
   "description": "Effortlessly manage, secure, and sync .env files directly inside VS Code with enterprise-grade encryption.",
-  "version": "2.2.1",
+  "version": "2.2.3",
   "icon": "resources/icons/icon.png",
   "publisher": "FreeRave",
   "author": "Kareem Ehab",
@@ -109,6 +109,11 @@
             "aws"
           ],
           "description": "%config.cloudSync.provider%"
+        },
+        "dotenvy.secrets.enableCloudAnalysis": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.secrets.enableCloudAnalysis%"
         }
       }
     },
@@ -117,6 +122,11 @@
         "command": "dotenvy.scanSecrets",
         "title": "%command.scanSecrets%",
         "icon": "$(search-view-icon)"
+      },
+      {
+        "command": "dotenvy.toggleCloudAnalysis",
+        "title": "%command.toggleCloudAnalysis%",
+        "icon": "$(cloud)"
       },
       {
         "command": "dotenvy.switchEnvironment",

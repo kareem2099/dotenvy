@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as crypto from 'crypto';
+import { FeatureExtractor } from './featureExtractor';
 import { DetectedSecret, ScanProgress } from './secretScannerTypes';
 import { PatternRegistry } from './patternRegistry';
 import { EntropyAnalyzer } from './entropyAnalyzer';
@@ -271,11 +273,19 @@ export class SecretDetector {
             const matches = [...line.matchAll(pattern.regex)];
 
             for (const match of matches) {
-                const matchIndex = match.index ?? 0;
-                const secretValue = match[0].trim();
+                let matchIndex = (match.index ?? 0) + match[0].length - match[0].trimStart().length;
+                let secretValue = match[0].trim();
+                // Assignment patterns include the variable name and quotes in match[0].
+                const assignment = secretValue.match(/^[A-Za-z_]\w*\s*[:=]\s*(["'`])([\s\S]+)\1$/);
+                if (assignment) {
+                    matchIndex += secretValue.indexOf(assignment[1]) + 1;
+                    secretValue = assignment[2];
+                }
                 
                 if (EntropyAnalyzer.isLikelySecret(secretValue)) {
-                    const context = ContextEvaluator.getContextLine(allLines, lineIndex, matchIndex);
+                    const originalContext = ContextEvaluator.getContextLine(allLines, lineIndex, matchIndex);
+                    const context = originalContext.split(secretValue).join('[REDACTED]')
+                        .replace(/(["'`])[^"'`\n]*\1/g, '"[REDACTED]"');
                     const secretScore = ContextEvaluator.calculateSecretScore(secretValue, context);
 
                     const variableName = this.extractVariableName(context);
@@ -315,7 +325,12 @@ export class SecretDetector {
                         context: context,
                         riskScore: secretScore.confidence,
                         detectionMethod: detectionMethod,
-                        reasoning: reasoning
+                        reasoning,
+                        features: FeatureExtractor.extract(secretValue, context, variableName),
+                        sourceFile: filePath,
+                        valueLength: secretValue.length,
+                        variableName,
+                        valueDigest: crypto.createHash('sha256').update(secretValue).digest('hex')
                     };
 
                     secrets.push(baseSecret);
