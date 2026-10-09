@@ -7,21 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.4] - 2026-10-09
+
 ### ☁️ Doppler & cloud sync
 
 - **Portable cloud encryption key**: The Doppler payload key is wrapped with a sync passphrase (PBKDF2 + AES-256-GCM). Salt and wrapped key are stored as Doppler metadata, so another machine can pull with the same passphrase. Pull no longer generates a new key, and a push refuses to overwrite a payload this machine cannot decrypt. The previous workspace key is left in place so another Doppler config in the same workspace can still be opened.
-
-### Fixed
-
-- Connect the sidebar's Init Secure Project and Init .dotenvyignore buttons to their registered commands; await completion and report dispatch failures.
-- Return the ignore command's asynchronous result, report file access errors, open existing ignore files without overwriting them and handle an empty workspace.
-- Stop secure setup on cancelled prompts and preserve the existing key envelope when reinitialization is cancelled. Report missing workspaces immediately.
-
-### Validation
-
-- Exercise actual frontend setup handlers through both dashboard receivers and registered commands, including real temporary ignore/envelope/config files, cancellation and visible failure notifications.
-
-## [2.2.4] - 2026-10-09
 
 ### Changed
 
@@ -35,10 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Match model-update ETags to verified cached weights so interrupted preference writes do not block future downloads. Keep model activation independent of old-cache cleanup and dispose workers if shutdown occurs during update persistence.
+- Connect the sidebar's Init Secure Project and Init .dotenvyignore buttons to their registered commands; await completion and report dispatch failures.
+- Return the ignore command's asynchronous result, report file access errors, open existing ignore files without overwriting them and handle an empty workspace.
+- Stop secure setup on cancelled prompts and preserve the existing key envelope when reinitialization is cancelled. Report missing workspaces immediately.
 
 ### Validation
 
 - Verify Python/TypeScript probability parity and actual workers, offline scans with network blocked, numeric-only consent/retry/concurrency behavior and actual panel consent flows, authentication and model-update fallback. Verify original-value .env writes and stale-source rejection.
+- Exercise actual frontend setup handlers through both dashboard receivers and registered commands, including real temporary ignore/envelope/config files, cancellation and visible failure notifications.
 
 ### Documentation
 
