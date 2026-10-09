@@ -7,6 +7,7 @@ import { ConfigUtils } from '../utils/configUtils';
 import { logger } from '../utils/logger';
 import { showActionStart, showSyncToast } from '../utils/panelNotification';
 import { t } from '../i18n';
+import { dopplerProjectNameHasUppercase } from '../utils/dopplerProjectSlug';
 
 export class InitSecureProjectCommand implements vscode.Disposable {
 
@@ -41,10 +42,17 @@ export class InitSecureProjectCommand implements vscode.Disposable {
             }
 
             // Get project name
+            const suggestedName = (vscode.workspace.workspaceFolders?.[0]?.name || 'project').toLowerCase();
             const projectName = await vscode.window.showInputBox({
                 prompt: t('initSecure.projectNamePrompt'),
                 placeHolder: t('initSecure.projectNamePlaceholder'),
-                value: vscode.workspace.workspaceFolders?.[0]?.name || 'Project'
+                value: suggestedName,
+                validateInput: (value) => {
+                    if (value && dopplerProjectNameHasUppercase(value)) {
+                        return t('initSecure.projectNameLowercase');
+                    }
+                    return null;
+                }
             });
 
             // Get admin username

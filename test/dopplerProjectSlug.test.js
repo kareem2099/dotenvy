@@ -5,7 +5,7 @@
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { normalizeDopplerProjectSlug } = require('../out/utils/dopplerProjectSlug.js');
+const { dopplerProjectNameHasUppercase, normalizeDopplerProjectSlug } = require('../out/utils/dopplerProjectSlug.js');
 
 describe('doppler project slug', () => {
     test('replaces dots with hyphens like Doppler slugs', () => {
@@ -14,6 +14,12 @@ describe('doppler project slug', () => {
 
     test('normalizes scoped npm package names', () => {
         assert.equal(normalizeDopplerProjectSlug('@acme/my.app'), 'my-app');
+    });
+
+    test('rejects uppercase and accepts an already lowercase name', () => {
+        assert.equal(dopplerProjectNameHasUppercase('My-Project'), true);
+        assert.equal(dopplerProjectNameHasUppercase('my-project'), false);
+        assert.equal(dopplerProjectNameHasUppercase(''), false);
     });
 
     test('collapses underscores, spaces, and repeated hyphens', () => {
