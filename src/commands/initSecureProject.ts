@@ -4,7 +4,6 @@ import { UserManager } from '../utils/userManager';
 import { UserCredentials } from '../types/user';
 import { MIN_PASSWORD_LENGTH } from '../constants';
 import { ConfigUtils } from '../utils/configUtils';
-import { logger } from '../utils/logger';
 import { showActionStart, showSyncToast } from '../utils/panelNotification';
 import { t } from '../i18n';
 
@@ -13,9 +12,15 @@ export class InitSecureProjectCommand implements vscode.Disposable {
     public async execute(): Promise<void> {
         showActionStart(t('initSecure.actionStart'));
 
+        if (!vscode.workspace.workspaceFolders?.length) {
+            showSyncToast(t('common.noWorkspace'), 'error');
+            return;
+        }
+
         try {
             // Check if already initialized
-            if (await UserManager.isSecureProjectInitialized()) {
+            const reinitializing = await UserManager.isSecureProjectInitialized();
+            if (reinitializing) {
                 const reinitLabel = t('initSecure.reinitConfirm');
                 const choice = await vscode.window.showWarningMessage(
                     t('initSecure.reinitWarning'),
@@ -27,17 +32,6 @@ export class InitSecureProjectCommand implements vscode.Disposable {
                     showSyncToast(t('initSecure.cancelled'), 'info');
                     return;
                 }
-
-                // Delete the old lock file so UserManager will accept the new initialization
-                const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-                if (workspacePath) {
-                    const lockFilePath = path.join(workspacePath, '.dotenvy.lock.json');
-                    try {
-                        await vscode.workspace.fs.delete(vscode.Uri.file(lockFilePath));
-                    } catch (e) {
-                        logger.error('Could not delete old lock file', e, 'InitSecureProject');
-                    }
-                }
             }
 
             // Get project name
@@ -46,6 +40,11 @@ export class InitSecureProjectCommand implements vscode.Disposable {
                 placeHolder: t('initSecure.projectNamePlaceholder'),
                 value: vscode.workspace.workspaceFolders?.[0]?.name || 'Project'
             });
+
+            if (projectName === undefined) {
+                showSyncToast(t('initSecure.cancelled'), 'info');
+                return;
+            }
 
             // Get admin username
             const adminUsername = await vscode.window.showInputBox({
@@ -63,6 +62,7 @@ export class InitSecureProjectCommand implements vscode.Disposable {
             });
 
             if (!adminUsername) {
+                showSyncToast(t('initSecure.cancelled'), 'info');
                 return; // User cancelled
             }
 
@@ -80,6 +80,7 @@ export class InitSecureProjectCommand implements vscode.Disposable {
             });
 
             if (!adminPassword) {
+                showSyncToast(t('initSecure.cancelled'), 'info');
                 return; // User cancelled
             }
 
@@ -97,6 +98,7 @@ export class InitSecureProjectCommand implements vscode.Disposable {
             });
 
             if (!confirmPassword) {
+                showSyncToast(t('initSecure.cancelled'), 'info');
                 return; // User cancelled
             }
 
@@ -114,6 +116,12 @@ export class InitSecureProjectCommand implements vscode.Disposable {
                     username: adminUsername.trim(),
                     password: adminPassword
                 };
+
+                // Keep existing keys if any of the setup prompts is cancelled.
+                if (reinitializing) {
+                    const rootPath = vscode.workspace.workspaceFolders![0].uri.fsPath;
+                    await vscode.workspace.fs.delete(vscode.Uri.file(path.join(rootPath, '.dotenvy.lock.json')));
+                }
 
                 const result = await UserManager.initializeSecureProject(adminCredentials, projectName?.trim());
 

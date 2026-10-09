@@ -250,6 +250,7 @@ export const en = {
 	'initIgnore.actionStart': 'Initializing .dotenvyignore...',
 	'initIgnore.alreadyExists': '.dotenvyignore already exists — opened for editing.',
 	'initIgnore.created': 'Created .dotenvyignore — customize it to exclude files from secret scanning.',
+	'initIgnore.error': 'Could not initialize .dotenvyignore: {message}',
 
 	'initSecure.actionStart': 'Initializing secure project...',
 	'initSecure.reinitWarning': 'Project is already initialized. Re-initializing will DELETE all existing keys and users! Continue?',

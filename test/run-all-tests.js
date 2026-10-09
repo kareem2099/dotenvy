@@ -9,6 +9,7 @@ const { spawnSync } = require('child_process');
 const path = require('path');
 
 const testSuites = [
+    { name: 'Dashboard Initialization Actions', file: 'e2e-init-actions.js', offline: true },
     { name: 'Post-Correction Community Consent', file: 'e2e-community-consent.js', offline: true },
     { name: 'Private Community Learning and Model Updates', file: 'e2e-community-learning.js' },
     { name: 'Local Transformer and Worker Parity', file: 'e2e-local-model.js', offline: true },

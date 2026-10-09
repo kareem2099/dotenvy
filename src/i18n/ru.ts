@@ -232,6 +232,7 @@ export const ru: Record<keyof typeof en, string> = {
 	'initIgnore.actionStart': 'Инициализация .dotenvyignore...',
 	'initIgnore.alreadyExists': '.dotenvyignore уже существует — открыт для редактирования.',
 	'initIgnore.created': 'Создан .dotenvyignore — настройте его для исключения файлов из сканирования.',
+	'initIgnore.error': 'Не удалось инициализировать .dotenvyignore: {message}',
 	'initSecure.actionStart': 'Инициализация защищенного проекта...',
 	'initSecure.reinitWarning': 'Проект уже инициализирован. Повторная инициализация УДАЛИТ все существующие ключи и пользователей! Продолжить?',
 	'initSecure.reinitConfirm': 'Да, удалить и инициализировать',

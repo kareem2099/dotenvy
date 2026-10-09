@@ -14,8 +14,8 @@ import * as path from 'path';
 import { logger } from '../utils/logger';
 import { TrashBinManager } from '../utils/trashBinManager';
 import { UserManager } from '../utils/userManager';
-import { registerPanelNotifier } from '../utils/panelNotification';
-import { LocalizationService } from '../i18n';
+import { registerPanelNotifier, showSyncToast } from '../utils/panelNotification';
+import { LocalizationService, t } from '../i18n';
 import { getWebviewLocalePayload } from '../i18n/webviewLocale';
 
 // Dashboard data interfaces
@@ -453,6 +453,23 @@ export class EnvironmentWebviewProvider implements vscode.WebviewViewProvider {
                 await this.refreshEnvironments();
                 break;
 
+            case 'initSecureProject':
+                try {
+                    await vscode.commands.executeCommand('dotenvy.initSecureProject');
+                    await this.refreshEnvironments();
+                } catch (error) {
+                    showSyncToast(t('initSecure.error', { message: (error as Error).message }), 'error');
+                }
+                break;
+
+            case 'initDotenvyIgnore':
+                try {
+                    await vscode.commands.executeCommand('dotenvy.initDotenvyIgnore');
+                } catch (error) {
+                    showSyncToast(t('initIgnore.error', { message: (error as Error).message }), 'error');
+                }
+                break;
+
             case 'openHistoryPanel':
                 vscode.commands.executeCommand('dotenvy.openHistoryPanel');
                 break;
@@ -779,4 +796,3 @@ DEBUG=false
         }
     }
 }
-

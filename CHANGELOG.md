@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Connect the sidebar's Init Secure Project and Init .dotenvyignore buttons to their registered commands; await completion and report dispatch failures.
+- Return the ignore command's asynchronous result, report file access errors, open existing ignore files without overwriting them and handle an empty workspace.
+- Stop secure setup on cancelled prompts and preserve the existing key envelope when reinitialization is cancelled. Report missing workspaces immediately.
+
+### Validation
+- Exercise actual frontend setup handlers through both dashboard receivers and registered commands, including real temporary ignore/envelope/config files, cancellation and visible failure notifications.
+
 ## [2.2.4] - 2026-10-09
 
 ### Changed

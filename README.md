@@ -347,6 +347,29 @@ Run **`DotEnvy: Init .dotenvyignore`** to create a default file, or right-click 
 
 ## 🚀 Usage
 
+### Initialize a project
+
+Open a project folder in VS Code before using either setup button in the
+DotEnvy sidebar or dashboard. Both actions are also available in the Command Palette.
+
+- **Init Secure Project** asks for an optional project name, an admin username,
+  a password and password confirmation in VS Code's input box at the top of the
+  window. On success it creates `.dotenvy.lock.json` (the password-wrapped project
+  key and user entries) and opens `.dotenvy.json` for configuration. Cancelling
+  any setup prompt stops initialization; cancelling a reinitialization preserves
+  the existing key envelope. Reinitialization replaces existing keys only after
+  confirmation and completing all prompts.
+- **Init .dotenvyignore** creates the default ignore file in the workspace root
+  and opens it for editing. If the file already exists, it opens that file without
+  replacing your patterns. File access failures produce an error notification.
+
+With multiple folders open, these initialization commands use the first workspace
+folder. A GitHub push updates the source repository; an installed extension must
+be rebuilt/reinstalled to receive the change. For local development, run
+`npm install` and `npm run compile`, then press **F5** to open an Extension Development Host.
+
+### Switch environments
+
 1. Place your environment files in your project root:
 
    ```bash

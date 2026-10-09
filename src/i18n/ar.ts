@@ -232,6 +232,7 @@ export const ar: Record<keyof typeof en, string> = {
 	'initIgnore.actionStart': 'جارٍ تهيئة .dotenvyignore...',
 	'initIgnore.alreadyExists': 'ملف .dotenvyignore موجود بالفعل — تم فتحه للتحرير.',
 	'initIgnore.created': 'تم إنشاء .dotenvyignore — خصصه لاستبعاد الملفات من فحص الأسرار.',
+	'initIgnore.error': 'تعذر تهيئة .dotenvyignore: {message}',
 	'initSecure.actionStart': 'جارٍ تهيئة المشروع الآمن...',
 	'initSecure.reinitWarning': 'المشروع مهيأ بالفعل. إعادة التهيئة ستحذف جميع المفاتيح والمستخدمين الحاليين! متابعة؟',
 	'initSecure.reinitConfirm': 'نعم، احذف وأعد التهيئة',

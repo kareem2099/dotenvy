@@ -243,6 +243,7 @@ export const it: Record<keyof typeof en, string> = {
 	'initIgnore.actionStart': 'Inizializzazione .dotenvyignore...',
 	'initIgnore.alreadyExists': '.dotenvyignore esiste già — aperto per modifica.',
 	'initIgnore.created': 'Creato .dotenvyignore — personalizzalo per escludere file dalla scansione secret.',
+	'initIgnore.error': 'Impossibile inizializzare .dotenvyignore: {message}',
 
 	'initSecure.actionStart': 'Inizializzazione progetto sicuro...',
 	'initSecure.reinitWarning': 'Il progetto è già inizializzato. Re-inizializzare ELIMINERÀ tutte le chiavi e gli utenti esistenti! Continuare?',
