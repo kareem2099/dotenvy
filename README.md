@@ -34,7 +34,19 @@ The environment view is a compact sidebar for narrow layouts, with an onboarding
 
 ### Doppler sync
 
-Push and pull go through Doppler. Several local `.env` files can share one Doppler config: `cloudSync.envTargets` routes keys by `keyPrefix` (longer prefixes win) or by `prefixes`. `pushMode` is `replace` (remote keys absent locally are removed) or `merge`. Cloud payloads are encrypted with AES-256-GCM unless `encryptCloudSync` is `false`. The data key is random. The first encrypted push asks for a passphrase that wraps it; Doppler stores the wrap and its salt, and another machine unlocks the same payload with that passphrase. A payload uploaded before the wrap exists opens only on the machine that still has the data key, until that machine pushes once.
+Push and pull go through Doppler. Several local `.env` files can share one Doppler config: `cloudSync.envTargets` routes keys by `keyPrefix` (longer prefixes win) or by `prefixes`. `pushMode` is `replace` (remote keys absent locally are removed) or `merge`. Project names from `package.json`, the folder, or `.dotenvy.json` become Doppler slugs: dots, underscores, and spaces turn into hyphens (`project.webservice` → `project-webservice`) before every API call.
+
+A pull merges into each local file. Comments, blank lines, key order, and inline `#` suffixes stay. Keys removed in Doppler are dropped. New keys are appended. Before that write, the previous file is copied to a sibling `.backup` (`.env` → `.env.backup`, `backend/.env.local` → `backend/.env.local.backup`). Pull then adds this line to the workspace `.gitignore` when it is missing:
+
+```gitignore
+.env*.backup
+```
+
+The pattern has no slash, so it matches those backups in every directory. A backup that Git already tracks stays tracked until you run `git rm --cached` on it.
+
+**DotEnvy: Diff Cloud Secrets** compares the merged local keys with Doppler and does not write files.
+
+Cloud payloads are encrypted with AES-256-GCM unless `encryptCloudSync` is `false`. The data key is random. The first encrypted push asks for a passphrase (at least 8 characters) that wraps the key with PBKDF2 and AES-256-GCM. Doppler stores the wrap, its salt, and the iteration count, so another machine unlocks the same payload with that passphrase. Pull does not create a new key. A push that cannot decrypt the remote payload stops instead of replacing it. A payload uploaded before the wrap exists opens only on the machine that still has the data key, until that machine pushes once. The previous workspace key is left in place so another Doppler config in the same workspace can still be opened.
 
 ### Discovery
 
@@ -123,7 +135,8 @@ Open the Command Palette with `Ctrl+Shift+P` or `⌘+Shift+P`.
 - **DotEnvy: Scan for Secrets**
 - **DotEnvy: Init .dotenvyignore**
 - **DotEnvy: Ignore this path** — Explorer context menu on a file or folder
-- Open editors underline a local pattern match while you type. That check does not call the analysis service.
+- **DotEnvy: Setup LLM Secret** — stores the device secret used to sign analysis requests
+- Open editors underline a local pattern match while you type and add a `dotenvy-secrets` problem. That check does not call the analysis service. The pre-commit hook uses the same local scan.
 - The secrets panel shows how many findings this installation confirmed, marked as not a secret, or has not sent yet.
 
 ### Secure project
@@ -229,7 +242,7 @@ You can also install a `.vsix` from the [Marketplace page](https://marketplace.v
 }
 ```
 
-`autoSwitchOnBranchChange` defaults to off. `encryptCloudSync` defaults to on. With encryption on, the first push asks for a passphrase that wraps the data key so other machines can pull. Without that wrap, pull works only on the machine that created the key. The Doppler token is read from `cloudSync.token`, from the `DOPPLER_TOKEN` environment variable, or from VS Code Secret Storage under `doppler:<project>:token`. The only implemented `provider` is `doppler`.
+`autoSwitchOnBranchChange` defaults to off. `encryptCloudSync` defaults to on. With encryption on, the first push asks for a passphrase that wraps the data key so other machines can pull. Without that wrap, pull works only on the machine that created the key. A later pull does not mint a replacement key, and a push that cannot open the remote payload does not overwrite it. The Doppler token is read from `cloudSync.token`, from the `DOPPLER_TOKEN` environment variable, or from VS Code Secret Storage under `doppler:<project>:token`. `cloudSync.project` is stored as a Doppler slug. The only implemented `provider` is `doppler`. After a pull finds env files to sync, dotenvy appends `.env*.backup` to `.gitignore` when that line is not already there.
 
 Editor settings under **DotEnvy** cover the backup folder, backup encryption, and history retention.
 
