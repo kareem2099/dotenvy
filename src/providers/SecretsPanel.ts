@@ -117,6 +117,7 @@ export class SecretsPanel {
 
             this._remove(secret);
             vscode.window.showInformationMessage(`✅ ${secret.suggestedEnvVar} added to .env`);
+            await FeedbackManager.offerAfterCorrection(secret, 'high');
 
         } catch (error) {
             logger.error('Failed to move secret to .env', error, 'SecretsPanel');
@@ -125,22 +126,17 @@ export class SecretsPanel {
     }
 
     private async _ignore(secret: DetectedSecret): Promise<void> {
-        if (secret.variableName && LLMAnalyzer.isCloudAnalysisEnabled()) {
-            try {
-                const { value } = await readDetectedValue(secret);
-                await LLMAnalyzer.getInstance().reportFalsePositive(secret.variableName, value);
-            } catch { /* stale detections still provide numeric feedback */ }
-        }
-        // ✅ Training signal: false positive
+        // Save the local decision first; separately ask about optional numeric sharing.
         await FeedbackManager.recordFalsePositive(secret);
         this._remove(secret);
 
         const stats = await FeedbackManager.getStats();
         if (stats.falsePositives > 0 && stats.falsePositives % 5 === 0) {
             vscode.window.showInformationMessage(
-                `🧠 Thanks! ${stats.falsePositives} false positives recorded — helping train the AI.`
+                t('secretsScanner.correctionsSaved', {count: stats.falsePositives})
             );
         }
+        await FeedbackManager.offerAfterCorrection(secret, 'false_positive');
     }
 
     private _remove(secret: DetectedSecret): void {
@@ -190,8 +186,8 @@ export class SecretsPanel {
 
         const json = JSON.stringify(secrets).replace(/</g, '\\u003c');
         
-        const isCloud = LLMAnalyzer.isCloudAnalysisEnabled();
-        const hintText = isCloud ? t('secretsScanner.hint') : t('secretsScanner.hintLocal');
+        const hintText = LLMAnalyzer.getInstance().isModelAvailable()
+            ? t('secretsScanner.hintLocal') : t('secretsScanner.hintFallback');
         const statsHint = secrets.length > 0 
             ? `<div class="hint">${hintText}</div>`
             : '';

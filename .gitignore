@@ -138,7 +138,13 @@ test/**
 !test/e2e-llm-logic.js
 !test/e2e-security-regressions.js
 !test/feature-parity.json
+!test/model-parity.json
+!test/e2e-local-model.js
+!test/deny-network.js
 !test/encryption-test-standalone.js
 
 # --- Articles (local drafts, not published) ---
 articles/
+
+!test/e2e-community-learning.js
+!test/e2e-community-consent.js

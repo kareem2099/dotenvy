@@ -9,6 +9,7 @@ import { EntropyAnalyzer } from './entropyAnalyzer';
 import { ContextEvaluator } from './contextEvaluator';
 import { CacheManager } from './cacheManager';
 import { LLMAnalyzer } from './llmAnalyzer';
+import { FeedbackManager } from './feedbackManager';
 import { DotenvyIgnore } from './dotenvyIgnore';
 import { logger } from './logger';
 import { t } from '../i18n';
@@ -281,6 +282,16 @@ export class SecretDetector {
                     matchIndex += secretValue.indexOf(assignment[1]) + 1;
                     secretValue = assignment[2];
                 }
+                // Different patterns can match fragments of one quoted value.
+                // Classify and remember the complete literal consistently.
+                for (const literal of line.matchAll(/(["'`])([^"'`\n]*)\1/g)) {
+                    const start = (literal.index ?? 0) + 1;
+                    if (start <= matchIndex && start + literal[2].length >= matchIndex + secretValue.length) {
+                        matchIndex = start;
+                        secretValue = literal[2];
+                        break;
+                    }
+                }
                 
                 if (EntropyAnalyzer.isLikelySecret(secretValue)) {
                     const originalContext = ContextEvaluator.getContextLine(allLines, lineIndex, matchIndex);
@@ -289,6 +300,9 @@ export class SecretDetector {
                     const secretScore = ContextEvaluator.calculateSecretScore(secretValue, context);
 
                     const variableName = this.extractVariableName(context);
+                    const valueDigest = crypto.createHash('sha256').update(secretValue).digest('hex');
+                    const correction = FeedbackManager.decision(filePath, variableName, valueDigest);
+                    if (correction === 'false_positive') { continue; }
 
                     const baselineConfidence = EntropyAnalyzer.getConfidence(secretValue);
                     let finalConfidence = baselineConfidence;
@@ -296,13 +310,16 @@ export class SecretDetector {
                     const reasoning = [...secretScore.reasoning];
 
                     // Try LLM analysis
-                    if (secretScore.confidence > 0.4) {
+                    if (correction === 'high') {
+                        finalConfidence = 'high';
+                        reasoning.push('Confirmed locally by you');
+                    } else if (secretScore.confidence > 0.4) {
                         try {
                             const llmConfidence = await LLMAnalyzer.getInstance().analyzeSecret(secretValue, context, variableName);
                             
-                            if (llmConfidence === 'high' || llmConfidence === 'critical') {
+                            if (llmConfidence === 'high') {
                                 finalConfidence = 'high';
-                                reasoning.push('✓ AI-verified');
+                                reasoning.push('Local classifier: likely secret (not credential validity)');
                                 detectionMethod = 'hybrid';
                             } else if (llmConfidence === 'medium') {
                                 finalConfidence = 'medium';
@@ -330,7 +347,7 @@ export class SecretDetector {
                         sourceFile: filePath,
                         valueLength: secretValue.length,
                         variableName,
-                        valueDigest: crypto.createHash('sha256').update(secretValue).digest('hex')
+                        valueDigest
                     };
 
                     secrets.push(baseSecret);

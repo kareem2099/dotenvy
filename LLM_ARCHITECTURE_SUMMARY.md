@@ -1,26 +1,34 @@
-# Secret analysis architecture (2.2.3)
+# Local classification and shared learning — DotEnvy 2.2.4
 
-DotEnvy performs local pattern/entropy analysis by default. Cloud analysis is
-explicitly opt-in. A registered device uses a per-installation HMAC credential
-held in VS Code SecretStorage. Requests send candidates and sanitized context
-transiently to DotAegis. The server classifies 35 numeric feature tokens with a
-small NumPy transformer; it is not a general-purpose language model.
+Complete candidate -> 35 locally extracted features -> local transformer worker
+-> classification. Raw candidates/code never enter the Aegis networking client.
+The exact TypeScript forward pass matches Python probabilities within 1e-8 on
+release fixtures. Bundled synthetic inference weights always provide an offline
+fallback; failed inference uses local heuristics without a cloud fallback.
 
-Detection captures features from the original value and redacts display/context
-before exposing scan results to the webview. A source location and digest let
-Move to .env re-read and verify the current original value. Plaintext keys are
-not held in persistent feedback or passed through webview messages.
+User decision -> immediate scoped local override -> one-time post-action consent.
+Consent accepts this correction and future ones; refusal/dismissal is persisted.
+Explicit Settings opt-out suppresses the suggestion; the toggle command allows
+users to change their choice later. Earlier history is never backfilled.
+With explicit community opt-in,
+a separate numeric sample (random ID, schema 2, 35 finite numbers, label/action)
+is queued and sent to `/extension/feedback` using per-installation HMAC.
+Acknowledged batches are removed; stable IDs make retries idempotent. Local
+fingerprints, paths, names, hashes and raw context never enter wire objects.
 
-Feedback schema 2 sends an ID, 35 finite features, feature schema, action and
-consistent label only. Local storage purges older context-bearing feedback.
-Uploads are serialized, preserve concurrent additions, and require explicit
-server acknowledgment. Aegis stages observations with quotas and deduplication;
-only administrator-approved observations update its durable checkpoint.
+Pending server samples -> administrator review -> exact-gradient shared training
+-> durable checkpoint -> `/model/release`. This public read endpoint returns
+compressed inference weights, manifest and revision, never replay/optimizer.
+No device credential is used for downloads. The client checks startup/hourly,
+validates data, replaces its worker only when ready, and invalidates scan caches.
+Bad updates retain the working local classifier. Both model downloads and numeric
+feedback can be disabled; the deprecated raw-cloud flag has no effect.
 
-Aegis bundles a synthetic bootstrap, verifies readiness against the trained model
-and PostgreSQL, persists numeric replay and optimizer state, and uses model
-weight revisions in Redis/LRU cache keys. Redis outages fall back to bounded LRU.
-Full-value SHA-256 community hashes live in v2 tables and require administrator
-review with matching real evidence. Hashes alone cannot be verified by a model.
+Local override state and opt-in numeric queues each retain at most 500 entries.
+Service credentials remain in SecretStorage. One accepted download is retained
+in global storage alongside bundled weights. Numeric feedback and shared training
+records persist server-side; no zero-storage or guaranteed anonymity claim applies.
+The classifier detects resemblance to secrets, not credential validity.
 
-See each repository's README and regression suites for operating instructions.
+See [README](README.md#privacy-local-ai-local-corrections-and-the-role-of-dotaegis)
+for settings, precise data flows, consent and Arabic explanation.

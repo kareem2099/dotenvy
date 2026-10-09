@@ -2,7 +2,7 @@
   "name": "dotenvy",
   "displayName": "DotEnvy – VS Code Environment Manager",
   "description": "Effortlessly manage, secure, and sync .env files directly inside VS Code with enterprise-grade encryption.",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "icon": "resources/icons/icon.png",
   "publisher": "FreeRave",
   "author": "Kareem Ehab",
@@ -113,7 +113,20 @@
         "dotenvy.secrets.enableCloudAnalysis": {
           "type": "boolean",
           "default": false,
-          "description": "%config.secrets.enableCloudAnalysis%"
+          "description": "%config.secrets.enableCloudAnalysis%",
+          "deprecationMessage": "%config.secrets.cloudAnalysisDeprecated%"
+        },
+        "dotenvy.secrets.enableCommunityLearning": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.secrets.enableCommunityLearning%",
+          "scope": "application"
+        },
+        "dotenvy.secrets.enableModelUpdates": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.secrets.enableModelUpdates%",
+          "scope": "application"
         }
       }
     },
@@ -122,11 +135,6 @@
         "command": "dotenvy.scanSecrets",
         "title": "%command.scanSecrets%",
         "icon": "$(search-view-icon)"
-      },
-      {
-        "command": "dotenvy.toggleCloudAnalysis",
-        "title": "%command.toggleCloudAnalysis%",
-        "icon": "$(cloud)"
       },
       {
         "command": "dotenvy.switchEnvironment",
@@ -150,11 +158,6 @@
         "command": "dotenvy.openVariableManager",
         "title": "%command.openVariableManager%",
         "icon": "$(edit)"
-      },
-      {
-        "command": "dotenvy.setupLLMSecret",
-        "title": "%command.setupLLMSecret%",
-        "icon": "$(key)"
       },
       {
         "command": "dotenvy.validateEnvironment",
@@ -242,6 +245,15 @@
         "command": "dotenvy.openTrashBin",
         "title": "%command.openTrashBin%",
         "icon": "$(trash)"
+      },
+      {
+        "command": "dotenvy.resetSecretCorrections",
+        "title": "%command.resetSecretCorrections%",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "dotenvy.toggleCommunityLearning",
+        "title": "%command.toggleCommunityLearning%"
       }
     ],
     "viewsContainers": {
@@ -270,12 +282,7 @@
       ]
     },
     "menus": {
-      "commandPalette": [
-        {
-          "command": "dotenvy.setupLLMSecret",
-          "when": "false"
-        }
-      ],
+      "commandPalette": [],
       "view/title": [
         {
           "command": "dotenvy.openVariableManager",

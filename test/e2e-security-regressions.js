@@ -11,7 +11,7 @@ const workspace = {uri: {fsPath: '/synthetic-workspace'}};
 const vscode = {
   ExtensionMode: {Development: 1},
   workspace: {
-    getConfiguration: () => ({get: (_key, fallback) => cloud}),
+    getConfiguration: () => ({get: key => key === 'secrets.enableCloudAnalysis' ? cloud : false, inspect: () => ({globalValue:false})}),
     workspaceFolders: [workspace],
     getWorkspaceFolder: () => workspace,
     openTextDocument: async () => ({lineAt: () => ({text: currentLine})}),
@@ -35,7 +35,7 @@ const {FeatureExtractor} = require('../out/utils/featureExtractor');
 const {readDetectedValue, encodeEnvValue} = require('../out/utils/detectedSecretValue');
 const context = {
   extensionMode: 1,
-  secrets: {get: async key => credentials.get(key), store: async (key, value) => credentials.set(key, value)},
+  secrets: {delete: async key => credentials.delete(key)},
   globalState: {
     get: (key, fallback) => structuredClone(state.get(key) || fallback),
     update: async (key, value) => { if (value === undefined) state.delete(key); else state.set(key, structuredClone(value)); }
@@ -48,7 +48,6 @@ async function main() {
       `Python/TypeScript feature ${i} mismatch for the synthetic parity fixture`));
   }
   const analyzer = await LLMAnalyzer.initialize(context);
-  await analyzer.setSharedSecret('test-only-synthetic-credential');
   await FeedbackManager.init(context);
   assert.equal(state.has('dotenvy.feedback.entries'), false, 'legacy raw queue must be purged');
 
@@ -67,40 +66,27 @@ async function main() {
   assert.equal(password.valueLength, 'SyntheticPassword012345ABCD'.length);
   assert.equal(password.column - 1, passwordLine.indexOf('SyntheticPassword'));
   await Promise.all([FeedbackManager.recordConfirmed(secret), FeedbackManager.recordFalsePositive(secret)]);
-  let entries = state.get('dotenvy.feedback.features.v2');
-  assert.equal(entries.length, 2, 'concurrent saves must preserve both entries');
-  assert.equal(entries[0].label, 'high', 'confirmation overrides a low prediction');
-  assert.equal(entries[1].label, 'false_positive');
+  let entries = state.get('dotenvy.corrections.local.v1');
+  assert.equal(entries.length, 1, 'latest correction replaces earlier decisions for the same value');
+  assert.equal(entries[0].label, 'false_positive');
   assert.equal(JSON.stringify(entries).includes(raw), false);
   assert.ok(entries.every(e => !('context' in e) && !('secret_value' in e)));
-  assert.notEqual(analyzer.hashEntry('API_KEY', 'sk_live_Alpha'), analyzer.hashEntry('API_KEY', 'sk_live_Beta'));
-  assert.equal(analyzer.hashEntry('API_KEY', raw), crypto.createHash('sha256').update(JSON.stringify(['API_KEY', raw])).digest('hex'));
-
-  cloud = true;
-  let mode = 'partial';
-  let requests = 0;
-  let release;
-  analyzer.makeSignedRequest = async (endpoint, data) => {
-    assert.equal(endpoint, '/extension/feedback');
-    assert.ok(data.samples.every(s => !('context' in s) && !('secret_value' in s)));
-    requests++;
-    if (mode === 'delay') await new Promise(resolve => {release = resolve;});
-    return {status: 'queued', accepted_sample_ids: mode === 'partial' ? [] : data.samples.map(s => s.id)};
-  };
-  await FeedbackManager.flush();
-  assert.equal(state.get('dotenvy.feedback.features.v2').filter(e => e.sent).length, 0);
-  mode = 'delay';
-  const flushing = FeedbackManager.flush();
-  const duplicateFlush = FeedbackManager.flush();
-  while (!release) await new Promise(resolve => setImmediate(resolve));
-  cloud = false;
+  assert.equal(FeedbackManager.decision(secret.sourceFile, secret.variableName, secret.valueDigest), 'false_positive');
+  await FeedbackManager.init(context);
+  assert.equal(FeedbackManager.decision(secret.sourceFile, secret.variableName, secret.valueDigest), 'false_positive',
+    'local corrections survive extension reinitialization');
+  const remaining = await SecretDetector.scanLine(currentLine, 0, [currentLine], secret.sourceFile);
+  assert.equal(remaining.length, 0);
+  assert.ok((await SecretDetector.scanLine(currentLine, 0, [currentLine], '/another-workspace/sample.ts')).length,
+    'false-positive correction must not affect another workspace/file');
+  assert.equal(FeedbackManager.decision(secret.sourceFile, secret.variableName, 'b'.repeat(64)), undefined,
+    'a changed value must not inherit an old ignore decision');
+  cloud = true; // Obsolete settings must not enable any upload.
   await FeedbackManager.recordConfirmed(secret);
-  release();
-  await Promise.all([flushing, duplicateFlush]);
-  entries = state.get('dotenvy.feedback.features.v2');
-  assert.equal(entries.length, 3, 'an entry added during upload must survive');
-  assert.equal(entries.filter(e => e.sent).length, 2);
-  assert.equal(requests, 2, 'overlapping flushes must share the same upload');
+  entries = state.get('dotenvy.corrections.local.v1');
+  assert.equal(entries[0].label, 'high', 'confirmation overrides a low model prediction');
+  assert.equal(FeedbackManager.decision(secret.sourceFile, secret.variableName, secret.valueDigest), 'high');
+  assert.equal(state.has('dotenvy.feedback.features.v2'), false);
 
   const panel = Object.create(SecretsPanel.prototype);
   panel._remove = () => {};
@@ -111,6 +97,14 @@ async function main() {
   await assert.rejects(readDetectedValue(secret), /changed/);
   await assert.rejects(readDetectedValue({...secret, sourceFile: undefined}), /stale/);
   assert.equal(encodeEnvValue('value # with spaces'), '"value # with spaces"');
-  console.log('✅ Security regressions: original features, private queues, acknowledgment, concurrency, full hashes, safe .env writes, stale-source rejection.');
+  for (let i = 0; i < 501; i++) {
+    await FeedbackManager.recordConfirmed({...secret, sourceFile: `/synthetic-workspace/file-${i}.ts`});
+  }
+  assert.equal(state.get('dotenvy.corrections.local.v1').length, 500);
+  await FeedbackManager.clear();
+  assert.equal(FeedbackManager.decision(secret.sourceFile, secret.variableName, secret.valueDigest), undefined);
+  assert.equal(state.has('dotenvy.corrections.local.v1'), false);
+  analyzer.dispose();
+  console.log('✅ Security regressions: feature parity, local correction persistence/scope/reset, concurrent writes, private records, original .env values and stale-source rejection.');
 }
 main().then(() => process.exit(0)).catch(error => {console.error(error); process.exit(1);});

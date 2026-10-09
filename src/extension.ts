@@ -34,7 +34,7 @@ import { SecretDetector } from './utils/secretDetector';
 import { HistoryManager } from './utils/historyManager';
 import { UpdateManager } from './managers/UpdateManager';
 
-// NEW: Import LLMAnalyzer (SecretStorage-based, no hardcoded secrets)
+// Bundled offline classifier and local user corrections.
 import { LLMAnalyzer } from './utils/llmAnalyzer';
 import { FeedbackManager } from './utils/feedbackManager';
 import { logger, LogLevel } from './utils/logger';
@@ -56,17 +56,23 @@ export async function activate(context: vscode.ExtensionContext) {
     const localization = LocalizationService.getInstance();
     await localization.initialize(context);
 
-    // ─── 0. Initialize LLMAnalyzer (must be first — other commands depend on it) ──
-    //
-    // This replaces the old: export const llmAnalyzer = LLMAnalyzer.getInstance();
-    //
-    // Why here? Because initialize() needs ExtensionContext to access SecretStorage.
-    // After this line, anywhere in the codebase you can call LLMAnalyzer.getInstance()
-    // safely — it will return the already-initialized instance.
-    //
-    // First-time setup (call once from your onboarding UI or settings command):
-    //   await LLMAnalyzer.getInstance().setSharedSecret('your-secret-here');
     await LLMAnalyzer.initialize(context);
+    await FeedbackManager.init(context);
+    // Updates only download weights; corrections upload only after explicit opt-in.
+    const syncAegis = () => { void LLMAnalyzer.getInstance().refreshModel(); void FeedbackManager.flush(); };
+    syncAegis();
+    const feedbackTimer = setInterval(() => { void FeedbackManager.flush(); }, 5 * 60 * 1000);
+    const modelTimer = setInterval(() => { void LLMAnalyzer.getInstance().refreshModel(); }, 60 * 60 * 1000);
+    feedbackTimer.unref(); modelTimer.unref();
+    context.subscriptions.push({dispose: () => { clearInterval(feedbackTimer); clearInterval(modelTimer); }},
+        vscode.workspace.onDidChangeConfiguration(event => {
+            if (event.affectsConfiguration('dotenvy.secrets.enableCommunityLearning')) {
+                void FeedbackManager.markCommunityChoice();
+                if (LLMAnalyzer.isCommunityLearningEnabled()) { void FeedbackManager.flush(); }
+                else { void FeedbackManager.clearQueue(); }
+            }
+            if (event.affectsConfiguration('dotenvy.secrets.enableModelUpdates')) { void LLMAnalyzer.getInstance().refreshModel(); }
+        }));
 
     // ─── 1. Initialize workspace manager ──────────────────────────────────────
     const workspaceManager = WorkspaceManager.getInstance();
@@ -108,14 +114,6 @@ export async function activate(context: vscode.ExtensionContext) {
             TrashBinWebviewProvider.refreshLocale();
             VariableWebviewProvider.refreshLocale();
             commandsTreeProvider.refresh();
-        }),
-        vscode.workspace.onDidChangeConfiguration(async (e) => {
-            if (e.affectsConfiguration('dotenvy.secrets.enableCloudAnalysis')) {
-                if (LLMAnalyzer.isCloudAnalysisEnabled()) {
-                    await LLMAnalyzer.getInstance().onCloudAnalysisEnabled();
-                    await FeedbackManager.flush();
-                }
-            }
         }),
     );
 
@@ -202,42 +200,27 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('dotenvy.showChangelog',
             () => UpdateManager.showChangelog(context)),
 
-        // NEW: Setup command — lets the user store the shared secret via UI
-        // Wire this to a settings button / onboarding flow in your webview
+        // Old keybindings remain safe: they cannot restore cloud transmission.
         vscode.commands.registerCommand('dotenvy.setupLLMSecret', async () => {
-            const secret = await vscode.window.showInputBox({
-                prompt: t('extension.llm.prompt'),
-                password: true,           // hides input
-                ignoreFocusOut: true,
-                placeHolder: t('extension.llm.placeholder'),
-            });
-            if (secret) {
-                await LLMAnalyzer.getInstance().setSharedSecret(secret);
-                vscode.window.showInformationMessage(t('extension.llm.saved'));
-            }
+            vscode.window.showInformationMessage(t('extension.localModel.info'));
         }),
-
-        // Toggle Cloud Secret Analysis (with explicit opt-in consent prompt)
         vscode.commands.registerCommand('dotenvy.toggleCloudAnalysis', async () => {
+            vscode.window.showInformationMessage(t('extension.localModel.info'));
+        }),
+        vscode.commands.registerCommand('dotenvy.toggleCommunityLearning', async () => {
             const config = vscode.workspace.getConfiguration('dotenvy');
-            const current = config.get<boolean>('secrets.enableCloudAnalysis', false);
-            if (!current) {
-                const choice = await vscode.window.showInformationMessage(
-                    t('extension.cloudAnalysis.consentPrompt'),
-                    { modal: true },
-                    t('extension.cloudAnalysis.enableBtn'),
-                    t('common.cancel')
-                );
-                if (choice === t('extension.cloudAnalysis.enableBtn')) {
-                    await config.update('secrets.enableCloudAnalysis', true, vscode.ConfigurationTarget.Global);
-                    await LLMAnalyzer.getInstance().onCloudAnalysisEnabled();
-                    await FeedbackManager.flush();
-                    vscode.window.showInformationMessage(t('extension.cloudAnalysis.enabledMsg'));
-                }
-            } else {
-                await config.update('secrets.enableCloudAnalysis', false, vscode.ConfigurationTarget.Global);
-                vscode.window.showInformationMessage(t('extension.cloudAnalysis.disabledMsg'));
+            if (LLMAnalyzer.isCommunityLearningEnabled()) {
+                await FeedbackManager.markCommunityChoice();
+                await config.update('secrets.enableCommunityLearning', false, vscode.ConfigurationTarget.Global);
+                await FeedbackManager.clearQueue();
+                vscode.window.showInformationMessage(t('extension.community.disabled'));
+                return;
             }
+            await FeedbackManager.requestCommunityConsent();
+        }),
+        vscode.commands.registerCommand('dotenvy.resetSecretCorrections', async () => {
+            await FeedbackManager.clear();
+            vscode.window.showInformationMessage(t('extension.localModel.correctionsCleared'));
         }),
 
         vscode.commands.registerCommand('dotenvy.addToIgnore', async (uri: vscode.Uri) => {
@@ -309,18 +292,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // ─── Startup checks ────────────────────────────────────────────────────────
 
-    // Test LLM connection on startup (non-blocking)
-    LLMAnalyzer.getInstance().testConnection().then(connected => {
-        if (connected) {
-            logger.info('LLM Service is online.', 'extension');
-        } else {
-            logger.warn('LLM Service unreachable, using local fallback.', 'extension');
-        }
-    });
-
     UpdateManager.checkNewVersion(context);
-    await FeedbackManager.init(context);
-    await FeedbackManager.flush();
 
     // Start real-time secret monitoring
     SecretDetector.startFileWatcher();

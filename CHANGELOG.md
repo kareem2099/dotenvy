@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.4] - 2026-10-09
+
+### Changed
+- Replace the extension and activity-bar icon with a clear DE monogram and amber key; show the updated icon in README.
+- Ask once about numeric community sharing after the first successful move or false-positive correction. Complete the local action before consent; acceptance includes that correction and future ones, while decline/dismissal persists across restarts. Keep the toggle command for later changes and respect explicit Settings opt-out.
+- Run DotAegis' trained transformer in a local worker. Classify complete original values without submitting candidates/code; retain local heuristic fallback and bundled synthetic weights.
+- Keep DotAegis as the shared training backend. Add explicit opt-in numeric corrections, installation HMAC authentication, stable-ID acknowledged retries and bounded local queues. Ignore the obsolete raw cloud-analysis setting; preserve device credentials and remove legacy queues.
+- Download the current inference-only release at startup/hourly by default, without device registration or scanner inputs. Validate checksums/schema/shapes, retain working weights on failure and invalidate scan caches after replacement. Both network features can be disabled independently.
+- Remember immediate local corrections scoped to file, variable and complete value; add reset and community-learning commands. Normalize overlapping matches to full quoted values.
+
+### Fixed
+- Match model-update ETags to verified cached weights so interrupted preference writes do not block future downloads. Keep model activation independent of old-cache cleanup and dispose workers if shutdown occurs during update persistence.
+
+### Validation
+- Verify Python/TypeScript probability parity and actual workers, offline scans with network blocked, numeric-only consent/retry/concurrency behavior and actual panel consent flows, authentication and model-update fallback. Verify original-value .env writes and stale-source rejection.
+
+### Documentation
+- Document local inference, optional feedback, reviewed shared training, downloaded weights, device/server storage and legacy behavior in English and Arabic. Avoid zero-storage or credential-validity claims.
+
 ## [2.2.3] - 2026-10-09
 
 ### Fixed

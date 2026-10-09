@@ -1,0 +1,25 @@
+{
+  "format": "dotenvy-local-transformer-v1",
+  "feature_schema": 2,
+  "sha256": "19042d5d1e99061bcd653a5e17e7e6de5d7d7949acb62329ad7cfec2236a5f70",
+  "bootstrap_sha256": "5ca0d0161e4bd3a652f011f83d36747819c4e89466bc3f7fd96845b9ac273288",
+  "training_source": "synthetic-only",
+  "validation": {
+    "samples": 81,
+    "binary_accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "tp": 42,
+    "tn": 39,
+    "fp": 0,
+    "fn": 0,
+    "dataset": "synthetic-independent-seed-v2; not a real-world accuracy guarantee"
+  },
+  "num_features": 35,
+  "labels": [
+    "high",
+    "medium",
+    "low",
+    "false_positive"
+  ]
+}
