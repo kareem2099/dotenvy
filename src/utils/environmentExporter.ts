@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 import { EncryptedVarsManager } from './encryptedVars';
 import { FileUtils } from './fileUtils';
 import { logger } from './logger';
@@ -66,7 +67,7 @@ export class EnvironmentExporter {
 
       // Read the environment file
       if (!await fs.promises.access(envPath, fs.constants.F_OK).catch(() => false)) {
-        throw new Error(`Environment file not found: ${envPath}`);
+        throw new Error(t('export.fileNotFound', { path: envPath }));
       }
 
       const content = await fs.promises.readFile(envPath, 'utf8');
@@ -92,7 +93,7 @@ export class EnvironmentExporter {
           exportContent = await this.exportToEncryptedJson(variables, metadata, { includeComments, maskSecrets });
           break;
         default:
-          throw new Error(`Unsupported export format: ${format}`);
+          throw new Error(t('export.unsupportedFormat', { format }));
       }
 
       return {
@@ -295,14 +296,14 @@ export class EnvironmentExporter {
     // Get master key if available
     const extensionContext = (global as { extensionContext?: vscode.ExtensionContext }).extensionContext;
     if (!extensionContext) {
-      throw new Error('Extension context not available for encrypted export');
+      throw new Error(t('export.noContext'));
     }
 
     let masterKey: Buffer;
     try {
       masterKey = await EncryptedVarsManager.ensureMasterKey(extensionContext);
     } catch {
-      throw new Error('Master key not available. Set a master password first for encrypted exports.');
+      throw new Error(t('export.noMasterKey'));
     }
 
     const encryptedContent = EncryptedVarsManager.encryptValue(jsonString, masterKey);
@@ -372,7 +373,7 @@ export class EnvironmentExporter {
     const supportedFormats = ['json', 'csv', 'env', 'encrypted-json'];
 
     if (options.format && !supportedFormats.includes(options.format)) {
-      return { valid: false, error: `Unsupported format: ${options.format}. Supported: ${supportedFormats.join(', ')}` };
+      return { valid: false, error: t('export.unsupportedOptions', { format: options.format, supported: supportedFormats.join(', ') }) };
     }
 
     return { valid: true };

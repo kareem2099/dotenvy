@@ -7,7 +7,7 @@ import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { FileUtils } from '../utils/fileUtils';
 import { EnvSyncUtils } from '../utils/envSyncUtils';
 import { extensionContext } from '../extension';
-import { createCloudSyncManager } from '../utils/encryptedCloudSyncManager';
+import { createCloudSyncManager } from '../utils/cloudSyncManagerFactory';
 import { showActionStart, showSyncToast } from '../utils/panelNotification';
 import { t } from '../i18n';
 
@@ -72,12 +72,13 @@ export class PushToCloudCommand implements vscode.Disposable {
 				return;
 			}
 
-			const connectionResult = await cloudManager.testConnection();
+			let connectionResult = await cloudManager.testConnection();
 			if (!connectionResult.success) {
 				const updatedSyncConfig = await DopplerSyncManager.handleConnectionFailure(
 					rootPath,
 					syncConfig,
-					connectionResult.error
+					connectionResult.error,
+					connectionResult.errorCode
 				);
 
 				if (!updatedSyncConfig) {
@@ -87,14 +88,23 @@ export class PushToCloudCommand implements vscode.Disposable {
 
 				syncConfig = updatedSyncConfig;
 				cloudManager = await createCloudSyncManager(syncConfig, extensionContext);
-				const retryResult = await cloudManager.testConnection();
-				if (!retryResult.success) {
+				connectionResult = await cloudManager.testConnection();
+				if (!connectionResult.success) {
 					showSyncToast(
-						retryResult.error ?? '',
+						connectionResult.error ?? '',
 						'error'
 					);
 					return;
 				}
+			}
+
+			syncConfig = await DopplerSyncManager.applyResolvedConfig(
+				rootPath,
+				syncConfig,
+				connectionResult.resolvedConfig
+			);
+			if (connectionResult.resolvedConfig) {
+				cloudManager = await createCloudSyncManager(syncConfig, extensionContext);
 			}
 
 			const syncTargets = await EnvSyncUtils.resolveSyncTargets(rootPath, syncConfig.config, config);

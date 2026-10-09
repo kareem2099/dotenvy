@@ -6,6 +6,7 @@ import { MIN_PASSWORD_LENGTH } from '../constants';
 import { ConfigUtils } from '../utils/configUtils';
 import { showActionStart, showSyncToast } from '../utils/panelNotification';
 import { t } from '../i18n';
+import { dopplerProjectNameHasUppercase } from '../utils/dopplerProjectSlug';
 
 export class InitSecureProjectCommand implements vscode.Disposable {
 
@@ -35,10 +36,17 @@ export class InitSecureProjectCommand implements vscode.Disposable {
             }
 
             // Get project name
+            const suggestedName = (vscode.workspace.workspaceFolders?.[0]?.name || 'project').toLowerCase();
             const projectName = await vscode.window.showInputBox({
                 prompt: t('initSecure.projectNamePrompt'),
                 placeHolder: t('initSecure.projectNamePlaceholder'),
-                value: vscode.workspace.workspaceFolders?.[0]?.name || 'Project'
+                value: suggestedName,
+                validateInput: (value) => {
+                    if (value && dopplerProjectNameHasUppercase(value)) {
+                        return t('initSecure.projectNameLowercase');
+                    }
+                    return null;
+                }
             });
 
             if (projectName === undefined) {
@@ -128,7 +136,11 @@ export class InitSecureProjectCommand implements vscode.Disposable {
                 if (result.success) {
                     workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
                     if (workspacePath) {
-                        await ConfigUtils.ensureWorkspaceConfigFile(workspacePath, undefined, false);
+                        await ConfigUtils.ensureWorkspaceConfigFile(
+                            workspacePath,
+                            projectName?.trim() || undefined,
+                            false
+                        );
                     }
 
                     showSyncToast(result.message, 'success');

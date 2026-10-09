@@ -1,0 +1,13 @@
+/* Modern Dashboard */
+.dashboard {
+    padding: var(--space-xl);
+    background: var(--vscode-editor-background);
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
+}
+

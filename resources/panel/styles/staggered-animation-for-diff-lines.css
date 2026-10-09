@@ -1,0 +1,20 @@
+/* Staggered animation for diff lines */
+.diff-line-added,
+.diff-line-removed,
+.diff-line-hunk {
+    animation: slideInUp 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+.diff-line-added:nth-child(odd) {
+    animation-delay: 0.1s;
+}
+
+.diff-line-removed:nth-child(odd) {
+    animation-delay: 0.15s;
+}
+
+.diff-line-hunk:nth-child(odd) {
+    animation-delay: 0.05s;
+}
+

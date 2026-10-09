@@ -34,6 +34,8 @@ export class AnalyticsWebviewProvider {
 
         if (AnalyticsWebviewProvider._panel) {
             AnalyticsWebviewProvider._panel.reveal(vscode.ViewColumn.One);
+            postLocaleToPanel(AnalyticsWebviewProvider._panel, 'analytics.');
+            await AnalyticsWebviewProvider._loadForActiveWorkspace();
             return;
         }
 
@@ -62,11 +64,7 @@ export class AnalyticsWebviewProvider {
             AnalyticsWebviewProvider._panel = undefined;
         }, null, context.subscriptions);
 
-        // Load data for the first workspace
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders && workspaceFolders.length > 0) {
-            await AnalyticsWebviewProvider.loadAnalytics(workspaceFolders[0].uri.fsPath);
-        }
+        // Initial load is triggered from the webview after scripts are ready (avoids lost postMessage).
     }
 
     // ─── Data Loading ───────────────────────────────────────────────────────────
@@ -99,7 +97,7 @@ export class AnalyticsWebviewProvider {
             logger.error('Failed to load analytics:', error, 'AnalyticsWebviewProvider');
             AnalyticsWebviewProvider._post({
                 type: 'error',
-                message: `Failed to load analytics: ${(error as Error).message}`,
+                errorMessage: (error as Error).message,
             });
         }
     }
@@ -110,18 +108,34 @@ export class AnalyticsWebviewProvider {
         AnalyticsWebviewProvider._panel?.webview.postMessage(message);
     }
 
-    private static async _handleMessage(message: { type: string; workspacePath: string }): Promise<void> {
+    private static async _loadForActiveWorkspace(): Promise<void> {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            AnalyticsWebviewProvider._post({
+                type: 'error',
+                errorMessage: t('common.noWorkspace'),
+            });
+            return;
+        }
+        await AnalyticsWebviewProvider.loadAnalytics(workspaceFolders[0].uri.fsPath);
+    }
+
+    private static async _handleMessage(message: { type: string; workspacePath?: string }): Promise<void> {
         switch (message.type) {
-            case 'loadAnalytics':
-                await AnalyticsWebviewProvider.loadAnalytics(message.workspacePath);
+            case 'webviewReady':
+                postLocaleToPanel(AnalyticsWebviewProvider._panel, 'analytics.');
+                await AnalyticsWebviewProvider._loadForActiveWorkspace();
                 break;
-            case 'refresh': {
-                const workspaceFolders = vscode.workspace.workspaceFolders;
-                if (workspaceFolders && workspaceFolders.length > 0) {
-                    await AnalyticsWebviewProvider.loadAnalytics(workspaceFolders[0].uri.fsPath);
+            case 'loadAnalytics':
+                if (message.workspacePath) {
+                    await AnalyticsWebviewProvider.loadAnalytics(message.workspacePath);
+                } else {
+                    await AnalyticsWebviewProvider._loadForActiveWorkspace();
                 }
                 break;
-            }
+            case 'refresh':
+                await AnalyticsWebviewProvider._loadForActiveWorkspace();
+                break;
         }
     }
 

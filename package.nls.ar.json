@@ -21,6 +21,8 @@
   "command.setupLLMSecret": "DotEnvy: إعداد سر خدمة LLM",
   "command.validateEnvironment": "DotEnvy: التحقق من صحة ملفات البيئة",
   "command.diffEnvironment": "DotEnvy: مقارنة ملفات البيئة (Diff)",
+  "command.compareEnvironments": "DotEnvy: مقارنة البيئات",
+  "command.diffCloud": "DotEnvy: مقارنة أسرار السحابة",
   "command.installGitHook": "DotEnvy: تثبيت خطاف Git Commit",
   "command.removeGitHook": "DotEnvy: إزالة خطاف Git Commit",
   "command.pullFromCloud": "DotEnvy: سحب البيئة من السحابة",

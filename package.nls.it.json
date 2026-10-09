@@ -21,6 +21,8 @@
   "command.setupLLMSecret": "DotEnvy: Configura secret LLM",
   "command.validateEnvironment": "DotEnvy: Valida file ambiente",
   "command.diffEnvironment": "DotEnvy: Confronta file ambiente",
+  "command.compareEnvironments": "DotEnvy: Confronta ambienti",
+  "command.diffCloud": "DotEnvy: Diff segreti cloud",
   "command.installGitHook": "DotEnvy: Installa Git commit hook",
   "command.removeGitHook": "DotEnvy: Rimuovi Git commit hook",
   "command.pullFromCloud": "DotEnvy: Pull ambiente dal cloud",

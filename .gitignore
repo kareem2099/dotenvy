@@ -30,7 +30,6 @@ test/runTest.js.map
 test/test-scanner.js
 test/test-llm-service.sh
 test/suite/
-test/*.test.js
 test/*.test.js.map
 
 # Environment files
@@ -134,14 +133,9 @@ RAILWAY-DEPLOYMENT.md
 
 test/**
 !test/run-all-tests.js
-!test/e2e-master-key-and-backup.js
-!test/e2e-llm-logic.js
-!test/e2e-security-regressions.js
-!test/feature-parity.json
-!test/model-parity.json
-!test/e2e-local-model.js
-!test/deny-network.js
-!test/encryption-test-standalone.js
+!test/*.test.js
+!test/support/
+!test/support/**
 
 # --- Articles (local drafts, not published) ---
 articles/

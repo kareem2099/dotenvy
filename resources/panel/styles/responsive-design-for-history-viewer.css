@@ -1,0 +1,51 @@
+/* Responsive Design for History Viewer */
+@media (max-width: 768px) {
+    .history-container {
+        padding: var(--space-md);
+    }
+
+    .history-header {
+        flex-direction: column;
+        gap: var(--space-md);
+        text-align: center;
+    }
+
+    .history-stats {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .history-toolbar {
+        justify-content: center;
+    }
+
+    .search-input {
+        min-width: 150px;
+        flex: 1;
+    }
+
+    .history-item-header {
+        flex-direction: column;
+        gap: var(--space-sm);
+        text-align: center;
+    }
+
+    .history-item-actions {
+        justify-content: center;
+    }
+
+    .detail-header {
+        flex-direction: column;
+        gap: var(--space-md);
+        text-align: center;
+    }
+
+    .detail-actions {
+        justify-content: center;
+    }
+
+    .blame-details {
+        justify-content: center;
+    }
+}
+

@@ -1,0 +1,144 @@
+/* Timeline Visualization Styles */
+.view-toggles {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.view-toggle {
+    background: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    color: var(--vscode-descriptionForeground) !important;
+    transition: all var(--transition-fast) !important;
+}
+
+.view-toggle.active {
+    background: var(--primary-gradient) !important;
+    color: white !important;
+    border-color: rgba(102, 126, 234, 0.5) !important;
+}
+
+.timeline-container {
+    padding: var(--space-lg);
+}
+
+.timeline-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.zoom-level {
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    min-width: 60px;
+    text-align: center;
+}
+
+.timeline-wrapper {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+    position: relative;
+}
+
+.timeline-svg {
+    width: 100%;
+    height: 400px;
+    background: transparent;
+}
+
+.timeline-content {
+    transform-origin: center;
+    transition: transform var(--transition-normal);
+}
+
+.time-axis {
+    font-size: 12px;
+    fill: var(--vscode-descriptionForeground);
+}
+
+.time-label {
+    font-family: var(--font-primary);
+    font-size: 11px;
+    fill: var(--vscode-descriptionForeground);
+    text-anchor: middle;
+}
+
+.timeline-line {
+    stroke: var(--glass-border);
+    stroke-width: 2;
+    fill: none;
+}
+
+.timeline-node {
+    transition: all var(--transition-fast);
+}
+
+.timeline-node:hover .timeline-circle {
+    r: 16;
+    stroke-width: 3;
+}
+
+.timeline-circle {
+    stroke: white;
+    stroke-width: 2;
+    transition: all var(--transition-fast);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.timeline-circle.action-switch {
+    fill: #3b82f6;
+    /* Blue */
+}
+
+.timeline-circle.action-rollback {
+    fill: #ef4444;
+    /* Red */
+}
+
+.timeline-circle.action-manual_edit {
+    fill: #f59e0b;
+    /* Orange */
+}
+
+.timeline-circle.action-import {
+    fill: #10b981;
+    /* Green */
+}
+
+.timeline-circle.action-initial {
+    fill: #8b5cf6;
+    /* Purple */
+}
+
+.timeline-icon {
+    font-size: 10px;
+    fill: white;
+    font-weight: bold;
+    pointer-events: none;
+    user-select: none;
+}
+
+.timeline-minimap {
+    margin-top: var(--space-md);
+    height: 60px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+}
+
+.minimap-svg {
+    width: 100%;
+    height: 100%;
+}
+

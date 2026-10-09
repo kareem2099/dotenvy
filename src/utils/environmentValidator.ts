@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { EnvironmentValidationRules } from '../types/environment';
+import { t } from '../i18n';
 
 export interface ValidationError {
 	type: 'syntax' | 'missing' | 'type' | 'custom';
@@ -46,7 +47,7 @@ export class EnvironmentValidator {
 		} catch (error) {
 			errors.push({
 				type: 'syntax',
-				message: `Failed to read environment file: ${(error as Error).message}`
+				message: t('validate.readFailed', { message: (error as Error).message })
 			});
 		}
 
@@ -105,7 +106,7 @@ export class EnvironmentValidator {
 			if (equalIndex === -1) {
 				errors.push({
 					type: 'syntax',
-					message: `Invalid line format: expected KEY=VALUE`,
+					message: t('validate.invalidLine'),
 					line: i + 1
 				});
 				continue;
@@ -115,7 +116,7 @@ export class EnvironmentValidator {
 			if (!key) {
 				errors.push({
 					type: 'syntax',
-					message: `Missing variable name before '='`,
+					message: t('validate.missingName'),
 					line: i + 1
 				});
 			}
@@ -126,7 +127,7 @@ export class EnvironmentValidator {
 			if (quoteCount % 2 !== 0) {
 				errors.push({
 					type: 'syntax',
-					message: `Unmatched quotes in value`,
+					message: t('validate.unmatchedQuotes'),
 					line: i + 1
 				});
 			}
@@ -149,7 +150,7 @@ export class EnvironmentValidator {
 				errors.push({
 					type: 'missing',
 					variable: requiredVar,
-					message: `Required variable '${requiredVar}' is missing`
+					message: t('validate.requiredMissing', { name: requiredVar })
 				});
 			}
 		}
@@ -177,7 +178,7 @@ export class EnvironmentValidator {
 				errors.push({
 					type: 'type',
 					variable: varName,
-					message: `Variable '${varName}' should be of type '${expectedType}' but got '${value}'`,
+					message: t('validate.wrongType', { name: varName, type: expectedType, value }),
 					line: variable.line
 				});
 			}
@@ -206,7 +207,7 @@ export class EnvironmentValidator {
 				errors.push({
 					type: 'custom',
 					variable: varName,
-					message: `Variable '${varName}' does not match required pattern`,
+					message: t('validate.patternMismatch', { name: varName }),
 					line: variable.line
 				});
 			}
@@ -252,7 +253,7 @@ export class EnvironmentValidator {
 	 */
 	static formatErrors(errors: ValidationError[]): string {
 		if (errors.length === 0) {
-			return 'No validation errors found.';
+			return t('validate.noneFound');
 		}
 
 		const groupedErrors = {
@@ -262,18 +263,18 @@ export class EnvironmentValidator {
 			custom: errors.filter(e => e.type === 'custom')
 		};
 
-		let result = `Found ${errors.length} validation error(s):\n\n`;
+		let result = `${t('validate.foundCount', { count: errors.length })}\n\n`;
 
 		if (groupedErrors.syntax.length > 0) {
-			result += '🔧 Syntax Errors:\n';
+			result += `${t('validate.syntaxHeader')}\n`;
 			groupedErrors.syntax.forEach(error => {
-				result += `  ${error.line ? `Line ${error.line}: ` : ''}${error.message}\n`;
+				result += `  ${error.line ? t('validate.linePrefix', { line: error.line }) : ''}${error.message}\n`;
 			});
 			result += '\n';
 		}
 
 		if (groupedErrors.missing.length > 0) {
-			result += '❌ Missing Required Variables:\n';
+			result += `${t('validate.missingHeader')}\n`;
 			groupedErrors.missing.forEach(error => {
 				result += `  ${error.message}\n`;
 			});
@@ -281,7 +282,7 @@ export class EnvironmentValidator {
 		}
 
 		if (groupedErrors.type.length > 0) {
-			result += '⚠️ Type Validation Errors:\n';
+			result += `${t('validate.typeHeader')}\n`;
 			groupedErrors.type.forEach(error => {
 				result += `  ${error.message}\n`;
 			});
@@ -289,7 +290,7 @@ export class EnvironmentValidator {
 		}
 
 		if (groupedErrors.custom.length > 0) {
-			result += '🔍 Custom Validation Errors:\n';
+			result += `${t('validate.customHeader')}\n`;
 			groupedErrors.custom.forEach(error => {
 				result += `  ${error.message}\n`;
 			});

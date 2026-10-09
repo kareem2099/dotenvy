@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
+import { t } from '../i18n';
 
 export interface BackupPackage {
     v: number;
@@ -30,7 +31,7 @@ export class BackupManager {
         return new Promise((resolve, reject) => {
             crypto.pbkdf2(password, salt, 310000, BackupManager.KEY_LENGTH, 'sha256', (err, derivedKey) => {
                 if (err) {
-                    reject(new Error(`Failed to derive key from password: ${err.message}`));
+                    reject(new Error(t('backup.deriveFailed', { message: err.message })));
                 } else {
                     resolve(derivedKey);
                 }
@@ -57,7 +58,7 @@ export class BackupManager {
 
     public static encryptWithKey(plaintext: string, key: Buffer, salt?: Buffer): string {
         if (key.length !== BackupManager.KEY_LENGTH) {
-            throw new Error('Invalid key length for encryption');
+            throw new Error(t('backup.invalidKey'));
         }
         const iv = crypto.randomBytes(BackupManager.IV_LENGTH);
         const cipher = crypto.createCipheriv(BackupManager.ALGO, key, iv, { authTagLength: 16 });
@@ -78,25 +79,25 @@ export class BackupManager {
 
     public static decryptWithKey(payloadB64: string, key: Buffer): string {
         if (key.length !== BackupManager.KEY_LENGTH) {
-            throw new Error('Invalid key length for decryption');
+            throw new Error(t('backup.invalidKey'));
         }
 
         let raw: string;
         try {
             raw = Buffer.from(payloadB64, 'base64').toString('utf8');
         } catch (e) {
-            throw new Error('Invalid encrypted payload', { cause: e });
+            throw new Error(t('backup.invalidPayload'), { cause: e });
         }
 
         let pack: { v: number; iv: string; ct: string; tag: string; s?: string };
         try {
             pack = JSON.parse(raw);
         } catch (e) {
-            throw new Error('Invalid encrypted payload format', { cause: e });
+            throw new Error(t('backup.invalidPayloadFormat'), { cause: e });
         }
 
         if (pack.v !== BackupManager.FORMAT_VERSION && pack.v !== 2) {
-            throw new Error(`Unsupported backup format version: ${pack.v}`);
+            throw new Error(t('backup.unsupportedVersion', { version: String(pack.v) }));
         }
 
         const iv = Buffer.from(pack.iv, 'base64');

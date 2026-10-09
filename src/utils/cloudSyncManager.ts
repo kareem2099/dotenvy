@@ -1,15 +1,21 @@
 import * as https from 'https';
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 import { CloudSyncConfig } from '../types/environment';
 
 export interface CloudSecrets {
 	[key: string]: string;
 }
 
+export type CloudSyncErrorCode = 'CONFIG_NOT_FOUND' | 'INVALID_PROJECT';
+
 export interface CloudSyncResult {
 	success: boolean;
 	secrets?: CloudSecrets;
 	error?: string;
+	/** Doppler config slug used after alias/API resolution */
+	resolvedConfig?: string;
+	errorCode?: CloudSyncErrorCode;
 }
 
 /**
@@ -47,7 +53,7 @@ export abstract class CloudSyncManager {
 		// Try config file's token field (for backward compatibility)
 		if (this.config.token) return this.config.token;
 
-		throw new Error(`${envVarName} environment variable is required, or specify token in config or VSCode secrets`);
+		throw new Error(t('doppler.tokenRequired', { name: envVarName }));
 	}
 
 	/**

@@ -1,0 +1,43 @@
+/* Modern Sections */
+.environments {
+    padding: var(--space-xl);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-md);
+    border-bottom: 2px solid var(--glass-border);
+}
+
+.section-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--vscode-foreground);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.current-env-section {
+    padding: var(--space-xl);
+    background: rgba(255, 255, 255, 0.01);
+    border-top: 1px solid var(--glass-border);
+}
+
+.current-env-content {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    background: var(--vscode-editor-background);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: var(--space-lg);
+    max-height: 400px;
+    overflow-y: auto;
+    box-shadow: inset var(--shadow-sm);
+}
+

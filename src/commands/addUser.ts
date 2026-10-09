@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { UserManager } from '../utils/userManager';
 import { UserCredentials } from '../types/user';
 import { MIN_PASSWORD_LENGTH } from '../constants';
+import { t } from '../i18n';
 
 export class AddUserCommand implements vscode.Disposable {
 
@@ -9,17 +10,17 @@ export class AddUserCommand implements vscode.Disposable {
         try {
             // Check if project is initialized
             if (!await UserManager.isSecureProjectInitialized()) {
-                vscode.window.showErrorMessage('Project not initialized. Run "DotEnvy: Init Secure Project" first.');
+                vscode.window.showErrorMessage(t('users.notInitialized'));
                 return;
             }
 
             // Get admin username
             const adminUsername = await vscode.window.showInputBox({
-                prompt: 'Enter your admin username',
-                placeHolder: 'admin_username',
+                prompt: t('addUser.adminUsernamePrompt'),
+                placeHolder: t('addUser.adminUsernamePlaceholder'),
                 validateInput: (value) => {
                     if (!value || value.trim().length < 3) {
-                        return 'Username must be at least 3 characters long';
+                        return t('initSecure.usernameMinLength');
                     }
                     return null;
                 }
@@ -31,12 +32,12 @@ export class AddUserCommand implements vscode.Disposable {
 
             // Get admin password
             const adminPassword = await vscode.window.showInputBox({
-                prompt: 'Enter your admin password',
+                prompt: t('addUser.adminPasswordPrompt'),
                 password: true,
-                placeHolder: 'Your admin password',
+                placeHolder: t('addUser.adminPasswordPlaceholder'),
                 validateInput: (value) => {
                     if (!value || value.length < MIN_PASSWORD_LENGTH) {
-                        return `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`;
+                        return t('initSecure.passwordMinLength', { min: MIN_PASSWORD_LENGTH });
                     }
                     return null;
                 }
@@ -48,14 +49,14 @@ export class AddUserCommand implements vscode.Disposable {
 
             // Get new user username
             const newUsername = await vscode.window.showInputBox({
-                prompt: 'Enter new user username',
-                placeHolder: 'new_developer_username',
+                prompt: t('addUser.newUsernamePrompt'),
+                placeHolder: t('addUser.newUsernamePlaceholder'),
                 validateInput: (value) => {
                     if (!value || value.trim().length < 3) {
-                        return 'Username must be at least 3 characters long';
+                        return t('initSecure.usernameMinLength');
                     }
                     if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
-                        return 'Username can only contain letters, numbers, hyphens, and underscores';
+                        return t('initSecure.usernameChars');
                     }
                     return null;
                 }
@@ -69,24 +70,24 @@ export class AddUserCommand implements vscode.Disposable {
             // This prevents the user from wasting time typing passwords if the name is taken.
             const userExists = await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Checking availability...'
+                title: t('addUser.checking')
             }, async () => {
                 return await UserManager.userExists(newUsername.trim());
             });
 
             if (userExists) {
-                vscode.window.showErrorMessage(`User "${newUsername}" already exists! Please choose another name.`);
+                vscode.window.showErrorMessage(t('addUser.alreadyExists', { username: newUsername }));
                 return;
             }
 
             // Get new user password (Only if username is valid)
             const newPassword = await vscode.window.showInputBox({
-                prompt: `Enter password for user "${newUsername.trim()}"`,
+                prompt: t('addUser.passwordPrompt', { username: newUsername.trim() }),
                 password: true,
-                placeHolder: 'Strong password for new user',
+                placeHolder: t('addUser.passwordPlaceholder'),
                 validateInput: (value) => {
                     if (!value || value.length < MIN_PASSWORD_LENGTH) {
-                        return `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`;
+                        return t('initSecure.passwordMinLength', { min: MIN_PASSWORD_LENGTH });
                     }
                     return null;
                 }
@@ -98,12 +99,12 @@ export class AddUserCommand implements vscode.Disposable {
 
             // Confirm new user password
             const confirmNewPassword = await vscode.window.showInputBox({
-                prompt: `Confirm password for user "${newUsername.trim()}"`,
+                prompt: t('addUser.confirmPrompt', { username: newUsername.trim() }),
                 password: true,
-                placeHolder: 'Re-enter password',
+                placeHolder: t('addUser.confirmPlaceholder'),
                 validateInput: (value) => {
                     if (value !== newPassword) {
-                        return 'Passwords do not match';
+                        return t('initSecure.passwordMismatch');
                     }
                     return null;
                 }
@@ -116,10 +117,10 @@ export class AddUserCommand implements vscode.Disposable {
             // Process creation
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Adding User to Secure Project',
+                title: t('addUser.progressTitle'),
                 cancellable: false
             }, async (progress) => {
-                progress.report({ message: 'Verifying admin credentials & Encrypting key...' });
+                progress.report({ message: t('addUser.progressMessage') });
 
                 const adminCredentials: UserCredentials = {
                     username: adminUsername.trim(),
@@ -136,12 +137,12 @@ export class AddUserCommand implements vscode.Disposable {
                 if (result.success) {
                     vscode.window.showInformationMessage(result.message);
                 } else {
-                    vscode.window.showErrorMessage(`Failed to add user: ${result.message}`);
+                    vscode.window.showErrorMessage(t('addUser.failed', { message: result.message }));
                 }
             });
 
         } catch (error) {
-            vscode.window.showErrorMessage(`Error adding user: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(t('addUser.error', { message: (error as Error).message }));
         }
     }
 

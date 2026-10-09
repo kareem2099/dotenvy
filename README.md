@@ -186,7 +186,7 @@ Native support for **English**, **Italian (`it`)**, **Arabic (`ar`)** (with full
 A modern, space-efficient sidebar design tailored for narrow split screens, complete with an interactive onboarding setup banner for newly opened repositories.
 
 ### ☁️ **Advanced Cloud Sync & Doppler Integration**
-Bidirectional cloud sync with Doppler Secrets Manager, supporting multi-file prefix routing (`BACKEND_`, `FRONTEND_`), orphan key cleanup, and automatic project discovery.
+Bidirectional cloud sync with Doppler Secrets Manager, supporting multi-file prefix routing (`BACKEND_`, `FRONTEND_`), orphan key cleanup, and automatic project discovery. Project names from `package.json`, the folder, or `.dotenvy.json` are normalized to lowercase Doppler slugs (dots and spaces become hyphens). Pull merges into existing `.env` files while preserving comments and layout, backs up each file to a sibling `.backup`, and appends `.env*.backup` to `.gitignore` when missing. Encrypted payloads use a sync passphrase (PBKDF2 + AES-256-GCM) stored in Doppler metadata so another machine can pull with the same passphrase.
 
 ### 📂 **Auto Detection & Sync**
 Automatically scans your workspace for `.env` files and syncs seamlessly across multi-workspace setups.
@@ -429,11 +429,20 @@ be rebuilt/reinstalled to receive the change. For local development, run
   "cloudSync": {
     "provider": "doppler",
     "project": "your-project-name",
-    "config": "development",
-    "token": "dp.pt.your_token_here"
+    "config": "dev",
+    "token": "dp.pt.your_token_here",
+    "encryptCloudSync": true,
+    "pushMode": "replace",
+    "envTargets": [
+      { "file": "backend/.env", "keyPrefix": "BACKEND_" },
+      { "file": "frontend/.env", "prefixes": ["VITE_"] },
+      { "file": ".env", "catchAll": true }
+    ]
   }
 }
 ```
+
+Use lowercase project slugs only. Doppler creates `dev`, `stg`, and `prd` configs for new projects.
 
 ---
 

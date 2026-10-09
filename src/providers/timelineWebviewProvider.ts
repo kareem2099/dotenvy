@@ -85,7 +85,7 @@ export class TimelineWebviewProvider {
             logger.error('Failed to load timeline:', error, 'TimelineWebviewProvider');
             TimelineWebviewProvider._post({
                 type: 'error',
-                message: `Failed to load timeline: ${(error as Error).message}`,
+                message: t('timeline.loadFailed', { message: (error as Error).message }),
             });
         }
     }

@@ -46,6 +46,62 @@ export class DotenvyIgnore {
 
     public static readonly FILENAME = '.dotenvyignore';
 
+    /** Always skipped by the secret scanner (even without .dotenvyignore). */
+    private static readonly BUILTIN_FILE_NAMES = new Set([
+        'package.json',
+        'package-lock.json',
+        'npm-shrinkwrap.json',
+        'yarn.lock',
+        'pnpm-lock.yaml',
+        'bun.lock',
+        'bun.lockb',
+        'composer.lock',
+        'gemfile.lock',
+        'poetry.lock',
+        'cargo.lock',
+        'go.sum',
+        'pipfile.lock',
+        '.dotenvy.json',
+        '.dotenvygit.json',
+    ]);
+
+    /** Directory name segments that skip scanning anywhere in the path. */
+    private static readonly BUILTIN_DIR_NAMES = new Set([
+        'node_modules',
+        '.git',
+        '.vscode',
+        '.idea',
+        '.gradle',
+        'out',
+        'dist',
+        'build',
+        'coverage',
+        'vendor',
+        'target',
+        'bin',
+        'obj',
+        '.next',
+        '.nuxt',
+        '.svelte-kit',
+        '.turbo',
+        '.cache',
+        '.parcel-cache',
+        '.venv',
+        'venv',
+        '__pycache__',
+        '.pytest_cache',
+        '.mypy_cache',
+        '.tox',
+        'htmlcov',
+        '.dotenvy',
+        '.dotenvy-backups',
+        '.cursor',
+        'articles',
+        'test',
+        'tests',
+        '__tests__',
+    ]);
+
     /** Default content written when user runs "Init .dotenvyignore" */
     public static readonly DEFAULT_CONTENT = `# .dotenvyignore
 # ================
@@ -87,10 +143,19 @@ k8s/**
 helm/**
 docker-compose*.yml
 
-# ── Lock files ────────────────────────────────────────────────────────────────
+# ── Lock / manifest files (also built-in scanner exclusions) ───────────────────
+package.json
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+bun.lockb
+composer.lock
+Cargo.lock
+go.sum
+
+# ── DotEnvy workspace config (may contain tokens by design) ───────────────────
+.dotenvy.json
+.dotenvyGit.json
 `;
 
     // ─── Cache ────────────────────────────────────────────────────────────────
@@ -105,7 +170,51 @@ pnpm-lock.yaml
     /**
      * Returns true if the file should be SKIPPED (is ignored).
      */
+    public static isBuiltinIgnored(filePath: string, rootPath: string): boolean {
+        const relative = path.relative(rootPath, filePath).replace(/\\/g, '/');
+        if (!relative || relative.startsWith('..')) {
+            return false;
+        }
+
+        const baseName = path.basename(relative).toLowerCase();
+        if (DotenvyIgnore.BUILTIN_FILE_NAMES.has(baseName)) {
+            return true;
+        }
+
+        const segments = relative.toLowerCase().split('/');
+        for (const segment of segments) {
+            if (DotenvyIgnore.BUILTIN_DIR_NAMES.has(segment)) {
+                return true;
+            }
+        }
+
+        if (baseName.endsWith('.min.js') || baseName.endsWith('.min.css') || baseName.endsWith('.map')) {
+            return true;
+        }
+
+        if (DotenvyIgnore.isBuiltinTestFileName(baseName)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** Test and e2e fixtures often embed fake secrets on purpose. */
+    private static isBuiltinTestFileName(baseNameLower: string): boolean {
+        if (/\.(test|spec)\.(js|ts|tsx|jsx|mjs|cjs)$/.test(baseNameLower)) {
+            return true;
+        }
+        if (baseNameLower.startsWith('e2e-') || baseNameLower.endsWith('-standalone.js')) {
+            return true;
+        }
+        return false;
+    }
+
     public static shouldIgnore(filePath: string, rootPath: string): boolean {
+        if (DotenvyIgnore.isBuiltinIgnored(filePath, rootPath)) {
+            return true;
+        }
+
         const patterns = DotenvyIgnore.loadPatterns(rootPath);
         if (patterns.length === 0) { return false; }
 

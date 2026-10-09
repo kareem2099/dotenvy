@@ -10,8 +10,21 @@ export type TranslationKey = keyof typeof en;
 const LOCALES: Record<Locale, Record<string, string>> = { en, it, ar, ru };
 const LOCALE_STORAGE_KEY = 'dotenvy.locale';
 
+export const SUPPORTED_LOCALES: readonly Locale[] = ['en', 'it', 'ar', 'ru'];
+
+const LOCALE_LABEL_KEYS: Record<Locale, TranslationKey> = {
+	en: 'panel.language.en',
+	it: 'panel.language.it',
+	ar: 'panel.language.ar',
+	ru: 'panel.language.ru',
+};
+
+export function isSupportedLocale(locale: string): locale is Locale {
+	return (SUPPORTED_LOCALES as readonly string[]).includes(locale);
+}
+
 export function resolveDefaultLocale(): Locale {
-	const lang = vscode.env.language.toLowerCase();
+	const lang = (vscode.env.language ?? 'en').toLowerCase();
 	if (lang.startsWith('ar')) {
 		return 'ar';
 	}
@@ -48,11 +61,18 @@ export class LocalizationService {
 		return this.locale;
 	}
 
+	getAvailableLocales(): Array<{ code: Locale; label: string }> {
+		return SUPPORTED_LOCALES.map(code => ({
+			code,
+			label: this.t(LOCALE_LABEL_KEYS[code]),
+		}));
+	}
+
 	async setLocale(locale: string): Promise<void> {
-		if (locale !== 'en' && locale !== 'it' && locale !== 'ar' && locale !== 'ru') {
+		if (!isSupportedLocale(locale)) {
 			return;
 		}
-		this.locale = locale as Locale;
+		this.locale = locale;
 		await this.context?.globalState.update(LOCALE_STORAGE_KEY, locale);
 		this.onDidChangeLocaleEmitter.fire(this.locale);
 	}

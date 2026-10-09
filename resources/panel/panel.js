@@ -76,6 +76,14 @@ const buttonEffects = {
 
 let currentStrings = {};
 let currentLocale = 'en';
+const DEFAULT_LOCALES = [
+    { code: 'en', label: 'English' },
+    { code: 'it', label: 'Italiano' },
+    { code: 'ar', label: 'العربية' },
+    { code: 'ru', label: 'Русский' },
+];
+let availableLocales = [...DEFAULT_LOCALES];
+window.dotenvyPanelShared = { vscode, get currentLocale() { return currentLocale; }, set currentLocale(value) { currentLocale = value; }, get availableLocales() { return availableLocales; }, set availableLocales(value) { availableLocales = value; } };
 
 function tr(key, params = {}) {
     let text = currentStrings[key] || key;
@@ -105,128 +113,9 @@ function applyTranslations() {
             el.title = tr(key);
         }
     });
-    syncLocaleDropdown();
+    window.dotenvyPanelLocale.sync();
 }
 
-function syncLocaleDropdown() {
-    const menu = document.getElementById('locale-dropdown-menu');
-    const valueEl = document.getElementById('locale-dropdown-value');
-    if (!menu || !valueEl || !currentLocale) {
-        return;
-    }
-
-    menu.querySelectorAll('.locale-dropdown-option').forEach((opt) => {
-        const isSelected = opt.dataset.locale === currentLocale;
-        opt.classList.toggle('is-selected', isSelected);
-        opt.setAttribute('aria-selected', isSelected ? 'true' : 'false');
-    });
-
-    const selectedOpt = menu.querySelector(`[data-locale="${currentLocale}"]`);
-    if (selectedOpt) {
-        const key = selectedOpt.getAttribute('data-i18n');
-        valueEl.textContent = key ? tr(key) : selectedOpt.textContent;
-    }
-}
-
-let localeDropdownScrollHandler = null;
-
-function positionLocaleDropdownMenu() {
-    const trigger = document.getElementById('locale-dropdown-trigger');
-    const menu = document.getElementById('locale-dropdown-menu');
-    if (!trigger || !menu) {
-        return;
-    }
-    const rect = trigger.getBoundingClientRect();
-    menu.style.top = `${rect.bottom + 4}px`;
-    menu.style.left = `${rect.left}px`;
-    menu.style.width = `${rect.width}px`;
-}
-
-function closeLocaleDropdown() {
-    const dropdown = document.getElementById('locale-dropdown');
-    const trigger = document.getElementById('locale-dropdown-trigger');
-    const menu = document.getElementById('locale-dropdown-menu');
-    if (!dropdown || !trigger || !menu) {
-        return;
-    }
-    dropdown.classList.remove('is-open');
-    trigger.setAttribute('aria-expanded', 'false');
-    menu.hidden = true;
-    if (localeDropdownScrollHandler) {
-        window.removeEventListener('scroll', localeDropdownScrollHandler, true);
-        window.removeEventListener('resize', localeDropdownScrollHandler);
-        localeDropdownScrollHandler = null;
-    }
-}
-
-function openLocaleDropdown() {
-    const dropdown = document.getElementById('locale-dropdown');
-    const trigger = document.getElementById('locale-dropdown-trigger');
-    const menu = document.getElementById('locale-dropdown-menu');
-    if (!dropdown || !trigger || !menu) {
-        return;
-    }
-    dropdown.classList.add('is-open');
-    trigger.setAttribute('aria-expanded', 'true');
-    menu.hidden = false;
-    positionLocaleDropdownMenu();
-    localeDropdownScrollHandler = () => closeLocaleDropdown();
-    window.addEventListener('scroll', localeDropdownScrollHandler, true);
-    window.addEventListener('resize', localeDropdownScrollHandler);
-}
-
-function toggleLocaleDropdown() {
-    const dropdown = document.getElementById('locale-dropdown');
-    if (!dropdown) {
-        return;
-    }
-    if (dropdown.classList.contains('is-open')) {
-        closeLocaleDropdown();
-    } else {
-        openLocaleDropdown();
-    }
-}
-
-function initLocaleDropdown() {
-    const dropdown = document.getElementById('locale-dropdown');
-    const trigger = document.getElementById('locale-dropdown-trigger');
-    const menu = document.getElementById('locale-dropdown-menu');
-    if (!dropdown || !trigger || !menu) {
-        return;
-    }
-
-    trigger.addEventListener('click', (event) => {
-        event.stopPropagation();
-        toggleLocaleDropdown();
-    });
-
-    menu.querySelectorAll('.locale-dropdown-option').forEach((opt) => {
-        opt.addEventListener('click', (event) => {
-            event.stopPropagation();
-            const locale = opt.dataset.locale;
-            if (locale && locale !== currentLocale) {
-                setLocale(locale);
-            }
-            closeLocaleDropdown();
-        });
-    });
-
-    menu.addEventListener('click', (event) => {
-        event.stopPropagation();
-    });
-
-    document.addEventListener('click', () => closeLocaleDropdown());
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-            closeLocaleDropdown();
-        }
-    });
-}
-
-function setLocale(value) {
-    vscode.postMessage({ type: 'setLocale', locale: value });
-}
-window.setLocale = setLocale;
 
 // ============================
 // 3. MAIN DASHBOARD LOGIC
@@ -238,6 +127,13 @@ function updateDashboard(data) {
     }
     if (data.locale) {
         currentLocale = data.locale;
+    }
+    if (Array.isArray(data.locales) && data.locales.length > 0) {
+        availableLocales = data.locales.map((entry) => ({
+            code: entry.code,
+            label: entry.label,
+        }));
+        window.dotenvyPanelLocale.renderMenu();
     }
     applyTranslations();
     console.log('📊 Updating dashboard...', data);
@@ -377,7 +273,7 @@ function updateEnvironmentsGrid(data) {
             <div class="env-card-actions">
                 <button class="btn btn-primary btn-sm" onclick="switchTo('${env.name}')">${tr('panel.environments.switch')}</button>
                 <button class="btn btn-secondary btn-sm" onclick="diffWithCurrent('${env.name}')">${tr('panel.environments.compare')}</button>
-                <button class="btn-secondary btn-sm" onclick="openVariableManager('${env.fileName}')">${tr('panel.environments.edit')}</button>
+                <button class="btn btn-secondary btn-sm" onclick="openVariableManager('${env.fileName}')">${tr('panel.environments.edit')}</button>
             </div>
         `;
         container.appendChild(card);
@@ -485,7 +381,8 @@ window.addEventListener('message', event => {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 DotEnvy UI Initialized');
     addAnimationStyles();
-    initLocaleDropdown();
+    window.dotenvyPanelLocale.renderMenu();
+    window.dotenvyPanelLocale.init();
 
     document.querySelectorAll('.btn').forEach(btn => {
         btn.addEventListener('click', buttonEffects.addRipple);

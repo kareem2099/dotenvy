@@ -1,0 +1,9 @@
+/* Animation Classes */
+.animate-fade-in {
+    animation: fadeInUp var(--transition-slow);
+}
+
+.animate-slide-in {
+    animation: slideIn var(--transition-normal);
+}
+

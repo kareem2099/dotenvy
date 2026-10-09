@@ -1,0 +1,76 @@
+/* Modern Backup Section */
+.backup-section {
+    padding: var(--space-xl);
+    background: rgba(255, 255, 255, 0.01);
+    border-top: 1px solid var(--glass-border);
+}
+
+.backup-settings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.setting-item {
+    padding: var(--space-md) var(--space-lg);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.setting-item-backup-path {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--space-md);
+    row-gap: var(--space-xs);
+    align-items: baseline;
+}
+
+.setting-label {
+    color: var(--vscode-descriptionForeground);
+    font-weight: 600;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.setting-value {
+    color: var(--vscode-foreground);
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    word-break: break-word;
+    min-width: 0;
+}
+
+.setting-item-checkbox {
+    display: flex;
+    align-items: center;
+}
+
+.setting-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin: 0;
+    cursor: pointer;
+    width: 100%;
+    min-height: 1.25rem;
+}
+
+.setting-checkbox {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: #667eea;
+}
+
+.setting-checkbox-text {
+    color: var(--vscode-foreground);
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+

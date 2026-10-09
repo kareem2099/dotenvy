@@ -1,0 +1,8 @@
+/* ── Search Highlight ── */
+mark.search-highlight {
+    background: rgba(245,158,11,0.35);
+    color: #fbbf24;
+    border-radius: 2px;
+    padding: 0 1px;
+}
+

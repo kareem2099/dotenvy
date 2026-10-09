@@ -94,7 +94,7 @@ export class VariableWebviewProvider {
             logger.error('Failed to load variables:', error, 'VariableWebviewProvider');
             VariableWebviewProvider._post({
                 type: 'error',
-                message: `Failed to load variables: ${(error as Error).message}`
+                errorMessage: (error as Error).message,
             });
         }
     }
@@ -105,6 +105,7 @@ export class VariableWebviewProvider {
         fileName?: string; 
         workspacePath?: string;
         message?: string;
+        errorMessage?: string;
     }): void {
         VariableWebviewProvider._panel?.webview.postMessage(message);
     }
@@ -156,10 +157,10 @@ export class VariableWebviewProvider {
                         
                         await EncryptedEnvironmentFile.writeEnvFile(filePath, varsMap, context);
                         await VariableWebviewProvider.loadVariables(envFile);
-                        vscode.window.showInformationMessage(`Variable ${message.key} updated`);
+                        vscode.window.showInformationMessage(t('vars.webviewUpdated', { key: message.key }));
                     }
                 } catch (err) {
-                    vscode.window.showErrorMessage(`Update failed: ${(err as Error).message}`);
+                    vscode.window.showErrorMessage(t('vars.updateFailed', { message: (err as Error).message }));
                 }
                 break;
             }
@@ -184,10 +185,10 @@ export class VariableWebviewProvider {
                         varsMap.delete(message.key);
                         await EncryptedEnvironmentFile.writeEnvFile(filePath, varsMap, context);
                         await VariableWebviewProvider.loadVariables(envFile);
-                        vscode.window.showInformationMessage(`Variable ${message.key} deleted`);
+                        vscode.window.showInformationMessage(t('vars.webviewDeleted', { key: message.key }));
                     }
                 } catch (err) {
-                    vscode.window.showErrorMessage(`Delete failed: ${(err as Error).message}`);
+                    vscode.window.showErrorMessage(t('vars.deleteFailed', { message: (err as Error).message }));
                 }
                 break;
             }
@@ -204,7 +205,7 @@ export class VariableWebviewProvider {
                         await VariableWebviewProvider.loadVariables(envFile);
                     }
                 } catch (err) {
-                    vscode.window.showErrorMessage(`Encryption toggle failed: ${(err as Error).message}`);
+                    vscode.window.showErrorMessage(t('vars.encryptionToggleFailed', { message: (err as Error).message }));
                 }
                 break;
             }
@@ -237,6 +238,7 @@ export class VariableWebviewProvider {
             tokens: {
                 styleUri:  webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css')).toString(),
                 scriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'variable-manager.js')).toString(),
+                modalScriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'variable-manager-modal.js')).toString(),
                 i18nScriptUri: webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'webview-i18n.js')).toString(),
             },
         });

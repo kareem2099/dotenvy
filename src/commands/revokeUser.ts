@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { UserManager } from '../utils/userManager';
 import { UserCredentials } from '../types/user';
+import { t } from '../i18n';
 
 export class RevokeUserCommand implements vscode.Disposable {
 
@@ -8,7 +9,7 @@ export class RevokeUserCommand implements vscode.Disposable {
         try {
             // Safety Check
             if (!await UserManager.isSecureProjectInitialized()) {
-                vscode.window.showErrorMessage('Project not initialized. Run "DotEnvy: Init Secure Project" first.');
+                vscode.window.showErrorMessage(t('users.notInitialized'));
                 return;
             }
 
@@ -17,17 +18,17 @@ export class RevokeUserCommand implements vscode.Disposable {
             // ==========================================
 
             const adminUsername = await vscode.window.showInputBox({
-                prompt: 'Enter Admin Username (to authorize revocation)',
-                placeHolder: 'admin_username',
+                prompt: t('revoke.adminUsernamePrompt'),
+                placeHolder: t('revoke.adminUsernamePlaceholder'),
                 ignoreFocusOut: true
             });
 
             if (!adminUsername) return;
 
             const adminPassword = await vscode.window.showInputBox({
-                prompt: `Enter password for admin '${adminUsername}'`,
+                prompt: t('revoke.adminPasswordPrompt', { username: adminUsername }),
                 password: true,
-                placeHolder: 'Admin password',
+                placeHolder: t('revoke.adminPasswordPlaceholder'),
                 ignoreFocusOut: true
             });
 
@@ -41,7 +42,7 @@ export class RevokeUserCommand implements vscode.Disposable {
             // Verify Admin First (Fail Fast)
             const accessResult = await UserManager.accessProjectKey(adminCredentials);
             if (!accessResult.success) {
-                vscode.window.showErrorMessage(`⛔ Access Denied: ${accessResult.message}`);
+                vscode.window.showErrorMessage(t('revoke.accessDenied', { message: accessResult.message ?? '' }));
                 return;
             }
 
@@ -56,13 +57,13 @@ export class RevokeUserCommand implements vscode.Disposable {
             const items = users.map(u => ({
                 label: u.username,
                 description: u.role,
-                detail: `Last access: ${u.lastAccess ? new Date(u.lastAccess).toLocaleString() : 'Never'}`,
+                detail: t('revoke.lastAccess', { time: u.lastAccess ? new Date(u.lastAccess).toLocaleString() : t('revoke.never') }),
                 picked: false
             }));
 
             const selectedUser = await vscode.window.showQuickPick(items, {
-                placeHolder: 'Select the user to REVOKE access',
-                title: 'Revoke User Access 🚫',
+                placeHolder: t('revoke.selectUser'),
+                title: t('revoke.title'),
                 matchOnDescription: true
             });
 
@@ -70,19 +71,21 @@ export class RevokeUserCommand implements vscode.Disposable {
 
             // Protection: if admin selects themselves
             if (selectedUser.label === adminUsername) {
+                const revokeMe = t('revoke.yesRevokeMe');
                 const confirm = await vscode.window.showWarningMessage(
-                    '⚠️ You are about to revoke your own access! Are you sure?',
-                    'Yes, Revoke Me', 'Cancel'
+                    t('revoke.selfWarning'),
+                    revokeMe, t('common.cancel')
                 );
-                if (confirm !== 'Yes, Revoke Me') return;
+                if (confirm !== revokeMe) return;
             } else {
                 // Normal confirmation
+                const revokeLabel = t('revoke.yesRevoke');
                 const confirm = await vscode.window.showWarningMessage(
-                    `Are you sure you want to revoke access for '${selectedUser.label}'? They will lose access to secrets immediately.`,
+                    t('revoke.confirm', { username: selectedUser.label }),
                     { modal: true },
-                    'Yes, Revoke', 'Cancel'
+                    revokeLabel, t('common.cancel')
                 );
-                if (confirm !== 'Yes, Revoke') return;
+                if (confirm !== revokeLabel) return;
             }
 
             // ==========================================
@@ -91,19 +94,19 @@ export class RevokeUserCommand implements vscode.Disposable {
 
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: `Revoking access for ${selectedUser.label}...`,
+                title: t('revoke.progress', { username: selectedUser.label }),
             }, async () => {
                 const result = await UserManager.revokeUser(adminCredentials, selectedUser.label);
 
                 if (result.success) {
-                    vscode.window.showInformationMessage(`✅ ${result.message}`);
+                    vscode.window.showInformationMessage(t('revoke.success', { message: result.message }));
                 } else {
-                    vscode.window.showErrorMessage(`❌ Failed: ${result.message}`);
+                    vscode.window.showErrorMessage(t('revoke.failed', { message: result.message }));
                 }
             });
 
         } catch (error) {
-            vscode.window.showErrorMessage(`Error: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(t('common.errorWithMessage', { message: (error as Error).message }));
         }
     }
 

@@ -1,0 +1,115 @@
+/* Table */
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.history-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--vscode-editor-background);
+}
+
+.history-table th {
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--vscode-descriptionForeground);
+    border-bottom: 2px solid var(--glass-border);
+}
+
+.history-table th.col-actions {
+    text-align: right;
+}
+
+.history-table td.empty-state,
+.history-table td.loading,
+.history-table td.error-state {
+    border-radius: 0;
+    border: 2px dashed var(--glass-border);
+    background: var(--glass-bg);
+}
+
+.history-row {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background var(--transition-fast);
+}
+
+.history-row:hover {
+    background: rgba(102, 126, 234, 0.06);
+}
+
+.history-row td {
+    padding: var(--space-sm) var(--space-md);
+    vertical-align: middle;
+}
+
+.col-time {
+    white-space: nowrap;
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.8rem;
+    min-width: 90px;
+}
+
+.env-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: rgba(102,126,234,0.15);
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-right: 4px;
+}
+
+.env-file {
+    font-size: 0.72rem;
+    color: var(--vscode-descriptionForeground);
+    font-family: var(--font-mono);
+}
+
+.col-note {
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.8rem;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.col-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.btn-table {
+    padding: 3px 10px;
+    border: 1px solid var(--glass-border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--vscode-foreground);
+    font-size: 0.78rem;
+    cursor: pointer;
+    margin-left: var(--space-xs);
+    transition: all var(--transition-fast);
+}
+
+.btn-table:hover {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: rgba(102, 126, 234, 0.5);
+}
+
+.btn-table-danger {
+    color: #ef4444;
+    border-color: rgba(239,68,68,0.3);
+}
+
+.btn-table-danger:hover {
+    background: rgba(239,68,68,0.1);
+    border-color: rgba(239,68,68,0.6);
+}
+

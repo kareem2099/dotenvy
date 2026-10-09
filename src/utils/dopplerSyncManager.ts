@@ -1,10 +1,17 @@
 import * as https from 'https';
 import * as vscode from 'vscode';
 import { t } from '../i18n';
-import { CloudSyncManager, CloudSecrets, CloudSyncResult } from './cloudSyncManager';
+import { CloudSyncErrorCode, CloudSyncManager, CloudSecrets, CloudSyncResult } from './cloudSyncManager';
 import { CloudSyncConfig } from '../types/environment';
 import { isCloudMetadataKey } from '../constants';
 import { DOPPLER_RESERVED_KEYS } from './envSyncUtils';
+import {
+	applyResolvedConfig as persistResolvedConfig,
+	handleConnectionFailure as promptConnectionFailure,
+	promptConfigSelection,
+	promptProjectSelection,
+} from './dopplerConfigPrompt';
+import { normalizeDopplerProjectSlug } from './dopplerProjectSlug';
 // Doppler API response format for individual secrets
 type DopplerSecretData = {
 	computed: string;
@@ -13,9 +20,16 @@ type DopplerSecretData = {
 export class DopplerSyncManager extends CloudSyncManager {
 	private resolvedConfig?: string;
 
+	constructor(config: CloudSyncConfig, token?: string) {
+		const project = config.project?.trim()
+			? normalizeDopplerProjectSlug(config.project)
+			: config.project;
+		super({ ...config, project }, token);
+	}
+
 	static getDashboardUrl(project?: string, config?: string): string {
 		const base = 'https://dashboard.doppler.com';
-		const trimmedProject = project?.trim();
+		const trimmedProject = project?.trim() ? normalizeDopplerProjectSlug(project) : undefined;
 		if (!trimmedProject) {
 			return base;
 		}
@@ -44,11 +58,16 @@ export class DopplerSyncManager extends CloudSyncManager {
 			const secrets: CloudSecrets = {};
 
 			for (const [key, secretData] of Object.entries(parsed) as [string, DopplerSecretData][]) {
+				let value: string | undefined;
 				if (secretData && typeof secretData === 'object' && 'computed' in secretData) {
-					secrets[key] = secretData.computed;
+					value = secretData.computed;
 				} else if (typeof secretData === 'string') {
-					secrets[key] = secretData;
+					value = secretData;
 				}
+				if (value === undefined) {
+					continue;
+				}
+				secrets[key] = isCloudMetadataKey(key) ? value.trim() : value;
 			}
 
 			return {
@@ -59,7 +78,7 @@ export class DopplerSyncManager extends CloudSyncManager {
 		} catch (error) {
 			return {
 				success: false,
-				error: `Failed to fetch from Doppler: ${(error as Error).message}`
+				error: t('doppler.fetchFailed', { message: (error as Error).message })
 			};
 		}
 	}
@@ -152,7 +171,7 @@ export class DopplerSyncManager extends CloudSyncManager {
 		} catch (error) {
 			return {
 				success: false,
-				error: `Failed to push to Doppler: ${(error as Error).message}`
+				error: t('doppler.pushFailed', { message: (error as Error).message })
 			};
 		}
 	}
@@ -188,7 +207,9 @@ export class DopplerSyncManager extends CloudSyncManager {
 	 * Test connection to Doppler
 	 */
 	async testConnection(): Promise<CloudSyncResult> {
-		const configNames = this.getConfigNames();
+		const listedConfigs = await this.listConfigs().catch(() => []);
+		const listedNames = listedConfigs.map(entry => entry.name);
+		const configNames = [...new Set([...this.getConfigNames(), ...listedNames])];
 
 		for (const configName of configNames) {
 			try {
@@ -197,31 +218,61 @@ export class DopplerSyncManager extends CloudSyncManager {
 
 				await this.makeDopplerRequest(url);
 
-				// If we reach here, connection successful
-				// If this was a different config than original, remember it
 				if (configName !== this.config.config) {
 					this.resolvedConfig = configName;
 				}
-				return { success: true };
+				return { success: true, resolvedConfig: configName };
 			} catch (error) {
 				const errorMessage = (error as Error).message;
 				if (DopplerSyncManager.isInvalidProjectError(errorMessage)) {
 					return {
 						success: false,
-						error: `Invalid Doppler project "${this.config.project}". Select the correct project slug from your Doppler workplace.`
+						errorCode: 'INVALID_PROJECT',
+						error: t('doppler.invalidProject', { project: this.config.project })
 					};
 				}
 
-				if (!errorMessage.includes('Could not find requested config') &&
-					!errorMessage.includes('not found') &&
-					!errorMessage.includes('404')) {
-					return { success: false, error: `Authentication failed: ${errorMessage}` };
+				if (!DopplerSyncManager.isConfigNotFoundError(errorMessage)) {
+					return { success: false, error: t('doppler.authFailed', { message: errorMessage }) };
 				}
-				// Otherwise, try next config
 			}
 		}
 
-		return { success: false, error: `Could not find config "${this.config.config}" in project "${this.config.project}". Try "dev", "stg", or "prd".` };
+		if (listedNames.length > 0) {
+			return {
+				success: false,
+				errorCode: 'CONFIG_NOT_FOUND',
+				error: t('doppler.configNotFoundWithList', {
+					config: this.config.config,
+					project: this.config.project,
+					configs: listedNames.join(', ')
+				})
+			};
+		}
+
+		return {
+			success: false,
+			errorCode: 'CONFIG_NOT_FOUND',
+			error: t('doppler.configNotFound', {
+				config: this.config.config,
+				project: this.config.project
+			})
+		};
+	}
+
+	async listConfigs(): Promise<Array<{ name: string; environment?: string }>> {
+		const url = `https://api.doppler.com/v3/configs?project=${encodeURIComponent(this.config.project)}&per_page=100`;
+		const response = await this.makeDopplerRequest(url);
+		const parsed = JSON.parse(response) as {
+			configs?: Array<{ name?: string; environment?: string }>;
+		};
+
+		return (parsed.configs ?? [])
+			.filter(config => Boolean(config.name))
+			.map(config => ({
+				name: config.name as string,
+				environment: config.environment
+			}));
 	}
 
 	async listProjects(): Promise<Array<{ slug: string; name: string }>> {
@@ -242,77 +293,45 @@ export class DopplerSyncManager extends CloudSyncManager {
 		rootPath: string,
 		syncConfig: CloudSyncConfig
 	): Promise<CloudSyncConfig | null> {
-		const manager = new DopplerSyncManager(syncConfig);
-
-		try {
-			const projects = await manager.listProjects();
-			if (projects.length === 0) {
-				vscode.window.showErrorMessage(t('doppler.noProjects'));
-				return null;
-			}
-
-			const selected = await vscode.window.showQuickPick(
-				projects.map(project => ({
-					label: project.name,
-					description: project.slug,
-					slug: project.slug
-				})),
-				{
-					placeHolder: t('doppler.selectProject'),
-					matchOnDescription: true
-				}
-			);
-
-			if (!selected) {
-				return null;
-			}
-
-			const { ConfigUtils } = await import('./configUtils');
-			const config = await ConfigUtils.readQuickEnvConfig(rootPath);
-			if (!config?.cloudSync) {
-				return null;
-			}
-
-			config.cloudSync.project = selected.slug;
-			await ConfigUtils.saveQuickEnvConfig(config, rootPath);
-			vscode.window.showInformationMessage(t('doppler.projectSet', { slug: selected.slug }));
-			return config.cloudSync;
-		} catch (error) {
-			vscode.window.showErrorMessage(t('doppler.listFailed', { message: (error as Error).message }));
-			return null;
-		}
+		return promptProjectSelection(rootPath, syncConfig);
 	}
 
 	static isInvalidProjectError(error?: string): boolean {
 		return Boolean(error && /valid project/i.test(error));
 	}
 
+	static isConfigNotFoundError(error?: string): boolean {
+		return Boolean(
+			error &&
+			(/Could not find requested config/i.test(error) ||
+				/Could not find config/i.test(error) ||
+				/configNotFound/i.test(error) ||
+				(/config/i.test(error) && /not found/i.test(error)))
+		);
+	}
+
+	static async promptConfigSelection(
+		rootPath: string,
+		syncConfig: CloudSyncConfig
+	): Promise<CloudSyncConfig | null> {
+		return promptConfigSelection(rootPath, syncConfig);
+	}
+
+	static async applyResolvedConfig(
+		rootPath: string,
+		syncConfig: CloudSyncConfig,
+		resolvedConfig?: string
+	): Promise<CloudSyncConfig> {
+		return persistResolvedConfig(rootPath, syncConfig, resolvedConfig);
+	}
+
 	static async handleConnectionFailure(
 		rootPath: string,
 		syncConfig: CloudSyncConfig,
-		error?: string
+		error?: string,
+		errorCode?: CloudSyncErrorCode
 	): Promise<CloudSyncConfig | null> {
-		const errorDetails = error ? t('doppler.errorDetails', { error }) : t('doppler.cannotConnect');
-		const actions: string[] = [];
-
-		if (DopplerSyncManager.isInvalidProjectError(error)) {
-			actions.push(t('doppler.selectProjectAction'));
-		}
-
-		actions.push(t('doppler.openConfig'), t('common.cancel'));
-
-		const choice = await vscode.window.showErrorMessage(`❌ ${errorDetails}`, ...actions);
-
-		if (choice === t('doppler.selectProjectAction')) {
-			return DopplerSyncManager.promptProjectSelection(rootPath, syncConfig);
-		}
-
-		if (choice === t('doppler.openConfig')) {
-			const { ConfigUtils } = await import('./configUtils');
-			await ConfigUtils.openWorkspaceConfigEditor(rootPath);
-		}
-
-		return null;
+		return promptConnectionFailure(rootPath, syncConfig, error, errorCode);
 	}
 
 	/**

@@ -1,0 +1,74 @@
+/* Variable History Styles */
+.variable-history {
+    padding: var(--space-lg);
+}
+
+.variable-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.variable-change-item {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: var(--space-lg);
+    transition: all var(--transition-fast);
+}
+
+.variable-change-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(102, 126, 234, 0.3);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.variable-change-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-md);
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.variable-value {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--vscode-foreground);
+    background: rgba(255, 255, 255, 0.05);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: 6px;
+    border: 1px solid var(--glass-border);
+    font-weight: 500;
+}
+
+.variable-timestamp {
+    font-size: 0.75rem;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.8;
+}
+
+.variable-change-details {
+    display: flex;
+    gap: var(--space-lg);
+    flex-wrap: wrap;
+    font-size: 0.875rem;
+    color: var(--vscode-descriptionForeground);
+}
+
+.variable-environment,
+.variable-user,
+.variable-reason {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.variable-change-actions {
+    margin-top: var(--space-md);
+    display: flex;
+    gap: var(--space-sm);
+}
+

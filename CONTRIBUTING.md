@@ -1,124 +1,64 @@
 # Contributing to dotenvy
 
-Thank you for your interest in contributing to dotenvy! We welcome contributions from the community.
+This repository is the DotEnvy VS Code extension. Secret analysis talks to an external service; that service is not built or deployed from this tree. See [LLM_ARCHITECTURE_SUMMARY.md](LLM_ARCHITECTURE_SUMMARY.md).
 
-## Development Setup
+## Development setup
 
-### Main Extension (TypeScript)
+1. Clone the repository and install dependencies:
 
-1. **Fork and Clone:**
-   ```bash
-   git clone https://github.com/kareem2099/dotenvy.git
-   cd dotenvy
-   npm install
-   ```
+    ```bash
+    git clone https://github.com/kareem2099/dotenvy.git
+    cd dotenvy
+    npm install
+    ```
 
-2. **VS Code Extension Development:**
-   - Open the project in VS Code
-   - Press `F5` to launch debug session
-   - A new VS Code window will open with dotenvy loaded
+    CI uses Node.js 20. Use the same major version locally.
 
-3. **Testing:**
-   ```bash
-   npm run compile
-   npm run lint
-   npm test
-   ```
+2. Open the folder in VS Code and press F5. The `Extension` launch configuration compiles TypeScript, then opens an Extension Development Host with this folder loaded.
 
-4. **Package for Testing:**
-   ```bash
-   npx vsce package
-   ```
-   Install the generated `.vsix` file to test release builds
+3. Run the checks:
 
-### Custom LLM Service (Python) 🧠
+    ```bash
+    npm test
+    ```
 
-The extension includes a custom Large Language Model service for advanced secret detection:
+    `pretest` compiles with `tsc` and runs ESLint. The test script then runs [test/run-all-tests.js](test/run-all-tests.js), which executes the listed `node:test` files against `out/`. The suite stubs the `vscode` module. It does not start the Extension Development Host. Git must be on `PATH` because the hook tests create a temporary repository.
 
-1. **Setup LLM Service:**
-   ```bash
-   cd python-llm
-   chmod +x deploy.sh
-   ./deploy.sh
-   ```
+    `npm run compile` and `npm run lint` are the same steps CI runs on their own.
 
-2. **Verify LLM Integration:**
-   ```bash
-   curl http://127.0.0.1:8000/health
-   # Should return: {"status":"ok","llm_ready":true}
-   ```
+4. Package a VSIX when you need a release-style install:
 
-3. **LLM Service Features:**
-   - Custom transformer architecture
-   - 14-dimensional feature analysis
-   - Real-time secret confidence scoring
-   - Automatic fallback to traditional analysis
+    ```bash
+    npx @vscode/vsce package
+    ```
 
-**Note:** The LLM service runs separately from the VS Code extension and auto-starts with the extension when available.
+## Pull requests
 
-## Development Workflow
+CI runs on pushes to `main` and on pull requests that target `main`. See [CI-CD-README.md](CI-CD-README.md).
 
-### Code Quality
-- **TypeScript:** Strict typing required
-- **Linting:** `npm run lint` must pass without errors
-- **Tests:** Write tests for new functionality
-- **Commits:** Use semantic commit messages:
-  - `feat:` for new features
-  - `fix:` for bug fixes
-  - `docs:` for documentation
-  - `refactor:` for code refactoring
+- Branch from `main` with a name that says what the branch does.
+- Keep a change focused. Update tests when behavior changes.
+- `npm test` must pass.
+- In the pull request, say what changed, why, and whether anything breaks for existing users.
+- Commit subjects in this repository are short. A conventional prefix (`feat:`, `fix:`, `docs:`, `refactor:`, `ci:`, `chore:`) is used when it fits.
 
-### Pull Request Process
+## Where code lives
 
-1. **Branch Naming:**
-   - Use descriptive branch names: `feature/cloud-sync-improvements` or `fix/git-hook-bug`
-   - Create feature branch from `main`
+- `src/extension.ts` — activation and command registration
+- `src/commands/` — command implementations
+- `src/providers/` — tree views, webviews, status bar
+- `src/utils/` — detection, encryption, history, cloud sync, and the LLM client
+- `src/i18n/` — extension strings
+- `src/git-hook.ts` — the `dotenvy-hook` CLI used by the Git hook
+- `resources/` — icons and webview assets
+- `test/` — regression tests and `test/support/`
 
-2. **Code Changes:**
-   - Keep changes focused and atomic
-   - Update tests for any behavior changes
-   - Update documentation if needed
-   - Ensure backward compatibility
+New commands need an entry in `package.json` under `contributes.commands` and a registration in `src/extension.ts`. User settings go under `contributes.configuration`. New regression tests are `test/<name>.test.js` files that import `out/`, and they must be added to the list in `test/run-all-tests.js`.
 
-3. **Testing:**
-   - Test in different VS Code versions
-   - Test with different workspace configurations
-   - Manual testing of all affected features
+## Bugs and features
 
-4. **PR Description:**
-   - Describe what the change does
-   - Explain WHY the change is needed
-   - List any breaking changes
-   - Reference any related issues
-
-### Architecture Notes
-
-- **`src/extension.ts`** - Extension activation and command registration
-- **`src/providers/`** - VS Code providers (tree views, webviews, status bar)
-- **`src/commands/`** - Command implementations
-- **`src/utils/`** - Shared utilities
-- **`resources/`** - Static web assets
-- **`test/`** - Test suite
-
-### Adding New Features
-
-1. **Commands:** Register in `package.json contributes.commands` and `src/extension.ts`
-2. **Providers:** Implement VS Code extension points (treeDataProvider, webviewViewProvider, etc.)
-3. **Configuration:** Add to `package.json contributes.configuration` for user settings
-4. **Tests:** Follow existing patterns in `test/` directory
-
-### Reporting Bugs
-
-- Use GitHub Issues with detailed reproduction steps
-- Include VS Code version and extension version
-- Provide example environment files/config if relevant
-
-### Feature Requests
-
-- Check existing issues first
-- Describe the use case and benefit clearly
-- Consider implementation complexity vs. value
+Open a GitHub issue with steps to reproduce, the VS Code version, and the extension version. For a feature, describe the use case. Search existing issues first.
 
 ## License
 
-By contributing to dotenvy, you agree that your contributions will be licensed under the same license as the project (MIT).
+Contributions are licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).

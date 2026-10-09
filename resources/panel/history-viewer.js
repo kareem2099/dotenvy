@@ -5,6 +5,8 @@
     let currentWorkspace = null;
     let currentHistory = [];
     let filteredHistory = [];
+    let lastFilterResult = null;
+    let lastErrorDetail = null;
 
     // DOM elements
     const statsDiv = document.getElementById('stats');
@@ -37,278 +39,26 @@
     // Timeline state removed
     let currentView = 'list';
 
-    // Advanced filtering functions
-    function toggleAdvancedFilters(show) {
-        const isVisible = advancedFiltersPanel.classList.contains('is-open');
-        const shouldShow = show !== undefined ? show : !isVisible;
 
-        advancedFiltersPanel.classList.toggle('is-open', shouldShow);
-        if (advancedFiltersBackdrop) {
-            advancedFiltersBackdrop.classList.toggle('is-open', shouldShow);
-        }
-        advancedFiltersBtn.classList.toggle('active', shouldShow);
-
-        if (shouldShow && !isVisible) {
-            loadFilterOptions();
-        }
-    }
-
-    function loadFilterOptions() {
-        if (!currentWorkspace) return;
-
-        vscode.postMessage({
-            type: 'getFilterOptions',
-            workspacePath: currentWorkspace
-        });
-    }
-
-    function applyAdvancedFilters(keepOpen = false) {
-        if (!currentWorkspace) return;
-
-        const filters = {
-            searchQuery: advancedSearchInput.value.trim() || undefined,
-            searchRegex: regexToggle.checked,
-            searchScope: searchScopeSelect.value,
-            dateRange: getDateRangeFromInputs(),
-            users: getSelectedValues(userFilterSelect),
-            environments: getSelectedValues(environmentFilterSelect),
-            actions: getSelectedValues(actionFilterSelect),
-            variables: getSelectedValues(variableFilterSelect)
-        };
-
-        vscode.postMessage({
-            type: 'applyFilters',
-            workspacePath: currentWorkspace,
-            filters: filters
-        });
-
-        // Close the filter panel only if not live update
-        if (keepOpen !== true) {
-            toggleAdvancedFilters(false);
-        }
-    }
-
-    // Debounce function for live updates
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
-
-    const liveUpdateFilters = debounce(() => applyAdvancedFilters(true), 300);
-
-    function clearAdvancedFilters() {
-        // Clear all inputs
-        advancedSearchInput.value = '';
-        regexToggle.checked = false;
-        searchScopeSelect.value = 'all';
-        datePresetSelect.value = '';
-        dateFromInput.value = '';
-        dateToInput.value = '';
-
-        // Clear all multi-selects
-        clearMultiSelect(userFilterSelect);
-        clearMultiSelect(actionFilterSelect);
-        clearMultiSelect(environmentFilterSelect);
-        clearMultiSelect(variableFilterSelect);
-
-        // Apply empty filters to show all results
-        applyAdvancedFilters();
-    }
-
-    function getDateRangeFromInputs() {
-        const fromDate = dateFromInput.value;
-        const toDate = dateToInput.value;
-
-        if (!fromDate && !toDate) return undefined;
-
-        return {
-            start: fromDate ? new Date(fromDate) : undefined,
-            end: toDate ? new Date(toDate + 'T23:59:59') : undefined
-        };
-    }
-
-    function handleDatePresetChange() {
-        const preset = datePresetSelect.value;
-        if (!preset) {
-            dateFromInput.value = '';
-            dateToInput.value = '';
-            return;
-        }
-
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-        let startDate, endDate;
-
-        switch (preset) {
-            case 'today':
-                startDate = today;
-                endDate = new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1);
-                break;
-            case 'last7days':
-                startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-                break;
-            case 'last30days':
-                startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-                break;
-            case 'last3months':
-                startDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
-                break;
-            case 'last6months':
-                startDate = new Date(today.getTime() - 180 * 24 * 60 * 60 * 1000);
-                break;
-            case 'lastyear':
-                startDate = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
-                break;
-        }
-
-        dateFromInput.value = startDate ? startDate.toISOString().split('T')[0] : '';
-        dateToInput.value = endDate ? endDate.toISOString().split('T')[0] : '';
-    }
-
-    function validateRegexInput() {
-        const pattern = advancedSearchInput.value;
-        const useRegex = regexToggle.checked;
-
-        if (!pattern || !useRegex) {
-            advancedSearchInput.classList.remove('invalid');
-            return;
-        }
-
-        vscode.postMessage({
-            type: 'validateRegex',
-            pattern: pattern
-        });
-    }
-
-    function getSelectedValues(selectElement) {
-        const selected = Array.from(selectElement.selectedOptions).map(option => option.value);
-        return selected.length > 0 ? selected : undefined;
-    }
-
-    function clearMultiSelect(selectElement) {
-        Array.from(selectElement.options).forEach(option => {
-            option.selected = false;
-        });
-    }
-
-    function populateMultiSelect(selectElement, options, placeholder = 'All') {
-        // Clear existing options except the first one if it's a placeholder
-        while (selectElement.options.length > 1) {
-            selectElement.remove(1);
-        }
-
-        // Add new options
-        options.forEach(option => {
-            const optionElement = document.createElement('option');
-            optionElement.value = option;
-            optionElement.textContent = option;
-            selectElement.appendChild(optionElement);
-        });
-    }
-
-    function displayFilteredHistory(result) {
-        filteredHistory = result.entries;
-        currentHistory = result.entries; // Update current history to filtered results
-
-        // Update stats
-        updateStats({
-            totalEntries: result.totalCount,
-            storageSize: 0 // We don't have storage size for filtered results
-        });
-
-        // Render appropriate view
-        if (currentView === 'list') {
-            renderHistoryList();
-        } else if (currentView === 'timeline') {
-            renderTimeline();
-        }
-    }
-
-    function updateFilterStats(result) {
-        if (!result.appliedFilters || result.appliedFilters.length === 0) {
-            filterStats.innerHTML = '';
-            return;
-        }
-
-        filterStats.innerHTML = `
-            <div class="filter-stats-content">
-                <span class="filter-count">Showing ${result.filteredCount} of ${result.totalCount} entries</span>
-                <span class="applied-filters">Filters: ${result.appliedFilters.join(', ')}</span>
-            </div>
-        `;
-    }
-
-    function populateFilterOptions(options) {
-        // Populate date presets
-        const datePresets = options.dateRangePresets || [];
-        datePresetSelect.innerHTML = '<option value="">Custom Range</option>';
-        datePresets.forEach(preset => {
-            const option = document.createElement('option');
-            option.value = preset.label.toLowerCase().replace(/\s+/g, '');
-            option.textContent = preset.label;
-            datePresetSelect.appendChild(option);
-        });
-
-        // Populate users
-        populateMultiSelect(userFilterSelect, options.users || []);
-
-        // Populate environments
-        populateMultiSelect(environmentFilterSelect, options.environments || []);
-
-        // Populate variables
-        populateMultiSelect(variableFilterSelect, options.variables || []);
-    }
-
-    function handleRegexValidation(message) {
-        const input = advancedSearchInput;
-        if (message.valid) {
-            input.classList.remove('invalid');
-            input.title = '';
-        } else {
-            input.classList.add('invalid');
-            input.title = `Invalid regex: ${message.error}`;
-        }
-    }
-
-    function displayVariableHistory(variableName, history) {
-        if (history.length === 0) {
-            detailContent.innerHTML = `<div class="empty-state">No history found for variable "${variableName}"</div>`;
-            return;
-        }
-
-        const html = `
-            <div class="variable-history">
-                <h4>Change History for "${variableName}"</h4>
-                <div class="variable-timeline">
-                    ${history.map(item => `
-                        <div class="variable-change-item">
-                            <div class="variable-change-header">
-                                <span class="variable-value">"${escapeHtml(item.value)}"</span>
-                                <span class="variable-timestamp">${formatTimestamp(item.timestamp)}</span>
-                            </div>
-                            <div class="variable-change-details">
-                                <span class="variable-environment">${item.entry.environmentName}</span>
-                                ${item.entry.user ? `<span class="variable-user">by ${item.entry.user}</span>` : ''}
-                                ${item.entry.metadata.reason ? `<span class="variable-reason">${item.entry.metadata.reason}</span>` : ''}
-                            </div>
-                            <div class="variable-change-actions">
-                                <button class="btn-small" data-action="view" data-entry-id="${item.entry.id}">View Entry</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-
-    }
+    const filters = window.dotenvyHistoryFilters.create({
+        getWorkspace: () => currentWorkspace,
+        vscode,
+        tr,
+        escapeHtml,
+        formatTimestamp,
+        elements: {
+            advancedFiltersPanel, advancedFiltersBackdrop, advancedFiltersBtn, advancedSearchInput,
+            regexToggle, searchScopeSelect, datePresetSelect, dateFromInput, dateToInput,
+            userFilterSelect, actionFilterSelect, environmentFilterSelect, variableFilterSelect, filterStats,
+        },
+        setFilteredEntries(entries) {
+            filteredHistory = entries;
+            currentHistory = entries;
+        },
+        updateStats,
+        renderHistoryList,
+        getCurrentView: () => currentView,
+    });
 
     // Initialize
     function init() {
@@ -318,12 +68,12 @@
         if (filterSelect) filterSelect.addEventListener('change', filterHistory);
 
         // Advanced filter listeners with null checks
-        if (advancedFiltersBtn) advancedFiltersBtn.addEventListener('click', () => toggleAdvancedFilters());
-        if (applyFiltersBtn) applyFiltersBtn.addEventListener('click', () => applyAdvancedFilters(false));
-        if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', clearAdvancedFilters);
-        if (closeFiltersBtn) closeFiltersBtn.addEventListener('click', () => toggleAdvancedFilters(false));
-        if (closeFiltersBtnIcon) closeFiltersBtnIcon.addEventListener('click', () => toggleAdvancedFilters(false));
-        if (advancedFiltersBackdrop) advancedFiltersBackdrop.addEventListener('click', () => toggleAdvancedFilters(false));
+        if (advancedFiltersBtn) advancedFiltersBtn.addEventListener('click', () => filters.toggleAdvancedFilters());
+        if (applyFiltersBtn) applyFiltersBtn.addEventListener('click', () => filters.applyAdvancedFilters(false));
+        if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', filters.clearAdvancedFilters);
+        if (closeFiltersBtn) closeFiltersBtn.addEventListener('click', () => filters.toggleAdvancedFilters(false));
+        if (closeFiltersBtnIcon) closeFiltersBtnIcon.addEventListener('click', () => filters.toggleAdvancedFilters(false));
+        if (advancedFiltersBackdrop) advancedFiltersBackdrop.addEventListener('click', () => filters.toggleAdvancedFilters(false));
 
         // Live update listeners
         const filterInputs = [
@@ -335,15 +85,15 @@
         filterInputs.forEach(input => {
             if (input) {
                 const eventType = input.tagName === 'SELECT' || input.type === 'checkbox' || input.type === 'date' ? 'change' : 'input';
-                input.addEventListener(eventType, liveUpdateFilters);
+                input.addEventListener(eventType, filters.liveUpdateFilters);
             }
         });
 
         // Date preset listener with null check
         if (datePresetSelect) {
             datePresetSelect.addEventListener('change', () => {
-                handleDatePresetChange();
-                liveUpdateFilters();
+                filters.handleDatePresetChange();
+                filters.liveUpdateFilters();
             });
         }
         // analytics tab removed – analytics now lives in the sidebar panel
@@ -399,15 +149,25 @@
                 if (message.workspacePath) {
                     currentWorkspace = message.workspacePath;
                 }
+                lastErrorDetail = null;
                 currentHistory = message.history;
                 currentStats = message.stats;
                 updateStats(message.stats);
                 filterHistory();
-                loadFilterOptions();
+                filters.loadFilterOptions();
                 break;
             case 'localeChanged':
+                if (window.dotenvyI18n && window.dotenvyI18n.applyTranslations) {
+                    window.dotenvyI18n.applyTranslations();
+                }
                 if (currentStats) updateStats(currentStats);
                 filterHistory();
+                if (lastFilterResult) filters.updateFilterStats(lastFilterResult);
+                if (lastErrorDetail !== null) {
+                    showError(lastErrorDetail);
+                } else if (currentWorkspace) {
+                    filters.loadFilterOptions();
+                }
                 break;
             case 'analyticsLoaded':
                 break;
@@ -415,20 +175,21 @@
                 handleRollbackResult(message);
                 break;
             case 'filtersApplied':
-                displayFilteredHistory(message.result);
-                updateFilterStats(message.result);
+                lastFilterResult = message.result;
+                filters.displayFilteredHistory(message.result);
+                filters.updateFilterStats(message.result);
                 break;
             case 'filterOptionsLoaded':
-                populateFilterOptions(message.options);
+                filters.populateFilterOptions(message.options);
                 break;
             case 'regexValidated':
-                handleRegexValidation(message);
+                filters.handleRegexValidation(message);
                 break;
             case 'variableHistoryLoaded':
-                displayVariableHistory(message.variableName, message.history);
+                filters.displayVariableHistory(message.variableName, message.history);
                 break;
             case 'error':
-                showError(message.message);
+                showError(message.errorMessage || message.message || '');
                 break;
         }
     }
@@ -489,7 +250,9 @@
         tbody.innerHTML = filteredHistory.map(entry => {
             const note = entry.metadata?.reason
                 ? escapeHtml(entry.metadata.reason)
-                : (entry.previousEnvironment ? `from ${entry.previousEnvironment}` : '');
+                : (entry.previousEnvironment
+                    ? tr('history.noteFromEnv', { env: escapeHtml(entry.previousEnvironment) }, `from ${entry.previousEnvironment}`)
+                    : '');
             return `
             <tr class="history-row" data-entry-id="${entry.id}">
                 <td class="col-time" title="${new Date(entry.timestamp).toLocaleString()}">${formatTimestamp(entry.timestamp)}</td>
@@ -497,11 +260,11 @@
                     <span class="env-pill">${escapeHtml(entry.environmentName)}</span>
                     <span class="env-file">${escapeHtml(getDisplayFileName(entry))}</span>
                 </td>
-                <td class="col-action"><span class="action-badge action-${entry.action}">${entry.action.replace('_', ' ')}</span></td>
+                <td class="col-action"><span class="action-badge action-${entry.action}">${filters.formatAction(entry.action)}</span></td>
                 <td class="col-note">${note}</td>
                 <td class="col-actions">
-                    <button class="btn-table" data-action="diff" data-entry-id="${entry.id}" title="${tr('history.diffTitle', {}, 'Open native VS Code diff')}">${tr('history.diffBtn', {}, '⟷ Diff')}</button>
-                    <button class="btn-table btn-table-danger" data-action="rollback" data-entry-id="${entry.id}" title="${tr('history.rollbackTitle', {}, 'Rollback to this state')}">${tr('history.rollbackBtn', {}, '↩ Rollback')}</button>
+                    <button type="button" class="btn-table" data-action="diff" data-entry-id="${entry.id}" title="${tr('history.diffTitle', {}, 'Open native VS Code diff')}">${tr('history.diffBtn', {}, '⟷ Diff')}</button>
+                    <button type="button" class="btn-table btn-table-danger" data-action="rollback" data-entry-id="${entry.id}" title="${tr('history.rollbackTitle', {}, 'Rollback to this state')}">${tr('history.rollbackBtn', {}, '↩ Rollback')}</button>
                 </td>
             </tr>`;
         }).join('');
@@ -542,18 +305,21 @@
         const diffMinutes = Math.floor(diffMs / (1000 * 60));
         const diffHours = Math.floor(diffMinutes / 60);
         const diffDays = Math.floor(diffHours / 24);
+        const locale = (window.dotenvyI18n && window.dotenvyI18n.getLocale)
+            ? window.dotenvyI18n.getLocale()
+            : undefined;
 
-        if (diffMinutes < 1) return 'Just now';
-        if (diffMinutes < 60) return `${diffMinutes}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
+        if (diffMinutes < 1) return tr('history.timeJustNow', {}, 'Just now');
+        if (diffMinutes < 60) return tr('history.timeMinutesAgo', { minutes: diffMinutes }, `${diffMinutes}m ago`);
+        if (diffHours < 24) return tr('history.timeHoursAgo', { hours: diffHours }, `${diffHours}h ago`);
+        if (diffDays < 7) return tr('history.timeDaysAgo', { days: diffDays }, `${diffDays}d ago`);
 
-        return date.toLocaleDateString();
+        return date.toLocaleDateString(locale);
     }
 
     function showDiff(entryId) {
         if (!currentWorkspace) {
-            alert('Error: Workspace not initialized. Please refresh the history view.');
+            alert(tr('history.workspaceNotReady', {}, 'Workspace not initialized. Please refresh the history view.'));
             return;
         }
         vscode.postMessage({
@@ -565,12 +331,12 @@
 
     function rollback(entryId) {
         if (!currentWorkspace) {
-            alert('Error: Workspace not initialized. Please refresh the history view.');
+            alert(tr('history.workspaceNotReady', {}, 'Workspace not initialized. Please refresh the history view.'));
             return;
         }
         const entry = currentHistory.find(e => e.id === entryId);
         if (!entry) {
-            alert('Error: Entry not found.');
+            alert(tr('history.entryNotFound', {}, 'Entry not found.'));
             return;
         }
 
@@ -585,14 +351,25 @@
 
     function handleRollbackResult(message) {
         if (message.success) {
-            alert(`Successfully rolled back to historical environment state!`);
+            alert(tr('history.rollbackSuccess', {}, 'Successfully rolled back to the historical environment state.'));
         } else {
-            alert('Failed to rollback to the selected environment state.');
+            alert(tr('history.rollbackFailed', {}, 'Failed to rollback to the selected environment state.'));
         }
     }
 
     function showError(message) {
-        historyList.innerHTML = `<div class="error-state">Error: ${message}</div>`;
+        lastErrorDetail = message || '';
+        const text = tr(
+            'history.loadFailed',
+            { message: lastErrorDetail },
+            `Failed to load history: ${lastErrorDetail}`
+        );
+        const tbody = document.getElementById('history-body');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="5" class="error-state">${escapeHtml(text)}</td></tr>`;
+        } else if (historyList) {
+            historyList.innerHTML = `<div class="error-state">${escapeHtml(text)}</div>`;
+        }
     }
 
 

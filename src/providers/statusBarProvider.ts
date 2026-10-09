@@ -8,7 +8,7 @@ import { DopplerSyncManager } from '../utils/dopplerSyncManager';
 import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { EnvironmentValidator } from '../utils/environmentValidator';
 import { FileUtils } from '../utils/fileUtils';
-import { CloudEncryptionUtils } from '../utils/encryptedCloudSyncManager';
+import { CloudEncryptionUtils } from '../utils/cloudSyncManagerFactory';
 import {
 	EnvironmentStatus,
 	CloudSyncStatus,
@@ -17,6 +17,7 @@ import {
 	StatusBarSegment
 } from '../types/environment';
 import { logger } from '../utils/logger';
+import { t } from '../i18n';
 
 export class StatusBarProvider implements vscode.Disposable {
 	private statusBarItems: Map<string, vscode.StatusBarItem> = new Map();
@@ -284,13 +285,13 @@ export class StatusBarProvider implements vscode.Disposable {
 
 		if (status.installed) {
 			text = '🔗 ✓';
-			tooltip = 'Git Commit Hook: Installed (Click to manage)';
+			tooltip = t('statusBar.git.tooltipInstalled');
 			item.color = new vscode.ThemeColor('statusBarItem.prominentForeground');
 		} else {
 			text = status.enabled ? '🔗 ⚠️' : '';
 			tooltip = status.enabled
-				? 'Git Commit Hook: Not installed (Click to install)'
-				: 'Git Commit Hook: Disabled';
+				? t('statusBar.git.tooltipNotInstalled')
+				: t('statusBar.git.tooltipDisabled');
 			if (!status.enabled) {
 				item.hide();
 				return;

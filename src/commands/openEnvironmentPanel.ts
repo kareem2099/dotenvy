@@ -3,9 +3,8 @@ import { extensionUri } from '../extension';
 import { EnvironmentProvider } from '../providers/environmentProvider';
 import { ConfigUtils } from '../utils/configUtils';
 import { GitHookManager } from '../utils/gitHookManager';
-import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { DopplerSyncManager } from '../utils/dopplerSyncManager';
-import { EnvironmentValidator } from '../utils/environmentValidator';
+import { getCloudSyncStatus, getValidationStatus } from '../providers/environmentDashboardStatus';
 import { QuickEnvConfig } from '../types/environment';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -145,6 +144,7 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
             type: 'refresh',
             locale: localePayload.locale,
             strings: localePayload.strings,
+            locales: localePayload.locales,
             environments: enhancedEnvironments,
             currentFile,
             currentEnvironment: currentEnvironment?.name || null,
@@ -157,60 +157,11 @@ export class OpenEnvironmentPanelCommand implements vscode.Disposable {
     }
 
     private async getCloudSyncStatus(rootPath: string, config: QuickEnvConfig | null) {
-        if (!config?.cloudSync) {
-            return null;
-        }
-
-        try {
-            let cloudManager: CloudSyncManager;
-
-            switch (config.cloudSync.provider) {
-                case 'doppler':
-                    cloudManager = new DopplerSyncManager(config.cloudSync);
-                    break;
-                default:
-                    return {
-                        connected: false,
-                        error: `Unsupported provider: ${config.cloudSync.provider}`
-                    };
-            }
-
-            const connected = await cloudManager.testConnection();
-
-            return {
-                connected,
-                provider: config.cloudSync.provider,
-                lastSync: null // Would track actual sync times in real implementation
-            };
-
-        } catch (error) {
-            return {
-                connected: false,
-                error: (error as Error).message
-            };
-        }
+        return getCloudSyncStatus(rootPath, config);
     }
 
     private async getValidationStatus(rootPath: string, envPath: string, config: QuickEnvConfig | null) {
-        if (!config?.validation || !fs.existsSync(envPath)) {
-            return {
-                valid: true
-            };
-        }
-
-        try {
-            const errors = EnvironmentValidator.validateFile(envPath, config.validation);
-            return {
-                valid: errors.length === 0,
-                errors: errors.length,
-                lastValidated: new Date()
-            };
-        } catch (error) {
-            return {
-                valid: false,
-                errors: 1
-            };
-        }
+        return getValidationStatus(rootPath, envPath, config);
     }
 
     private async handleMessage(message: WebviewMessage): Promise<void> {
@@ -410,9 +361,11 @@ DEBUG=false
         // Create webview URIs for CSS and JS resources
         const cssUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.css'));
         const jsUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel.js'));
+        const localeJsUri = this.panel.webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'resources', 'panel', 'panel-locale-menu.js'));
 
         // Replace placeholders with actual URIs
         html = html.replace('{{panelCssUri}}', cssUri.toString());
+        html = html.replace('{{panelLocaleJsUri}}', localeJsUri.toString());
         html = html.replace('{{panelJsUri}}', jsUri.toString());
 
         return html;
