@@ -8,6 +8,7 @@ import * as path from 'path';
 import { EnvironmentProvider } from '../providers/environmentProvider';
 import { CloudSecrets } from './cloudSyncManager';
 import { EnvSyncUtils, ResolvedEnvFile, ResolvedSyncTarget } from './envSyncUtils';
+import { isRegularEnvFile } from './environmentDiscovery';
 import { findEnvironmentForConfig, resolveSyncTargets, toResolvedEnvFile } from './syncTargetResolver';
 import { t } from '../i18n';
 
@@ -94,11 +95,10 @@ export function mergeEnvFileContent(existingContent: string, secrets: CloudSecre
 export function parseEnvFile(envPath: string): CloudSecrets {
 	const secrets: CloudSecrets = {};
 
-	if (!fs.existsSync(envPath)) {
+	const envContent = readEnvFileIfPresent(envPath);
+	if (envContent === null) {
 		return secrets;
 	}
-
-	const envContent = fs.readFileSync(envPath, 'utf8');
 	for (const line of envContent.split('\n')) {
 		const trimmed = line.trim();
 		if (!trimmed || trimmed.startsWith('#')) {
@@ -124,11 +124,57 @@ export function parseEnvFile(envPath: string): CloudSecrets {
  * Copies an environment file to a sibling `.backup` before it is overwritten.
  */
 export async function backupEnvFile(envPath: string): Promise<void> {
-	if (!fs.existsSync(envPath)) {
+	if (!isRegularEnvFile(envPath)) {
 		return;
 	}
 
 	await fs.promises.copyFile(envPath, `${envPath}.backup`);
+}
+
+async function writeTextFile(filePath: string, content: string): Promise<void> {
+	let lastError: unknown;
+	for (let attempt = 0; attempt < 3; attempt++) {
+		try {
+			await fs.promises.writeFile(filePath, content, 'utf8');
+			return;
+		} catch (error) {
+			lastError = error;
+			const code = (error as NodeJS.ErrnoException).code;
+			if ((code !== 'EPERM' && code !== 'EACCES') || attempt === 2) {
+				throw error;
+			}
+			await new Promise(resolve => setTimeout(resolve, 40 * (attempt + 1)));
+		}
+	}
+
+	throw lastError;
+}
+
+function readEnvFileIfPresent(envPath: string): string | null {
+	let stats: fs.Stats;
+	try {
+		stats = fs.statSync(envPath);
+	} catch (error) {
+		const code = (error as NodeJS.ErrnoException).code;
+		if (code === 'ENOENT' || code === 'ENOTDIR') {
+			return null;
+		}
+		throw error;
+	}
+
+	if (!stats.isFile()) {
+		return null;
+	}
+
+	try {
+		return fs.readFileSync(envPath, 'utf8');
+	} catch (error) {
+		const code = (error as NodeJS.ErrnoException).code;
+		if (code === 'ENOENT') {
+			return null;
+		}
+		throw error;
+	}
 }
 
 /**
@@ -146,11 +192,11 @@ export async function writeSecretsToTargets(
 		await backupEnvFile(target.absolutePath);
 		await fs.promises.mkdir(path.dirname(target.absolutePath), { recursive: true });
 		let content = formatEnvFileContent(secrets);
-		if (fs.existsSync(target.absolutePath)) {
-			const existing = await fs.promises.readFile(target.absolutePath, 'utf8');
+		const existing = readEnvFileIfPresent(target.absolutePath);
+		if (existing !== null) {
 			content = mergeEnvFileContent(existing, secrets);
 		}
-		await fs.promises.writeFile(target.absolutePath, content, 'utf8');
+		await writeTextFile(target.absolutePath, content);
 		writtenFiles.push(target.file);
 	}
 

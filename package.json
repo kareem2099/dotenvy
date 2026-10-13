@@ -298,7 +298,7 @@
         {
           "id": "dotenvy",
           "title": "%views.container.title%",
-          "icon": "./resources/icons/icon.png"
+          "icon": "./resources/icons/activitybar.png"
         }
       ]
     },

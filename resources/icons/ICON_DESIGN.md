@@ -1,6 +1,8 @@
 # DotEnvy icon
 
-Primary asset: `icon.png`. Used by the extension package and activity-bar container.
+Primary asset: `icon.png`. Used by the extension marketplace listing (`package.json` `icon`).
+
+Activity bar: `activitybar.png` (24×24) and `activitybar@2x.png` (48×48), downscaled from `icon.png` with the same DE + key artwork. Do not point the activity bar at the 1254×1254 marketplace master; VS Code scales it poorly.
 DE abbreviates DotEnvy; the key represents environment secrets. The square mark
 uses the existing dark teal, mint and amber visual direction, with transparency
 outside the rounded tile. Generated with the built-in `image_gen` tool, then

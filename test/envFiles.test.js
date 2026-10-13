@@ -15,9 +15,9 @@ installVscodeMock(createHarness());
 const { GitUtils } = require('../out/utils/gitUtils.js');
 const { EnvironmentDiffer } = require('../out/utils/environmentDiffer.js');
 const { EnvironmentValidator } = require('../out/utils/environmentValidator.js');
-const { formatEnvFileContent, mergeEnvFileContent, parseEnvFile } = require('../out/utils/envFileContent.js');
+const { formatEnvFileContent, mergeEnvFileContent, parseEnvFile, writeSecretsToTargets } = require('../out/utils/envFileContent.js');
 const { EnvSyncUtils, DOPPLER_RESERVED_KEYS } = require('../out/utils/envSyncUtils.js');
-const { discoverEnvironments } = require('../out/utils/environmentDiscovery.js');
+const { discoverEnvironments, resolveConfiguredEnvPath } = require('../out/utils/environmentDiscovery.js');
 const { findValueConflicts } = require('../out/utils/crossEnvironmentConflicts.js');
 const { diffCloudSecrets } = require('../out/utils/cloudSecretDiff.js');
 
@@ -212,6 +212,75 @@ describe('environment files', () => {
             assert.deepEqual(split.get('extra.env'), { FOO: 'nested' });
         } finally {
             removeTempDir(root);
+        }
+    });
+
+    test('missing env file parses as empty and a directory is not opened', () => {
+        const root = createTempDir('dotenvy-missing-env-');
+        try {
+            assert.deepEqual(parseEnvFile(path.join(root, '.env')), {});
+            fs.mkdirSync(path.join(root, '.env'));
+            assert.deepEqual(parseEnvFile(path.join(root, '.env')), {});
+        } finally {
+            removeTempDir(root);
+        }
+    });
+
+    test('pull creates a configured env file that is not on disk yet', async () => {
+        const root = createTempDir('dotenvy-create-env-');
+        const filePath = path.join(root, '.env');
+        try {
+            const written = await writeSecretsToTargets(
+                [targetFor(filePath, '.env')],
+                { SECRET_KEY: 'abc' },
+            );
+            assert.deepEqual(written, ['.env']);
+            assert.equal(fs.readFileSync(filePath, 'utf8'), 'SECRET_KEY=abc\n');
+        } finally {
+            removeTempDir(root);
+        }
+    });
+
+    test('backend workspace does not join backend/.env into backend/backend/.env', () => {
+        const repo = createTempDir('dotenvy-backend-root-');
+        const backend = path.join(repo, 'backend');
+        try {
+            fs.mkdirSync(path.join(backend, 'backend'), { recursive: true });
+            writeFile(path.join(repo, '.dotenvy.json'), '{}\n');
+
+            assert.equal(
+                resolveConfiguredEnvPath(backend, 'backend/.env'),
+                path.join(backend, '.env'),
+            );
+
+            writeFile(path.join(backend, 'backend', '.env'), 'NESTED=1\n');
+            assert.equal(
+                resolveConfiguredEnvPath(backend, 'backend/.env'),
+                path.join(backend, 'backend', '.env'),
+            );
+        } finally {
+            removeTempDir(repo);
+        }
+    });
+
+    test('config copied into the backend folder still resolves to that folder .env', () => {
+        const repo = createTempDir('dotenvy-backend-config-');
+        const backend = path.join(repo, 'backend');
+        try {
+            fs.mkdirSync(path.join(backend, 'backend'), { recursive: true });
+            fs.mkdirSync(path.join(repo, '.git'));
+            writeFile(path.join(backend, '.dotenvy.json'), '{}\n');
+
+            assert.equal(
+                resolveConfiguredEnvPath(backend, 'backend/.env'),
+                path.join(backend, '.env'),
+            );
+            assert.equal(
+                resolveConfiguredEnvPath(repo, 'backend/.env'),
+                path.join(repo, 'backend', '.env'),
+            );
+        } finally {
+            removeTempDir(repo);
         }
     });
 

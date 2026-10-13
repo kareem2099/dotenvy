@@ -8,6 +8,7 @@ import * as path from 'path';
 import { Environment, EnvSyncTarget, QuickEnvConfig } from '../types/environment';
 import { EnvironmentProvider } from '../providers/environmentProvider';
 import { ConfigUtils } from './configUtils';
+import { isCreatableEnvPath, resolveConfiguredEnvPath } from './environmentDiscovery';
 import type { ResolvedEnvFile, ResolvedSyncTarget } from './envSyncUtils';
 import { t } from '../i18n';
 
@@ -62,14 +63,23 @@ export function findEnvironmentForConfig(
 }
 
 function normalizeTargets(rootPath: string, targets: EnvSyncTarget[]): ResolvedSyncTarget[] {
-	return targets.map(target => ({
-		file: target.file.replace(/\\/g, '/'),
-		absolutePath: path.join(rootPath, target.file),
-		keyPrefix: target.keyPrefix ?? '',
-		prefixes: target.prefixes ?? [],
-		catchAll: !!target.catchAll,
-		label: target.label ?? path.basename(target.file)
-	}));
+	return targets.map(target => {
+		const configuredRelative = target.file.replace(/\\/g, '/');
+		const absolutePath = resolveConfiguredEnvPath(rootPath, target.file);
+		const relative = path.relative(rootPath, absolutePath).replace(/\\/g, '/');
+		const file = relative && !path.isAbsolute(relative)
+			? relative
+			: configuredRelative;
+
+		return {
+			file,
+			absolutePath,
+			keyPrefix: target.keyPrefix || deriveKeyPrefix(configuredRelative),
+			prefixes: target.prefixes ?? [],
+			catchAll: !!target.catchAll,
+			label: target.label ?? path.basename(file)
+		};
+	});
 }
 
 function deriveKeyPrefix(file: string): string {
@@ -126,6 +136,19 @@ function buildAutoTargets(
 	});
 }
 
+function isLiveEnvCopy(env: Environment, environments: Environment[]): boolean {
+	if (path.basename(env.filePath) !== '.env') {
+		return false;
+	}
+
+	const directory = path.dirname(env.filePath);
+	return environments.some(other =>
+		other.filePath !== env.filePath
+		&& path.dirname(other.filePath) === directory
+		&& path.basename(other.filePath).startsWith('.env.')
+	);
+}
+
 async function collectEnvFilesForConfig(
 	rootPath: string,
 	dopplerConfig: string | undefined,
@@ -133,7 +156,7 @@ async function collectEnvFilesForConfig(
 ): Promise<ResolvedSyncTarget[]> {
 	const provider = new EnvironmentProvider(rootPath);
 	let environments = await provider.getEnvironments();
-	environments = environments.filter(env => fs.existsSync(env.filePath));
+	environments = environments.filter(env => isCreatableEnvPath(env.filePath));
 
 	if (dopplerConfig) {
 		const matched = environments.filter(env => environmentMatchesConfig(env, dopplerConfig));
@@ -145,7 +168,7 @@ async function collectEnvFilesForConfig(
 	const uniquePaths = new Map<string, Environment>();
 	for (const env of environments) {
 		const relativePath = path.relative(rootPath, env.filePath).replace(/\\/g, '/');
-		if (relativePath === '.env' && environments.length > 1) {
+		if (isLiveEnvCopy(env, environments)) {
 			continue;
 		}
 		if (!uniquePaths.has(relativePath)) {
