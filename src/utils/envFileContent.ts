@@ -135,7 +135,7 @@ async function writeTextFile(filePath: string, content: string): Promise<void> {
 	let lastError: unknown;
 	for (let attempt = 0; attempt < 3; attempt++) {
 		try {
-			await fs.promises.writeFile(filePath, content, 'utf8');
+			await writeTextFileOnce(filePath, content);
 			return;
 		} catch (error) {
 			lastError = error;
@@ -143,11 +143,53 @@ async function writeTextFile(filePath: string, content: string): Promise<void> {
 			if ((code !== 'EPERM' && code !== 'EACCES') || attempt === 2) {
 				throw error;
 			}
+			await clearReadOnlyAttribute(filePath);
 			await new Promise(resolve => setTimeout(resolve, 40 * (attempt + 1)));
 		}
 	}
 
 	throw lastError;
+}
+
+/**
+ * Replaces an existing file in place. `writeFile` on Windows returns EPERM
+ * when the target is hidden, which is how many `.env` files are stored.
+ */
+async function writeTextFileOnce(filePath: string, content: string): Promise<void> {
+	let handle: fs.promises.FileHandle;
+	try {
+		handle = await fs.promises.open(filePath, 'r+');
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+			await fs.promises.writeFile(filePath, content, 'utf8');
+			return;
+		}
+		throw error;
+	}
+
+	try {
+		await handle.truncate(0);
+		await handle.writeFile(content, 'utf8');
+	} finally {
+		await handle.close();
+	}
+}
+
+async function clearReadOnlyAttribute(filePath: string): Promise<void> {
+	try {
+		if (process.platform === 'win32') {
+			await fs.promises.chmod(filePath, 0o666);
+			return;
+		}
+		const stats = await fs.promises.stat(filePath);
+		await fs.promises.chmod(filePath, stats.mode | 0o200);
+	} catch (error) {
+		const code = (error as NodeJS.ErrnoException).code;
+		if (code === 'ENOENT') {
+			return;
+		}
+		throw error;
+	}
 }
 
 function readEnvFileIfPresent(envPath: string): string | null {

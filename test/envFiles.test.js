@@ -4,6 +4,7 @@
 
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -222,6 +223,33 @@ describe('environment files', () => {
             fs.mkdirSync(path.join(root, '.env'));
             assert.deepEqual(parseEnvFile(path.join(root, '.env')), {});
         } finally {
+            removeTempDir(root);
+        }
+    });
+
+    test('pull overwrites a hidden env file on Windows', { skip: process.platform !== 'win32' }, async () => {
+        const root = createTempDir('dotenvy-hidden-env-');
+        const filePath = path.join(root, '.env');
+        try {
+            fs.writeFileSync(filePath, 'OLD=1\n');
+            execFileSync('attrib', ['+H', filePath]);
+
+            const written = await writeSecretsToTargets(
+                [targetFor(filePath, '.env')],
+                { SECRET_KEY: 'abc' },
+            );
+
+            assert.deepEqual(written, ['.env']);
+            const updated = fs.readFileSync(filePath, 'utf8');
+            assert.equal(updated.includes('OLD'), false);
+            assert.match(updated, /SECRET_KEY=abc\n/);
+            assert.match(execFileSync('attrib', [filePath], { encoding: 'utf8' }), /(^|\s)H(\s|$)/);
+        } finally {
+            try {
+                execFileSync('attrib', ['-H', filePath]);
+            } catch {
+                // The temp file may already be gone.
+            }
             removeTempDir(root);
         }
     });
