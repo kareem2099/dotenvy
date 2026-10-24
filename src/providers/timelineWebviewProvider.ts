@@ -47,6 +47,7 @@ export class TimelineWebviewProvider {
             }
         );
 
+        panel.iconPath = vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'icon.png');
         TimelineWebviewProvider._panel = panel;
         panel.webview.html = TimelineWebviewProvider._getHtml(panel.webview, extensionUri);
         postLocaleToPanel(panel, 'timeline.');
@@ -85,7 +86,7 @@ export class TimelineWebviewProvider {
             logger.error('Failed to load timeline:', error, 'TimelineWebviewProvider');
             TimelineWebviewProvider._post({
                 type: 'error',
-                message: `Failed to load timeline: ${(error as Error).message}`,
+                message: t('timeline.loadFailed', { message: (error as Error).message }),
             });
         }
     }

@@ -1,0 +1,24 @@
+/* Advanced Filter Accessibility */
+.advanced-filters-btn[aria-expanded="true"]::after {
+    content: ' ▲';
+}
+
+.advanced-filters-btn[aria-expanded="false"]::after {
+    content: ' ▼';
+}
+
+.filter-input[aria-invalid="true"] {
+    border-color: rgba(255, 107, 107, 0.7);
+}
+
+.filter-input[aria-invalid="true"]+.filter-error {
+    display: block;
+    color: #ff6b6b;
+    font-size: 0.75rem;
+    margin-top: var(--space-xs);
+}
+
+.filter-error {
+    display: none;
+}
+

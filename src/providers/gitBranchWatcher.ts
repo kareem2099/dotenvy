@@ -6,6 +6,7 @@ import { StatusBarProvider } from './statusBarProvider';
 import { FileUtils } from '../utils/fileUtils';
 import { SecretsGuard } from '../utils/secretsGuard';
 import { logger } from '../utils/logger';
+import { t } from '../i18n';
 
 export class GitBranchWatcher implements vscode.Disposable {
 	private workspaceRoot: string;
@@ -85,7 +86,7 @@ export class GitBranchWatcher implements vscode.Disposable {
 
 		if (!targetEnv) {
 			vscode.window.showWarningMessage(
-				`dotenvy: Branch '${branch}' maps to '${environmentName}' but environment file not found.`
+				t('envSwitch.branchMissing', { branch, environment: environmentName })
 			);
 			return;
 		}
@@ -98,11 +99,11 @@ export class GitBranchWatcher implements vscode.Disposable {
 			const warnings = SecretsGuard.checkFile(targetEnv.filePath);
 			if (warnings.length > 0) {
 				vscode.window.showWarningMessage(
-					`🔄 Auto-switched to ${targetEnv.name} (branch: ${branch}) - ⚠️ Contains potential secrets: ${warnings.join(', ')}`
+					t('envSwitch.autoSecrets', { name: targetEnv.name, branch, warnings: warnings.join(', ') })
 				);
 			} else {
 				vscode.window.showInformationMessage(
-					`🔄 Auto-switched environment to ${targetEnv.name} (branch: ${branch})`
+					t('envSwitch.autoSwitched', { name: targetEnv.name, branch })
 				);
 			}
 
@@ -111,7 +112,7 @@ export class GitBranchWatcher implements vscode.Disposable {
 
 		} catch (error) {
 			vscode.window.showErrorMessage(
-				`Failed to auto-switch environment: ${(error as Error).message}`
+				t('envSwitch.autoFailed', { message: (error as Error).message })
 			);
 		}
 	}

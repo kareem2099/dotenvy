@@ -10,11 +10,19 @@
 <body>
     <div class="trash-bin-container">
         <div class="trash-header">
-            <div>
-                <h3>🗑️ <span data-i18n="trash.title">Session Trash Bin</span> <span class="trash-count" id="trash-count">0</span></h3>
-                <p style="margin:0;font-size:0.8rem;opacity:0.6;" data-i18n="trash.subtitle">Variables deleted or modified this session. Clears on VS Code restart.</p>
+            <div class="trash-header-main">
+                <div class="trash-title-row">
+                    <h3>
+                        <span class="trash-header-icon" aria-hidden="true">🗑️</span>
+                        <span data-i18n="trash.title">Session Trash Bin</span>
+                    </h3>
+                    <span class="trash-count" id="trash-count">0</span>
+                </div>
+                <p class="trash-subtitle" data-i18n="trash.subtitle">Variables deleted or modified this session. Clears on VS Code restart.</p>
             </div>
-            <button class="btn btn-secondary" id="clear-all-btn" data-i18n="trash.clearAll">🗑 Clear All</button>
+            <div class="trash-header-actions">
+                <button type="button" class="btn btn-secondary" id="clear-all-btn" data-i18n="trash.clearAll">🗑 Clear All</button>
+            </div>
         </div>
         <div class="trash-list" id="trash-list">
             <div class="trash-empty" data-i18n="trash.empty">🎉 Nothing in the bin — your variables are safe!</div>

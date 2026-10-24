@@ -1,0 +1,54 @@
+/* Setup / onboarding (shown before dashboard until initialized) */
+.setup-section {
+    padding: 12px;
+}
+
+.setup-card {
+    background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.setup-title {
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.setup-description {
+    margin: 0 0 12px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--vscode-descriptionForeground);
+}
+
+.setup-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+body.sidebar-view .setup-section {
+    padding: 10px 12px;
+}
+
+body.sidebar-view .setup-card {
+    padding: 12px;
+}
+
+body.sidebar-view .setup-title {
+    font-size: 0.9rem;
+}
+
+body.sidebar-view .setup-description {
+    font-size: 0.75rem;
+    margin-bottom: 10px;
+}
+
+body.sidebar-view .setup-actions .btn {
+    min-height: 26px;
+    font-size: 0.7rem;
+}
+

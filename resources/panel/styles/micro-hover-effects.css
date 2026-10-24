@@ -1,0 +1,10 @@
+/* Enhanced hover effects */
+.history-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.timeline-node:hover .timeline-circle {
+    filter: drop-shadow(0 4px 8px rgba(102, 126, 234, 0.4));
+}
+

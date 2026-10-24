@@ -1,0 +1,20 @@
+/* ── Table Header ── */
+.vm-table-header {
+    display: grid;
+    grid-template-columns: 280px 1fr 130px;
+    gap: 0;
+    padding: 6px var(--space-md);
+    margin-bottom: var(--space-xs);
+}
+
+.vm-th {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.7;
+}
+
+.vm-th--actions { text-align: right; }
+

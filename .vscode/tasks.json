@@ -11,7 +11,7 @@
 			"runOptions": {
 				"runOn": "folderOpen"
 			},
-			"problemMatcher": "$tsc-watch",
+			"problemMatcher": [],
 			"isBackground": true,
 			"options": {
 				"cwd": "${workspaceFolder}"
@@ -25,7 +25,7 @@
 				"$tsc"
 			],
 			"label": "npm: compile",
-			"detail": "tsc -p ./"
+			"detail": "tsc -p ./ && node esbuild.mjs"
 		}
 	]
 }

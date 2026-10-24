@@ -1,96 +1,65 @@
-# 1. Prevent source and development files (we only upload Javascript)
-src/**
-tsconfig.json
-tsconfig.tsbuildinfo
-.eslintrc.json
-eslint.config.mjs
-vsc-extension-quickstart.md
-node_modules/**
-package-lock.json
-.yarnrc
-yarn.lock
-.vscode/**
-!.vscode/extensions.json
+# Package allowlist: exclude everything, then include only what the extension
+# needs at runtime. The extension and Git hook are esbuild bundles (dist/), so
+# out/, src/ and node_modules/ are not shipped. Run `vsce ls` to check.
+**
 
-# 2. Prevent metadata, articles and drafts (internal work)
-todo_list*.json
-articles/**
-*.md
-**/*.md
+!package.json
+!package.nls*.json
 !README.md
 !CHANGELOG.md
 !LICENSE
-roadmap*.json
 
-# 3. Security: prevent any environment files absolutely 🚫
+# Bundled extension and Git hook CLI (no source maps)
+!dist/extension.js
+!dist/git-hook.js
+
+# Webview pages, scripts and bundled stylesheets (styles/ is bundled into panel.css)
+!resources/panel/*.html
+!resources/panel/*.js
+!resources/panel/panel.css
+!resources/panel/analytics.css
+!resources/panel/secrets-scanner.css
+
+# Icons referenced by package.json and the panels
+!resources/icons/icon.png
+!resources/icons/activity-bar.svg
+!resources/icons/dotenvyignoreIcon.svg
+
+# Final safety exclusions, after resource inclusion rules.
+# Local settings/envelopes and credential material are never package resources.
 **/.env
 **/.env.*
-!.env.example
-.dotenvy.json
-.dotenvyGit.json
-
-# 4. Prevent source map files (for size and security)
-out/**/*.js.map
-test/**/*.js.map
-
-# 5. Prevent scripts and deployment tools
-scripts/**
-deploy/**
-infrastructure/**
-k8s/**
-ci-cd/**
-.github/**
-
-# 6. Prevent Python LLM project files (not the right place)
-python-llm/**
-llm-service/**
-**/__pycache__/**
-**/*.pyc
-requirements.txt
-Dockerfile
-docker-compose.yml
-railway.json
-
-# 7. System files and IDE junk
-.DS_Store
-Thumbs.db
-*.log
-.idea/**
-.git/**
-.vscode-test/**
-extracted-vsix/**
-coverage/**
-.nyc_output/**
-
-# 8. Clean up resources
-resources/icons/compressed.zip
-resources/icons/icon.orig.png
-resources/icons/compressed/**
-
-# 9. Important exceptions (these files must be uploaded for the extension to work) ✅
-!out/extension.js
-!out/git-hook.js
-!out/utils/*.js
-!out/commands/*.js
-!out/providers/*.js
-!out/types/*.js
-!out/managers/*.js
-!resources/**
-
-# 10. Prevent any test files (we don't need to upload tests to the marketplace)
-test/**
-**/test/**
-
-# 11. Prevent any original or compressed icons (we only upload the final icons)
-!resources/**
-
-resources/icons/*.orig.*
-resources/icons/*.zip
-resources/icons/compressed/**
-
-# 12. Prevent any dotenvy source files (we only upload the compiled version)
-.dotenvy/**
-.gitignore
-.dotenvy/history
-
+**/*.env
+**/.envrc
+**/.dotenvy.json
+**/.dotenvy.lock.json
+**/.dotenvyGit.json
+**/.dotenvy/**
+**/.dotenvy-backups/**
+**/.railway/**
+**/.railway-credentials*.json
+**/.aws/**
+**/.ssh/**
+**/.npmrc
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.keystore
+**/id_rsa
+**/id_ed25519
+**/*service-account*.json
+**/*service_account*.json
+**/*serviceaccount*.json
+**/*credentials*.json
+**/credentials.json
+**/backups/**
+**/*.enc
+**/*.vsix
+**/*.tgz
+**/*.zip
+**/*.bak
+**/*.backup
+.gitguardian.yaml
+.gitattributes
 .vscode/**

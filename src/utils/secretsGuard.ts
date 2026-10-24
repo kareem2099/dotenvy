@@ -1,5 +1,6 @@
 import { FileUtils } from './fileUtils';
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 
 export class SecretsGuard {
 	/**
@@ -15,9 +16,7 @@ export class SecretsGuard {
 	static async warnIfSecretsDetected(filePath: string): Promise<void> {
 		const warnings = this.checkFile(filePath);
 		if (warnings.length > 0) {
-			const message = `⚠️ Potential secrets detected: ${warnings.join(', ')}. ` +
-							'Ensure you are not committing sensitive data.';
-			vscode.window.showWarningMessage(message);
+			vscode.window.showWarningMessage(t('secrets.detectedWarning', { warnings: warnings.join(', ') }));
 		}
 	}
 }

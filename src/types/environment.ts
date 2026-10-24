@@ -79,6 +79,10 @@ export interface CloudSyncStatus {
 	hasConfig?: boolean;
 	error?: string;
 	encryptionEnabled?: boolean;
+	/** True when Doppler has secrets that differ from local env files */
+	hasUpdates?: boolean;
+	/** Number of remote changes pending a local pull */
+	pendingChanges?: number;
 }
 
 export interface GitHookStatus {

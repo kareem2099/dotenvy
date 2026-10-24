@@ -1,0 +1,124 @@
+/* ── Modal Dialog ── */
+.vm-modal {
+    background: var(--vscode-editor-background);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    width: 480px;
+    max-width: calc(100vw - 48px);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(102,126,234,0.2);
+    animation: modal-in 0.2s cubic-bezier(0.34,1.56,0.64,1) both;
+    overflow: hidden;
+}
+
+.vm-modal--sm { width: 360px; }
+
+@keyframes modal-in {
+    from { opacity: 0; transform: scale(0.92) translateY(12px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.vm-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-lg) var(--space-xl);
+    background: linear-gradient(135deg, rgba(102,126,234,0.12), rgba(118,75,162,0.08));
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.vm-modal-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.vm-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--vscode-foreground);
+    font-size: 1rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    opacity: 0.5;
+    transition: all var(--transition-fast);
+}
+
+.vm-modal-close:hover {
+    opacity: 1;
+    background: rgba(255,255,255,0.08);
+}
+
+.vm-modal-body {
+    padding: var(--space-xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.vm-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.vm-form-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--vscode-descriptionForeground);
+}
+
+.vm-form-input {
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, var(--glass-border));
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 0.88rem;
+    outline: none;
+    transition: all var(--transition-fast);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.vm-form-input:focus {
+    border-color: rgba(102,126,234,0.7);
+    box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
+}
+
+.vm-form-input[readonly] {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: rgba(255,255,255,0.03);
+}
+
+.vm-form-textarea {
+    resize: vertical;
+    min-height: 80px;
+    font-family: var(--font-mono);
+    line-height: 1.5;
+}
+
+.vm-mono { font-family: var(--font-mono); }
+
+.vm-form-error {
+    display: none;
+    font-size: 0.8rem;
+    color: #ef4444;
+    padding: 6px 10px;
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.25);
+    border-radius: 6px;
+}
+
+.vm-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-xl);
+    border-top: 1px solid var(--glass-border);
+    background: rgba(255,255,255,0.02);
+}
+

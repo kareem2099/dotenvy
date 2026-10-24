@@ -1,0 +1,22 @@
+/* ── Cells ── */
+.vm-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    min-width: 0;
+}
+
+.vm-cell--key {
+    padding-right: var(--space-md);
+}
+
+.vm-cell--value {
+    padding: 0 var(--space-sm);
+    overflow: hidden;
+}
+
+.vm-cell--actions {
+    justify-content: flex-end;
+    gap: 4px;
+}
+

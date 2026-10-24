@@ -1,0 +1,18 @@
+/* ── Spinner ── */
+.loading-state {
+    text-align: center;
+    padding: 5rem var(--space-xl);
+}
+
+.spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(102,126,234,0.2);
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto var(--space-md);
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+

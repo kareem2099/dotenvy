@@ -8,7 +8,8 @@ import { DopplerSyncManager } from '../utils/dopplerSyncManager';
 import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { EnvironmentValidator } from '../utils/environmentValidator';
 import { FileUtils } from '../utils/fileUtils';
-import { CloudEncryptionUtils } from '../utils/encryptedCloudSyncManager';
+import { CloudEncryptionUtils } from '../utils/cloudSyncManagerFactory';
+import { DopplerWatcherRegistry } from '../utils/dopplerWatcher';
 import {
 	EnvironmentStatus,
 	CloudSyncStatus,
@@ -17,12 +18,14 @@ import {
 	StatusBarSegment
 } from '../types/environment';
 import { logger } from '../utils/logger';
+import { t } from '../i18n';
 
 export class StatusBarProvider implements vscode.Disposable {
 	private statusBarItems: Map<string, vscode.StatusBarItem> = new Map();
 	private environmentProvider: EnvironmentProvider | null = null;
 	private rootPath: string | null = null;
 	private updateInterval?: NodeJS.Timeout;
+	private watcherSubscription?: vscode.Disposable;
 
 	constructor() {
 		this.createStatusBarSegments();
@@ -87,6 +90,14 @@ export class StatusBarProvider implements vscode.Disposable {
 	public setWorkspace(rootPath: string): void {
 		this.rootPath = rootPath;
 		this.environmentProvider = new EnvironmentProvider(rootPath);
+
+		// Subscribe to Doppler watcher for instant cloud badge updates
+		this.watcherSubscription?.dispose();
+		const watcher = DopplerWatcherRegistry.getOrCreate(rootPath);
+		this.watcherSubscription = watcher.onDidChangeState(() => {
+			void this.updateAllStatuses();
+		});
+
 		this.updateAllStatuses();
 	}
 
@@ -189,6 +200,13 @@ export class StatusBarProvider implements vscode.Disposable {
 			if (!testResult.success && testResult.error) {
 				status.error = testResult.error;
 			}
+
+			// Attach live update state from the background watcher (no extra network call)
+			const watcherState = DopplerWatcherRegistry.get(rootPath)?.getState();
+			if (watcherState) {
+				status.hasUpdates = watcherState.hasUpdates;
+				status.pendingChanges = watcherState.totalChanges;
+			}
 		} catch (error) {
 			status.error = (error as Error).message;
 		}
@@ -249,22 +267,28 @@ export class StatusBarProvider implements vscode.Disposable {
 		let text: string;
 		let tooltip = `Cloud Sync: ${status.provider || 'Unknown'}`;
 
+		const cloudIcon = status.encryptionEnabled ? '🔐' : '☁️';
 		if (status.encryptionEnabled) {
-			text = status.connected ? '🔐 ✓' : '🔐 ✗';
 			tooltip += ' (Encrypted)';
-		} else {
-			text = status.connected ? '☁️ ✓' : '☁️ ✗';
 		}
 
-		if (status.connected) {
-			tooltip += ' (Connected ✓)';
-			item.color = new vscode.ThemeColor('statusBarItem.prominentForeground');
-		} else {
+		if (!status.connected) {
+			text = `${cloudIcon} ✗`;
 			tooltip += ' (Not Connected ✗)';
 			item.color = new vscode.ThemeColor('statusBarItem.warningForeground');
 			if (status.error) {
 				tooltip += ` - ${status.error}`;
 			}
+		} else if (status.hasUpdates && status.pendingChanges) {
+			// Remote has newer secrets — highlight with an up-arrow badge
+			text = `${cloudIcon} ↑${status.pendingChanges}`;
+			tooltip += t('statusBar.cloud.updatesAvailable', { count: status.pendingChanges });
+			tooltip += ' — ' + t('statusBar.cloud.clickToPull');
+			item.color = new vscode.ThemeColor('statusBarItem.warningForeground');
+		} else {
+			text = `${cloudIcon} ✓`;
+			tooltip += ' (Connected ✓)';
+			item.color = new vscode.ThemeColor('statusBarItem.prominentForeground');
 		}
 
 		item.text = text;
@@ -284,13 +308,13 @@ export class StatusBarProvider implements vscode.Disposable {
 
 		if (status.installed) {
 			text = '🔗 ✓';
-			tooltip = 'Git Commit Hook: Installed (Click to manage)';
+			tooltip = t('statusBar.git.tooltipInstalled');
 			item.color = new vscode.ThemeColor('statusBarItem.prominentForeground');
 		} else {
 			text = status.enabled ? '🔗 ⚠️' : '';
 			tooltip = status.enabled
-				? 'Git Commit Hook: Not installed (Click to install)'
-				: 'Git Commit Hook: Disabled';
+				? t('statusBar.git.tooltipNotInstalled')
+				: t('statusBar.git.tooltipDisabled');
 			if (!status.enabled) {
 				item.hide();
 				return;
@@ -354,6 +378,7 @@ export class StatusBarProvider implements vscode.Disposable {
 		if (this.updateInterval) {
 			clearInterval(this.updateInterval);
 		}
+		this.watcherSubscription?.dispose();
 		this.statusBarItems.forEach(item => item.dispose());
 		this.statusBarItems.clear();
 	}

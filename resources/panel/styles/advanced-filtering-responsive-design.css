@@ -1,0 +1,64 @@
+/* Advanced Filtering Responsive Design */
+@media (max-width: 768px) {
+    .advanced-filters-panel {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .filters-section {
+        padding: var(--space-md);
+    }
+
+    .filter-row {
+        gap: var(--space-md);
+    }
+
+    .filter-group {
+        min-width: 150px;
+    }
+
+    .filters-actions {
+        padding: var(--space-md);
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filters-actions .filter-footer-btn {
+        width: 100%;
+        flex: 1 1 100%;
+    }
+
+    .filter-stats-content {
+        justify-content: center;
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .filter-row {
+        flex-direction: column;
+        gap: var(--space-sm);
+    }
+
+    .filter-group {
+        min-width: auto;
+    }
+
+    .filter-options {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-xs);
+    }
+
+    .variable-change-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-xs);
+    }
+
+    .variable-change-details {
+        flex-direction: column;
+        gap: var(--space-sm);
+    }
+}
+

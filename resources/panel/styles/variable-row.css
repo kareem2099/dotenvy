@@ -1,0 +1,26 @@
+/* ── Variable Row ── */
+.vm-row {
+    display: grid;
+    grid-template-columns: 280px 1fr 130px;
+    align-items: center;
+    gap: 0;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    padding: 10px var(--space-md);
+    transition: all var(--transition-fast);
+    animation: vm-row-in 0.18s ease both;
+}
+
+@keyframes vm-row-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.vm-row:hover {
+    background: rgba(102,126,234,0.08);
+    border-color: rgba(102,126,234,0.35);
+    transform: translateX(2px);
+    box-shadow: 0 2px 12px rgba(102,126,234,0.12);
+}
+

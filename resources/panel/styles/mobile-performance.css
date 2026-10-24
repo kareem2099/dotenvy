@@ -1,0 +1,9 @@
+/* Performance Optimizations */
+.dashboard-card,
+.env-card,
+.btn {
+    will-change: transform;
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+

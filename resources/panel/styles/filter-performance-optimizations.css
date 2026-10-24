@@ -1,0 +1,8 @@
+/* Filter Performance Optimizations */
+.advanced-filters-panel,
+.filter-input,
+.filter-select-multi {
+    will-change: transform;
+    backface-visibility: hidden;
+}
+

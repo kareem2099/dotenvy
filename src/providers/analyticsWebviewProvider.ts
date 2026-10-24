@@ -5,17 +5,25 @@ import { logger } from '../utils/logger';
 import { loadWebviewHtml } from '../utils/webviewUtils';
 import { postLocaleToPanel } from '../i18n/webviewLocale';
 import { t } from '../i18n';
+import { WorkspaceManager } from './workspaceManager';
 
 export class AnalyticsWebviewProvider {
     public static readonly viewType = 'dotenvy.analyticsViewer';
     private static _panel?: vscode.WebviewPanel;
     private static _context?: vscode.ExtensionContext;
     private static _extensionUri?: vscode.Uri;
+    private static _workspacePath?: string;
+    private static _loadRevision = 0;
 
     /** Call once on activate */
     public static init(extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
         AnalyticsWebviewProvider._extensionUri = extensionUri;
         AnalyticsWebviewProvider._context      = context;
+        context.subscriptions.push(HistoryManager.onDidChange(async rootPath => {
+            if (AnalyticsWebviewProvider._panel && rootPath === AnalyticsWebviewProvider._workspacePath) {
+                await AnalyticsWebviewProvider.loadAnalytics(rootPath);
+            }
+        }));
     }
 
     public static refreshLocale(): void {
@@ -23,7 +31,7 @@ export class AnalyticsWebviewProvider {
     }
 
     /** Open (or reveal) the Analytics webview panel */
-    public static async openOrReveal(): Promise<void> {
+    public static async openOrReveal(workspacePath?: string): Promise<void> {
         const context      = AnalyticsWebviewProvider._context;
         const extensionUri = AnalyticsWebviewProvider._extensionUri;
 
@@ -32,8 +40,18 @@ export class AnalyticsWebviewProvider {
             return;
         }
 
+        const editor = vscode.window.activeTextEditor;
+        const activeFolder = editor ? vscode.workspace.getWorkspaceFolder(editor.document.uri) : undefined;
+        const preferred = workspacePath ?? activeFolder?.uri.fsPath
+            ?? WorkspaceManager.getInstance().getActiveWorkspace()?.workspace.uri.fsPath;
+        AnalyticsWebviewProvider._workspacePath = vscode.workspace.workspaceFolders
+            ?.find(folder => folder.uri.fsPath === preferred)?.uri.fsPath
+            ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
         if (AnalyticsWebviewProvider._panel) {
             AnalyticsWebviewProvider._panel.reveal(vscode.ViewColumn.One);
+            postLocaleToPanel(AnalyticsWebviewProvider._panel, 'analytics.');
+            await AnalyticsWebviewProvider._loadForActiveWorkspace();
             return;
         }
 
@@ -48,6 +66,7 @@ export class AnalyticsWebviewProvider {
             }
         );
 
+        panel.iconPath = vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'icon.png');
         AnalyticsWebviewProvider._panel = panel;
         panel.webview.html = AnalyticsWebviewProvider._getHtml(panel.webview, extensionUri);
         postLocaleToPanel(panel, 'analytics.');
@@ -60,18 +79,16 @@ export class AnalyticsWebviewProvider {
         // Cleanup on close
         panel.onDidDispose(() => {
             AnalyticsWebviewProvider._panel = undefined;
+            AnalyticsWebviewProvider._loadRevision++;
         }, null, context.subscriptions);
 
-        // Load data for the first workspace
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders && workspaceFolders.length > 0) {
-            await AnalyticsWebviewProvider.loadAnalytics(workspaceFolders[0].uri.fsPath);
-        }
+        // Initial load is triggered from the webview after scripts are ready (avoids lost postMessage).
     }
 
     // ─── Data Loading ───────────────────────────────────────────────────────────
 
     public static async loadAnalytics(workspacePath: string): Promise<void> {
+        const revision = ++AnalyticsWebviewProvider._loadRevision;
         try {
             const historyData = await HistoryManager.getHistory(workspacePath, 1000);
             const analytics   = await HistoryAnalytics.generateAnalytics(historyData);
@@ -90,16 +107,18 @@ export class AnalyticsWebviewProvider {
                 }
             };
 
+            if (revision !== AnalyticsWebviewProvider._loadRevision) return;
             AnalyticsWebviewProvider._post({
                 type: 'analyticsLoaded',
                 analytics: enhanced,
                 workspacePath,
             });
         } catch (error) {
+            if (revision !== AnalyticsWebviewProvider._loadRevision) return;
             logger.error('Failed to load analytics:', error, 'AnalyticsWebviewProvider');
             AnalyticsWebviewProvider._post({
                 type: 'error',
-                message: `Failed to load analytics: ${(error as Error).message}`,
+                errorMessage: (error as Error).message,
             });
         }
     }
@@ -110,18 +129,33 @@ export class AnalyticsWebviewProvider {
         AnalyticsWebviewProvider._panel?.webview.postMessage(message);
     }
 
-    private static async _handleMessage(message: { type: string; workspacePath: string }): Promise<void> {
+    private static async _loadForActiveWorkspace(): Promise<void> {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            AnalyticsWebviewProvider._post({
+                type: 'error',
+                errorMessage: t('common.noWorkspace'),
+            });
+            return;
+        }
+        const folder = workspaceFolders.find(folder => folder.uri.fsPath === AnalyticsWebviewProvider._workspacePath)
+            ?? workspaceFolders[0];
+        AnalyticsWebviewProvider._workspacePath = folder.uri.fsPath;
+        await AnalyticsWebviewProvider.loadAnalytics(folder.uri.fsPath);
+    }
+
+    private static async _handleMessage(message: { type: string; workspacePath?: string }): Promise<void> {
         switch (message.type) {
+            case 'webviewReady':
+                postLocaleToPanel(AnalyticsWebviewProvider._panel, 'analytics.');
+                await AnalyticsWebviewProvider._loadForActiveWorkspace();
+                break;
             case 'loadAnalytics':
-                await AnalyticsWebviewProvider.loadAnalytics(message.workspacePath);
+                await AnalyticsWebviewProvider._loadForActiveWorkspace();
                 break;
-            case 'refresh': {
-                const workspaceFolders = vscode.workspace.workspaceFolders;
-                if (workspaceFolders && workspaceFolders.length > 0) {
-                    await AnalyticsWebviewProvider.loadAnalytics(workspaceFolders[0].uri.fsPath);
-                }
+            case 'refresh':
+                await AnalyticsWebviewProvider._loadForActiveWorkspace();
                 break;
-            }
         }
     }
 

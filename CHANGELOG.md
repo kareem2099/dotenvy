@@ -1,23 +1,65 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to **DotEnvy** — the `.env` manager and secret scanner for VS Code, part of the [DotSuite](https://www.dotsuite.dev/en) developer toolkit — are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.3.0] - 2026-10-25
+
+### ⚠️ Removed — DotAegis AI classifier
+- **DotAegis is no longer part of DotEnvy.** The bundled model, local inference worker, hourly model downloads, community-learning upload and consent prompts are gone, along with the `Toggle Community Learning` command and the `secrets.enableCommunityLearning`, `secrets.enableModelUpdates` and `secrets.enableCloudAnalysis` settings.
+- **Why:** a useful model needs a large set of real, labelled keys, and nobody can or should hand over real secrets to train it. The shipped model was trained on synthetic data only. DotAegis continues as a [separate DotSuite project](https://www.dotsuite.dev/en/product/dotaegis).
+- Upgrading deletes the pending feedback queue and consent state left by earlier versions.
+
+### Changed
+- **Smaller, faster package.** The extension and Git hook are now esbuild bundles and the 104 webview stylesheets are merged into one `panel.css`. The VSIX drops from more than 300 files to 36, with no `node_modules` or unbundled `out/` files.
+- **Offline, rule-based secret scanner.** Candidates are classified by known key formats, entropy, surrounding code and variable names. Results show **Local rules** or **Confirmed by you**, and the scanner makes no network requests. "Not a Secret" / "Move to .env" corrections work as before.
+
+### Added
+- **Connect Doppler** from the dashboard, sidebar or Command Palette: browser sign-in, automatic project and `dev` config setup, a config-scoped service token in SecretStorage, a connection check, and automatic revocation of the temporary setup credential. Connecting never uploads or downloads environment values, and failed or cancelled setups keep your existing settings.
+- **Set Doppler Token** recovery on authentication errors stores the token in SecretStorage and removes the legacy `cloudSync.token` JSON field.
 
 ### Fixed
-- Connect the sidebar's Init Secure Project and Init .dotenvyignore buttons to their registered commands; await completion and report dispatch failures.
-- Return the ignore command's asynchronous result, report file access errors, open existing ignore files without overwriting them and handle an empty workspace.
-- Stop secure setup on cancelled prompts and preserve the existing key envelope when reinitialization is cancelled. Report missing workspaces immediately.
 
-### Validation
-- Exercise actual frontend setup handlers through both dashboard receivers and registered commands, including real temporary ignore/envelope/config files, cancellation and visible failure notifications.
+#### ☁️ Doppler & cloud sync
+- Cloud pull writes `backend/.env` instead of `backend/backend/.env` when the opened folder already matches a configured path, creates configured files that don't exist yet, and skips a folder named `.env`. *(PR [#5](https://github.com/kareem2099/dotenvy/pull/5) by @FaberVi)*
+- Cloud pull overwrites hidden `.env` files on Windows instead of failing with EPERM. *(PR [#5](https://github.com/kareem2099/dotenvy/pull/5) by @FaberVi)*
+- Pull replaces complete multiline assignments and keeps `export` prefixes, comments and CRLF line endings without duplicating inline comments.
+- Connection checks use Doppler's config access probe instead of downloading secret values, and never switch to another config; a missing config must be selected explicitly.
+- Pull/Push work with SecretStorage or `DOPPLER_TOKEN` tokens and no JSON token. Credentials are trimmed, SecretStorage takes precedence, and HTTP 401 and 403 show distinct messages.
+- Doppler setup recovers from an unclassified HTTP 400 during project lookup by checking the full project list before creating anything, sends project/config where the API requires them, and reports the failing step and HTTP status without exposing credentials.
+- The sidebar Doppler button opens the dashboard, shows connection errors, and opens the dashboard home for an empty or placeholder (`your-project-name`) project.
+- Environment comparisons and cloud diffs open a plaintext report with key names and paths instead of logging secret values.
+
+#### 🔍 Secret scanner
+- `resources/` folders are scanned again, such as `src/main/resources/application.yml` in Java/Spring projects.
+- Base64 detection validates complete tokens, so fragments of URLs and file paths are no longer reported; credentials inside URL parameters are still found.
+- Ordinary `import` / `export` / `require` paths are no longer reported as Base64 or hash secrets.
+- Generated files (`htmlcov`, coverage, build output, Python environments and caches) are excluded from scans and file watching, using each folder's own `.dotenvyignore`.
+- Large scans stay responsive: at most four files scan at once and the scanner yields to the UI between batches.
+- **View** opens the original file in multi-folder workspaces, selects the complete value and reports missing files.
+- The **Review Secrets** notification opens the scanner panel with its findings.
+- Editor warnings use the same rules and saved corrections, and refresh after a correction or reset.
+
+#### 🧭 Dashboard, history & UI
+- Init Secure Project and Init .dotenvyignore buttons run their commands and report failures. Cancelling a secure setup prompt stops it and keeps the existing key envelope; the ignore command opens an existing file without overwriting it.
+- Sidebar and dashboard environment switches are recorded in history, and open Analytics panels refresh after new records. Empty history shows an explanation.
+- DotEnvy panels show the DE/key logo on their editor tabs, and the activity bar uses a transparent monochrome icon.
+- Machine-local settings, nested environment files, key envelopes, credentials, private keys and backups are excluded from Git and from the packaged extension.
+
+### Tests
+- `node:test` suites from PR #5 for env files, cloud sync and sessions, command passwords, Doppler slugs, encryption, history and the trash bin, the secret hook and user management, plus a new release-safety suite for Git and package exclusions. Env-file tests cover the subfolder path, missing-file and hidden Windows file fixes.
+- Regression suites for Doppler onboarding, scanner navigation, notifications, responsiveness, scan exclusions, Base64/module-path false positives, analytics history and dashboard actions. Offline suites block all network calls.
 
 ## [2.2.4] - 2026-10-09
 
+### Added
+
+- **Portable cloud encryption key**: The Doppler payload key is wrapped with a sync passphrase (PBKDF2 + AES-256-GCM). Salt and wrapped key are stored as Doppler metadata, so another machine can pull with the same passphrase. Pull no longer generates a new key, and a push refuses to overwrite a payload this machine cannot decrypt. The previous workspace key is left in place so another Doppler config in the same workspace can still be opened.
+
 ### Changed
+
 - Replace the extension and activity-bar icon with a clear DE monogram and amber key; show the updated icon in README.
 - Ask once about numeric community sharing after the first successful move or false-positive correction. Complete the local action before consent; acceptance includes that correction and future ones, while decline/dismissal persists across restarts. Keep the toggle command for later changes and respect explicit Settings opt-out.
 - Run DotAegis' trained transformer in a local worker. Classify complete original values without submitting candidates/code; retain local heuristic fallback and bundled synthetic weights.
@@ -26,39 +68,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remember immediate local corrections scoped to file, variable and complete value; add reset and community-learning commands. Normalize overlapping matches to full quoted values.
 
 ### Fixed
+
 - Match model-update ETags to verified cached weights so interrupted preference writes do not block future downloads. Keep model activation independent of old-cache cleanup and dispose workers if shutdown occurs during update persistence.
+- Connect the sidebar's Init Secure Project and Init .dotenvyignore buttons to their registered commands; await completion and report dispatch failures.
+- Return the ignore command's asynchronous result, report file access errors, open existing ignore files without overwriting them and handle an empty workspace.
+- Stop secure setup on cancelled prompts and preserve the existing key envelope when reinitialization is cancelled. Report missing workspaces immediately.
 
 ### Validation
+
 - Verify Python/TypeScript probability parity and actual workers, offline scans with network blocked, numeric-only consent/retry/concurrency behavior and actual panel consent flows, authentication and model-update fallback. Verify original-value .env writes and stale-source rejection.
+- Exercise actual frontend setup handlers through both dashboard receivers and registered commands, including real temporary ignore/envelope/config files, cancellation and visible failure notifications.
 
 ### Documentation
+
 - Document local inference, optional feedback, reviewed shared training, downloaded weights, device/server storage and legacy behavior in English and Arabic. Avoid zero-storage or credential-validity claims.
 
 ## [2.2.3] - 2026-10-09
 
+### ☁️ Doppler & cloud sync
+
+- **Project slug normalization**: Doppler project names from `package.json`, folder names, or `.dotenvy.json` now map dots to hyphens (e.g. `project.webservice` → `project-webservice`) on read, save, and every API call.
+- **Read-only cloud diff**: New command to compare local merged secrets with Doppler without writing files; uses the same metadata filters as pull and restores last-sync storage after fetch.
+- **Pull preserves `.env` formatting**: Cloud pull merges into the existing file instead of rewriting plain `KEY=value` lines—comments, blank lines, key order, and inline `#` suffixes on updated keys are kept; keys removed from Doppler are dropped; new keys are appended.
+- **Env backup gitignore**: Cloud pull appends `.env*.backup` to the workspace `.gitignore` when missing so pre-overwrite backups are not committed.
+
+### 🔍 Local safety & workspace insight
+
+- **Cross-environment value conflicts**: Discovers configured/nested `.env` files (not root `.env`) and reports the same key with different values; command output on the DotEnvy channel plus toast.
+- **Editor secret diagnostics**: Synchronous local pattern scan with debounced Problems entries (`dotenvy-secrets`); pre-commit hook uses the same scan together with `SecretsGuard`.
+- **Secrets panel feedback stats**: Scanner webview shows confirmed/false-positive counts from `FeedbackManager`; removed the “helping train the AI” toast on ignore.
+
 ### Fixed
+
 - Capture features from original candidates instead of redacted display strings; consistently label user confirmations as positive evidence.
 - Remove keys and code context from persistent feedback; purge legacy raw-context queues and clarify cloud data retention in all consent translations.
 - Serialize feedback writes and uploads, preserve concurrent additions, and mark only server-acknowledged sample IDs as sent.
 - Re-read and verify original source values before writing .env; reject stale detections, conflicting values, and forged webview payloads.
 - Use full-value SHA-256 community fingerprints and v2 blacklist sync; report false positives with the correct original fingerprint.
 - Support new installation identities after lost credentials; retain existing registered-device identities.
+- **Secrets panel**: Generation counter avoids race conditions when refreshing webview HTML.
+- **Secret diagnostics**: Clears debounce timer on dispose.
+- **Environment panel**: “Edit” button uses full `btn` secondary styling.
 
-### Validation
+### 🧪 Tests
+
+- Coverage for value conflicts, cloud diff filtering, local scan/hook behavior, Doppler slug normalization, and pull merge formatting (`dopplerProjectSlug.test.js`, extended `envFiles` / `secretsAndHook` suites).
 - Add privacy, Python/TypeScript feature parity, acknowledgment/retry, concurrency, and source-value regression tests.
 - Make existing LLM tests fail the process on failed assertions and isolate backup tests from real user backups.
-- Compatible with DotAegis 2.2.3 feature-only feedback and administrator-reviewed learning.
 
-## [2.2.2] - 2026-09-26
+## [2.2.2] - 2026-10-07
 
-### 🛡️ Privacy-First Local Architecture, Explicit Opt-In Cloud Analysis & Regex Transparency
+### 🌐 Webview localization & History filters UX
 
-- **100% Local-First Scanning by Default**: All secret scanning layers (L1 Regex patterns, L2 Local Blacklist, L3 Shannon Entropy, and L4 Heuristic fallback) run exclusively on the local machine by default. Zero code or candidate secret data is transmitted externally.
-- **Explicit Cloud Analysis Opt-In (`dotenvy.secrets.enableCloudAnalysis`)**: Remote AI verification via DotSuite Aegis (`aegis.dotsuite.dev`) is now strictly disabled by default (`default: false`). It requires explicit opt-in via VS Code settings or the new interactive consent command (`DotEnvy: Toggle AI Cloud Secret Analysis`).
-- **Complete Reversal of Regex Obfuscation**: Eliminated all dynamic string assembly (`.join('')`) across `llmAnalyzer.ts`, `patternRegistry.ts`, and `featureExtractor.ts`. All detection rules are now 100% transparent, plain, and fully inspectable regex literals.
-- **Offline Startup & Lifecycle Isolation**: Startup initialization and device handshakes are completely isolated and skipped when cloud analysis is disabled. Zero background requests occur upon extension activation.
-- **Gated Feedback & Sync**: Community blacklist synchronization and feedback telemetry are strictly dormant unless cloud analysis is explicitly enabled.
-- **In-Editor Transparency Indicators**: Secrets scanner panel displays a clear privacy badge indicating whether the scan ran in 100% Local Mode or Opt-In Cloud Mode.
+- **Analytics panel i18n**: Localized all dynamically rendered strings (sections, table headers, heatmap, footer, rates, loading/error states); locale-aware hours and dates via `getLocale()`; error messages use `analytics.loadFailed`.
+- **History viewer i18n**: Localized relative timestamps, action badges, filter summary chips, rollback alerts, and variable-history copy; structured filter tags replace hardcoded English summaries from the extension host.
+- **Variable Manager i18n**: Localized modals (placeholders, delete hint, retry), encrypted badge label, and load-error handling with `variableManager.loadFailed`.
+- **Advanced filters drawer**: Improved contrast and layout for inputs/selects (VS Code theme tokens, `color-scheme`); uniform field widths and spacing; localized date-range presets (`history.preset.*`); footer buttons aligned to a single control style; removed stale “Loading…” placeholders in multi-selects.
+- **History header stats**: Unified label/value typography (UI font, aligned chips) instead of monospace numerals.
+- **Accessibility**: Added `scope="col"` on history table header cells (`wcag/h63`).
+- **i18n catalog**: New `history.*` and `variableManager.*` keys in `en`, `it`, `ar`, and `ru`; date presets identified by `id` in `HistoryFilters.getDateRangePresets()`.
 
 ## [2.2.1] - 2026-09-24
 
@@ -615,8 +683,17 @@ Complete implementation of envelope encryption enabling secure multi-user access
 
 | Version | Date | Codename | Highlights |
 |---------|------|----------|------------|
+| **2.3.0** | 2026-10-25 | — | DotAegis removed; offline rule-based scanner; Connect Doppler; cloud pull fixes; bundled 418 KB package |
+| **2.2.4** | 2026-10-09 | — | Portable cloud encryption key (sync passphrase) |
+| **2.2.3** | 2026-10-09 | — | Read-only cloud diff, value conflicts, editor secret diagnostics, format-preserving pull |
+| **2.2.2** | 2026-10-07 | — | Webview localization and history filters UX |
+| **2.2.1** | 2026-09-24 | — | Full Arabic (RTL) and Russian localization |
+| **2.2.0** | 2026-09-24 | Aegis | Italian localization, sidebar redesign, Doppler multi-file sync, monorepo hooks |
+| **2.1.3** | 2026-09-23 | Aegis | Static scanner hardening and build hygiene |
+| **2.1.2** | 2026-09-23 | Aegis | Per-installation credential handshake |
 | **2.1.1** | 2026-09-23 | Aegis | Dependency hygiene — all deps to latest, removed unused mocha/test-electron |
 | **2.1.0** | 2026-09-22 | Aegis | L1-L4 AI Secrets Guard, OS-Level SecretStorage Migration, Master Key Architecture |
+| **2.0.0** | 2026-04-11 | Nexus | Architecture overhaul, modular webviews, high-density UI, session Trash Bin |
 | **1.6.0** | 2026-03-17 | SolidBase | SecretStorage, 35-feature ML fix, Logger, Secrets Panel, FeedbackManager, .dotenvyignore |
 | **1.5.0** | 2026-03-13 | — | HMAC auth, 35-feature ML, two-tier cache, SSE streaming, service refactor |
 | **1.4.0** | 2026-01-26 | — | Portable backup encryption (PBE + PBKDF2) |

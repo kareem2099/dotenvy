@@ -1,0 +1,14 @@
+/* ── Manager Root ── */
+#manager-root {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-lg) var(--space-xl);
+}
+
+#manager-root::-webkit-scrollbar { width: 6px; }
+#manager-root::-webkit-scrollbar-track { background: transparent; }
+#manager-root::-webkit-scrollbar-thumb {
+    background: var(--glass-border);
+    border-radius: 3px;
+}
+

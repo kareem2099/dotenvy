@@ -1,10 +1,17 @@
 # DotEnvy icon
 
-Primary asset: `icon.png`. Used by the extension package and activity-bar container.
+Primary asset: `icon.png`. Used by the extension package and editor tabs for all DotEnvy webview panels.
 DE abbreviates DotEnvy; the key represents environment secrets. The square mark
 uses the existing dark teal, mint and amber visual direction, with transparency
 outside the rounded tile. Generated with the built-in `image_gen` tool, then
 copied into this repository without altering the generated image.
+
+The activity-bar container uses `activity-bar.svg`: a 24×24 monochrome DE and
+key mark built from paths with transparent counters and background. VS Code
+renders custom activity-bar images as masks in the theme's foreground color.
+The opaque tile from the package logo must not be used here, because its alpha
+silhouette becomes a solid square and hides the lettering and key.
+See [VS Code view-container icon specifications](https://code.visualstudio.com/api/references/contribution-points#contributes.viewsContainers).
 
 ## Generation prompt
 

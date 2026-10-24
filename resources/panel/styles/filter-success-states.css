@@ -1,0 +1,6 @@
+/* Filter Success States */
+.filter-group.success .filter-input {
+    border-color: rgba(16, 185, 129, 0.5);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+

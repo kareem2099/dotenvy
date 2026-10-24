@@ -5,6 +5,7 @@ import * as os from 'os';
 import { logger } from '../utils/logger';
 import { BackupManager } from '../utils/backupManager';
 import { EncryptedVarsManager } from '../utils/encryptedVars';
+import { t } from '../i18n';
 
 export class BackupCommands {
     
@@ -13,19 +14,19 @@ export class BackupCommands {
             canSelectFolders: true,
             canSelectFiles: false,
             canSelectMany: false,
-            openLabel: 'Select Backup Folder'
+            openLabel: t('backup.selectFolder')
         });
 
         if (folderUri && folderUri[0]) {
             const config = vscode.workspace.getConfiguration('dotenvy');
             await config.update('backupPath', folderUri[0].fsPath, vscode.ConfigurationTarget.Global);
-            vscode.window.showInformationMessage(`Backup location set to: ${folderUri[0].fsPath}`);
+            vscode.window.showInformationMessage(t('backup.locationSet', { path: folderUri[0].fsPath }));
         }
     }
 
     public static async backupEnv(context: vscode.ExtensionContext, filePath: string) {
         if (!fs.existsSync(filePath)) {
-            vscode.window.showErrorMessage(`No file found to backup at: ${path.basename(filePath)}`);
+            vscode.window.showErrorMessage(t('backup.fileMissing', { file: path.basename(filePath) }));
             return;
         }
 
@@ -35,19 +36,19 @@ export class BackupCommands {
 
         if (hasMasterKey) {
             encryptionChoice = {
-                label: '🔐 Master Key (Auto-Authorized)',
-                detail: 'Using project master key',
+                label: t('backup.masterKeyLabel'),
+                detail: t('backup.masterKeyDetail'),
                 value: 'master-key'
             };
         } else {
             const encryptionOptions = [
-                { label: '🔐 Password Protection (Recommended)', detail: 'Portable across devices - works anywhere with your password', value: 'password' },
-                { label: '🔒 Legacy Encryption', detail: 'Uses VSCode SecretStorage (may become inaccessible)', value: 'legacy' },
-                { label: '📄 No Encryption', detail: 'Plain text backup', value: 'none' }
+                { label: t('backup.passwordLabel'), detail: t('backup.passwordDetail'), value: 'password' },
+                { label: t('backup.legacyLabel'), detail: t('backup.legacyDetail'), value: 'legacy' },
+                { label: t('backup.noneLabel'), detail: t('backup.noneDetail'), value: 'none' }
             ];
 
             encryptionChoice = await vscode.window.showQuickPick(encryptionOptions, {
-                placeHolder: 'How would you like to encrypt your backup?',
+                placeHolder: t('backup.encryptPlaceholder'),
                 ignoreFocusOut: true
             });
         }
@@ -81,35 +82,35 @@ export class BackupCommands {
                 filename = `env.backup.${timestamp}.master.enc`;
                 backupPathOut = path.join(backupDir, filename);
                 fs.writeFileSync(backupPathOut, packaged, 'utf8');
-                vscode.window.showInformationMessage(`✅ Backup secured with Project Master Key!\n📁 ${filename}`);
+                vscode.window.showInformationMessage(t('backup.masterCreated', { file: filename }));
 
             } else if (encryptionChoice.value === 'password') {
                 const password = await vscode.window.showInputBox({
-                    prompt: 'Enter a password to encrypt your backup',
+                    prompt: t('backup.passwordPrompt'),
                     password: true,
-                    placeHolder: 'Enter password (min 8 characters recommended)',
+                    placeHolder: t('backup.passwordPlaceholder'),
                     ignoreFocusOut: true,
                     validateInput: (value: string) => {
-                        if (!value || value.length === 0) return 'Password cannot be empty';
-                        if (value.length < 8) return 'Warning: Password is short. Minimum 8 characters recommended.';
+                        if (!value || value.length === 0) return t('common.passwordEmpty');
+                        if (value.length < 8) return t('common.passwordShort');
                         return null;
                     }
                 });
 
                 if (!password) {
-                    vscode.window.showInformationMessage('Backup cancelled.');
+                    vscode.window.showInformationMessage(t('backup.cancelled'));
                     return;
                 }
 
                 const passwordConfirm = await vscode.window.showInputBox({
-                    prompt: 'Confirm your password',
+                    prompt: t('backup.confirmPrompt'),
                     password: true,
-                    placeHolder: 'Re-enter password',
+                    placeHolder: t('backup.confirmPlaceholder'),
                     ignoreFocusOut: true
                 });
 
                 if (password !== passwordConfirm) {
-                    vscode.window.showErrorMessage('Passwords do not match. Backup cancelled.');
+                    vscode.window.showErrorMessage(t('backup.mismatch'));
                     return;
                 }
 
@@ -120,7 +121,7 @@ export class BackupCommands {
                 filename = `env.backup.${timestamp}.enc`;
                 backupPathOut = path.join(backupDir, filename);
                 fs.writeFileSync(backupPathOut, packaged, 'utf8');
-                vscode.window.showInformationMessage(`✅ Password-protected backup created!\n📁 ${filename}\n🔐 This backup is portable - works on any device with your password.`);
+                vscode.window.showInformationMessage(t('backup.passwordCreated', { file: filename }));
 
             } else if (encryptionChoice.value === 'legacy') {
                 const key = await BackupManager.ensureAndGetStoredKey(context);
@@ -129,17 +130,17 @@ export class BackupCommands {
                 filename = `env.backup.${timestamp}.legacy.enc`;
                 backupPathOut = path.join(backupDir, filename);
                 fs.writeFileSync(backupPathOut, packaged, 'utf8');
-                vscode.window.showInformationMessage(`Encrypted backup created: ${filename}`);
-                vscode.window.showWarningMessage('⚠️ Legacy encrypted backups use a local key. If VS Code data is lost, backups may become inaccessible. Consider using password protection instead.');
+                vscode.window.showInformationMessage(t('backup.legacyCreated', { file: filename }));
+                vscode.window.showWarningMessage(t('backup.legacyWarning'));
             } else {
                 filename = `env.backup.${timestamp}.txt`;
                 backupPathOut = path.join(backupDir, filename);
                 fs.writeFileSync(backupPathOut, content, 'utf8');
-                vscode.window.showInformationMessage(`Backup created: ${filename}\n⚠️ This backup is not encrypted.`);
+                vscode.window.showInformationMessage(t('backup.plainCreated', { file: filename }));
             }
         } catch (error) {
             logger.error('Failed to create backup:', error, 'BackupCommands');
-            vscode.window.showErrorMessage(`Failed to create backup: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(t('backup.createFailed', { message: (error as Error).message }));
         }
     }
 
@@ -155,7 +156,7 @@ export class BackupCommands {
         }
 
         if (!fs.existsSync(restoreBackupDir)) {
-            vscode.window.showErrorMessage('No backup directory found.');
+            vscode.window.showErrorMessage(t('backup.noDirectory'));
             return;
         }
 
@@ -165,20 +166,20 @@ export class BackupCommands {
             .reverse();
 
         if (allBackupFiles.length === 0) {
-            vscode.window.showInformationMessage('No backups found.');
+            vscode.window.showInformationMessage(t('backup.noneFound'));
             return;
         }
 
         const selectedFile = await vscode.window.showQuickPick(
             allBackupFiles.map(file => {
-                let type = '📄 Plain text';
+                let type = t('backup.typePlain');
                 if (file.endsWith('.enc')) {
                     if (file.includes('.master.')) {
-                        type = '🔐 Project Master Key';
+                        type = t('backup.typeMaster');
                     } else if (file.includes('.legacy.')) {
-                        type = '🔒 Legacy encrypted';
+                        type = t('backup.typeLegacy');
                     } else {
-                        type = '🔐 Password protected';
+                        type = t('backup.typePassword');
                     }
                 }
                 return {
@@ -193,7 +194,7 @@ export class BackupCommands {
                 };
             }),
             {
-                placeHolder: 'Select backup to restore',
+                placeHolder: t('backup.selectPlaceholder'),
                 ignoreFocusOut: true
             }
         );
@@ -212,21 +213,21 @@ export class BackupCommands {
                         const key = await EncryptedVarsManager.ensureMasterKey(context);
                         decryptedContent = BackupManager.decryptWithKey(fileContent, key);
                     } catch (error) {
-                        vscode.window.showErrorMessage('❌ Failed to decrypt backup. Project Master Key could not decrypt this file.');
+                        vscode.window.showErrorMessage(t('backup.decryptMasterFailed'));
                         return;
                     }
                 } else {
                     const salt = BackupManager.getSaltFromBackup(fileContent);
                     if (salt) {
                         const password = await vscode.window.showInputBox({
-                            prompt: 'Enter the password used to encrypt this backup',
+                            prompt: t('backup.restorePasswordPrompt'),
                             password: true,
-                            placeHolder: 'Enter password',
+                            placeHolder: t('backup.restorePasswordPlaceholder'),
                             ignoreFocusOut: true
                         });
 
                         if (!password) {
-                            vscode.window.showInformationMessage('Restore cancelled.');
+                            vscode.window.showInformationMessage(t('backup.restoreCancelled'));
                             return;
                         }
 
@@ -234,16 +235,16 @@ export class BackupCommands {
                             const key = await BackupManager.deriveKeyFromPassword(password, salt);
                             decryptedContent = BackupManager.decryptWithKey(fileContent, key);
                         } catch (error) {
-                            vscode.window.showErrorMessage('❌ Incorrect password or corrupted backup file.');
+                            vscode.window.showErrorMessage(t('backup.wrongPassword'));
                             return;
                         }
                     } else {
-                        vscode.window.showInformationMessage('📦 Legacy encrypted backup detected. Using VSCode SecretStorage...');
+                        vscode.window.showInformationMessage(t('backup.legacyDetected'));
                         try {
                             const key = await BackupManager.ensureAndGetStoredKey(context);
                             decryptedContent = BackupManager.decryptWithKey(fileContent, key);
                         } catch (error) {
-                            vscode.window.showErrorMessage('❌ Failed to decrypt legacy backup. VSCode SecretStorage key may be missing.');
+                            vscode.window.showErrorMessage(t('backup.decryptLegacyFailed'));
                             return;
                         }
                     }
@@ -253,31 +254,31 @@ export class BackupCommands {
             }
 
             const restoreOptions = [
-                { label: 'Overwrite .env', detail: 'Replace current environment file' },
-                { label: 'Create new file', detail: 'Save as .env.restored' }
+                { label: t('backup.overwriteLabel'), detail: t('backup.overwriteDetail'), value: 'overwrite' },
+                { label: t('backup.newFileLabel'), detail: t('backup.newFileDetail'), value: 'new' }
             ];
 
             const restoreChoice = await vscode.window.showQuickPick(restoreOptions, {
-                placeHolder: 'How to restore the backup?',
+                placeHolder: t('backup.restorePlaceholder'),
                 ignoreFocusOut: true
             });
 
             if (!restoreChoice) return;
 
             let targetPath: string;
-            if (restoreChoice.label === 'Overwrite .env') {
+            if (restoreChoice.value === 'overwrite') {
                 targetPath = path.join(rootPath, '.env');
             } else {
                 targetPath = path.join(rootPath, '.env.restored');
             }
 
             fs.writeFileSync(targetPath, decryptedContent, 'utf8');
-            vscode.window.showInformationMessage(`✅ Restored backup to ${path.basename(targetPath)}`);
+            vscode.window.showInformationMessage(t('backup.restored', { file: path.basename(targetPath) }));
 
             const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(targetPath));
             await vscode.window.showTextDocument(doc);
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to restore backup: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(t('backup.restoreFailed', { message: (error as Error).message }));
         }
     }
 }

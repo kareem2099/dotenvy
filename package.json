@@ -1,8 +1,37 @@
 {
   "name": "dotenvy",
-  "displayName": "DotEnvy – VS Code Environment Manager",
-  "description": "Effortlessly manage, secure, and sync .env files directly inside VS Code with enterprise-grade encryption.",
-  "version": "2.2.4",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "localizations": [
+    {
+      "languageId": "it",
+      "translations": [
+        {
+          "id": "package",
+          "path": "./package.nls.it.json"
+        }
+      ]
+    },
+    {
+      "languageId": "ar",
+      "translations": [
+        {
+          "id": "package",
+          "path": "./package.nls.ar.json"
+        }
+      ]
+    },
+    {
+      "languageId": "ru",
+      "translations": [
+        {
+          "id": "package",
+          "path": "./package.nls.ru.json"
+        }
+      ]
+    }
+  ],
+  "version": "2.3.0",
   "icon": "resources/icons/icon.png",
   "publisher": "FreeRave",
   "author": "Kareem Ehab",
@@ -22,25 +51,32 @@
     "security",
     "encryption",
     "sync",
-    "secrets"
+    "secrets",
+    "dotsuite",
+    ".env",
+    "env manager",
+    "environment variables",
+    "secret scanner",
+    "doppler"
   ],
   "activationEvents": [
     "onStartupFinished",
     "workspaceContains:**/.env",
     "workspaceContains:**/.env.*"
   ],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/kareem2099/dotenvy"
   },
   "bin": {
-    "dotenvy-hook": "./out/git-hook.js"
+    "dotenvy-hook": "./dist/git-hook.js"
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "rm -rf out && tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "tsc -p ./ --noEmit && node esbuild.mjs --production",
+    "compile": "node -e \"require('fs').rmSync('out',{recursive:true,force:true})\" && tsc -p ./ && node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "watch:tsc": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src/**/*.ts",
     "test": "node test/run-all-tests.js"
@@ -109,24 +145,6 @@
             "aws"
           ],
           "description": "%config.cloudSync.provider%"
-        },
-        "dotenvy.secrets.enableCloudAnalysis": {
-          "type": "boolean",
-          "default": false,
-          "description": "%config.secrets.enableCloudAnalysis%",
-          "deprecationMessage": "%config.secrets.cloudAnalysisDeprecated%"
-        },
-        "dotenvy.secrets.enableCommunityLearning": {
-          "type": "boolean",
-          "default": false,
-          "description": "%config.secrets.enableCommunityLearning%",
-          "scope": "application"
-        },
-        "dotenvy.secrets.enableModelUpdates": {
-          "type": "boolean",
-          "default": true,
-          "description": "%config.secrets.enableModelUpdates%",
-          "scope": "application"
         }
       }
     },
@@ -168,6 +186,10 @@
         "title": "%command.diffEnvironment%"
       },
       {
+        "command": "dotenvy.compareEnvironments",
+        "title": "%command.compareEnvironments%"
+      },
+      {
         "command": "dotenvy.installGitHook",
         "title": "%command.installGitHook%"
       },
@@ -178,6 +200,10 @@
       {
         "command": "dotenvy.pullFromCloud",
         "title": "%command.pullFromCloud%"
+      },
+      {
+        "command": "dotenvy.diffCloud",
+        "title": "%command.diffCloud%"
       },
       {
         "command": "dotenvy.pushToCloud",
@@ -252,8 +278,9 @@
         "icon": "$(clear-all)"
       },
       {
-        "command": "dotenvy.toggleCommunityLearning",
-        "title": "%command.toggleCommunityLearning%"
+        "command": "dotenvy.connectDoppler",
+        "title": "%command.connectDoppler%",
+        "category": "DotEnvy"
       }
     ],
     "viewsContainers": {
@@ -261,7 +288,7 @@
         {
           "id": "dotenvy",
           "title": "%views.container.title%",
-          "icon": "./resources/icons/icon.png"
+          "icon": "./resources/icons/activity-bar.svg"
         }
       ]
     },
@@ -308,22 +335,21 @@
       ]
     }
   },
-  "homepage": "https://github.com/kareem2099/dotenvy",
+  "homepage": "https://www.dotsuite.dev/en/product/dotenvy",
   "bugs": {
     "url": "https://github.com/kareem2099/dotenvy/issues"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^26.6.2",
-    "@types/vscode": "^1.90.0",
-    "@typescript-eslint/eslint-plugin": "^8.70.1",
-    "@typescript-eslint/parser": "^8.70.1",
-    "dotenv": "^18.0.3",
-    "eslint": "^10.11.0",
+    "@types/node": "^26.6.4",
+    "@types/vscode": "1.90.0",
+    "dotenv": "^18.0.6",
+    "esbuild": "0.28.2",
+    "eslint": "^10.12.0",
     "glob": "^13.0.6",
-    "globals": "^17.12.0",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.70.1"
+    "globals": "^17.13.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1"
   },
   "dependencies": {
     "uuid": "^14.0.2"

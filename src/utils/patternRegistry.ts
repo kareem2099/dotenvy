@@ -7,10 +7,18 @@
  */
 
 import { PatternDefinition } from './secretScannerTypes';
+import * as path from 'path';
 
 export class PatternRegistry {
     private static patterns: PatternDefinition[] = [];
     private static excludePattern = '';
+    private static readonly EXCLUDED_DIRECTORIES = new Set([
+        '.git', '.vscode', 'node_modules', 'build', 'dist', 'out',
+        'coverage', 'htmlcov', '__pycache__', '.venv', 'venv',
+        '.pytest_cache', '.mypy_cache', '.ruff_cache', '.tox', '.nox',
+        '.next', '.nuxt', '.svelte-kit', '.turbo', '.cache',
+        '.dotenvy', '.dotenvy-backups'
+    ]);
 
     /**
      * Initialize the pattern registry with default secret detection patterns
@@ -131,7 +139,8 @@ export class PatternRegistry {
             {
                 // Only match when the keyword is followed by = or : and then a quoted/unquoted value
                 // Negative lookahead prevents matching class names, imports, TypeScript types
-                regex: /(?<![.])\b(secret|token|key|auth)\b(?!\s*[({<])\s*[:=]\s*(["'`])[^\s"'`]{12,}\2/gi,
+                // Lookbehind prevents matching kebab-case attributes (data-key, aria-key, etc.) or dotted properties
+                regex: /(?<![\w.-])(secret|token|key|auth)\b(?!\s*[({<])\s*[:=]\s*(["'`])[^\s"'`]{12,}\2/gi,
                 type: 'Generic Secret',
                 description: 'Generic secrets and tokens (assignment form only)',
                 priority: 2,
@@ -235,9 +244,9 @@ export class PatternRegistry {
                 requiresEntropyCheck: false
             },
             {
-                // Base64: must be 32+ chars, mix of upper+lower+digit or +/= chars
-                // Excludes pure hex (caught by Hash patterns) and plain camelCase words
-                regex: /\b([A-Za-z0-9+/]{32,}={0,2})\b/g,
+                // Match whole tokens, not substrings of URLs, file paths or names.
+                // Padding stays within the span; canonical validation follows.
+                regex: /(?<![A-Za-z0-9_+/.\-])([A-Za-z0-9+/]{32,}={0,2})(?![A-Za-z0-9_+/=.\-])/g,
                 type: 'Base64 Encoded Data',
                 description: 'Long base64 encoded string (32+ chars with mixed charset)',
                 priority: 1,
@@ -245,7 +254,10 @@ export class PatternRegistry {
             }
         ];
 
-        this.excludePattern = `{**/*.git/**,**/.vscode/**,**/node_modules/**,**/build/**,**/dist/**,**/out/**,**/*.log,**/*.tmp,**/*.cache,**/coverage/**}`;
+        this.excludePattern = `{${[
+            ...Array.from(this.EXCLUDED_DIRECTORIES, directory => `**/${directory}/**`),
+            '**/*.log', '**/*.tmp', '**/*.cache'
+        ].join(',')}}`;
     }
 
     /**
@@ -287,25 +299,21 @@ export class PatternRegistry {
      * Check if a file should be scanned based on the exclude pattern
      */
     static shouldScanFile(filePath: string, workspaceRoot: string): boolean {
-        // Don't scan files in excluded directories
-        const relativePath = filePath.replace(workspaceRoot, '').replace(/^[/\\]/, '');
-
-        // Check against common exclude patterns
-        if (relativePath.includes('.git/') ||
-            relativePath.includes('node_modules/') ||
-            relativePath.includes('.vscode/') ||
-            relativePath.includes('build/') ||
-            relativePath.includes('dist/') ||
-            relativePath.includes('out/') ||
-            relativePath.includes('coverage/')) {
+        const relativePath = path.relative(workspaceRoot, filePath);
+        if (relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
+            return false;
+        }
+        const directories = relativePath.split(path.sep).slice(0, -1);
+        if (directories.some(directory => this.EXCLUDED_DIRECTORIES.has(directory))) {
             return false;
         }
 
         // Only scan relevant file types
-        const ext = filePath.toLowerCase().substring(filePath.lastIndexOf('.'));
+        const filename = path.basename(filePath).toLowerCase();
+        const ext = path.extname(filename);
         const allowedExtensions = ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cpp', '.c', '.h', '.hpp', '.cs', '.php', '.rb', '.go', '.rs', '.swift', '.kt', '.scala', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd', '.yaml', '.yml', '.json', '.xml', '.env', '.dotenv', '.toml', '.ini', '.cfg', '.conf'];
 
-        return allowedExtensions.includes(ext) || !ext; // Include files without extensions (shell scripts, etc.)
+        return filename === '.env' || filename.startsWith('.env.') || allowedExtensions.includes(ext) || !ext;
     }
 
     /**

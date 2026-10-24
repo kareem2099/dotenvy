@@ -1,0 +1,11 @@
+/* Timeline Tooltip Enhancement */
+.timeline-node title {
+    background: var(--dark-gradient);
+    color: white;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: 6px;
+    font-size: 11px;
+    white-space: pre-line;
+    max-width: 200px;
+}
+

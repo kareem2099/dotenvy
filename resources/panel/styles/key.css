@@ -1,0 +1,26 @@
+/* ── Key ── */
+.vm-key-text {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: var(--vscode-foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vm-badge {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+}
+
+.vm-badge--enc {
+    background: rgba(129,140,248,0.18);
+    border: 1px solid rgba(129,140,248,0.4);
+    color: #818cf8;
+}
+

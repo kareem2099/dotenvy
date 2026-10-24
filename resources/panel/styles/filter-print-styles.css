@@ -1,0 +1,6 @@
+/* Filter Print Styles */
+@media print {
+    .advanced-filters-panel {
+        display: none !important;
+    }
+}

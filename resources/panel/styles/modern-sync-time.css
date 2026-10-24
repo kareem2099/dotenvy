@@ -1,0 +1,8 @@
+/* Modern Sync Time */
+.sync-time {
+    font-size: 0.75rem;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.8;
+    font-weight: 500;
+}
+

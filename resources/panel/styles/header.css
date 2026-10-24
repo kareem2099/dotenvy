@@ -1,0 +1,103 @@
+/* ── Header ── */
+.vm-header {
+    background: var(--primary-gradient);
+    padding: var(--space-md) var(--space-xl);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 100;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+    flex-shrink: 0;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+}
+
+.vm-header::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    pointer-events: none;
+}
+
+.vm-header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    position: relative;
+    z-index: 1;
+}
+
+.vm-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.vm-title-icon {
+    font-size: 1.4rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.vm-title {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: white;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    white-space: nowrap;
+}
+
+.vm-file-badge {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.35);
+    white-space: nowrap;
+}
+
+.vm-header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    position: relative;
+    z-index: 1;
+    flex-wrap: wrap;
+}
+
+.vm-search-input {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 10px;
+    padding: 7px 14px;
+    color: white;
+    font-size: 0.85rem;
+    width: 220px;
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+.vm-search-input::placeholder {
+    color: rgba(255,255,255,0.55);
+}
+
+.vm-search-input:focus {
+    background: rgba(255,255,255,0.22);
+    width: 280px;
+    border-color: rgba(255,255,255,0.7);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.15);
+}
+
+.vm-btn-add,
+.vm-btn-refresh {
+    white-space: nowrap;
+    font-size: 0.85rem;
+    padding: 7px 16px;
+}
+

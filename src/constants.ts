@@ -11,6 +11,9 @@ export const CLOUD_SYNC_ENCRYPTED_KEY = 'DOTENVY_ENCRYPTED';
 export const CLOUD_SYNC_VERSION_KEY = 'DOTENVY_ENCRYPTION_VERSION';
 export const CLOUD_SYNC_LAST_SYNC_KEY = 'DOTENVY_LAST_SYNC';
 export const CLOUD_SYNC_ALGO_KEY = 'DOTENVY_ENCRYPTION_ALGO';
+export const CLOUD_SYNC_WRAPPED_KEY = 'DOTENVY_WRAPPED_KEY';
+export const CLOUD_SYNC_KEY_SALT = 'DOTENVY_KEY_SALT';
+export const CLOUD_SYNC_KDF_ITERATIONS = 'DOTENVY_KDF_ITERATIONS';
 
 /** @deprecated Legacy keys from earlier dotenvy versions — kept for read/cleanup only */
 export const LEGACY_CLOUD_SYNC_ENCRYPTED_KEY = '__dotenvy_encrypted__';
@@ -23,6 +26,9 @@ export const CLOUD_SYNC_METADATA_KEYS = [
 	CLOUD_SYNC_VERSION_KEY,
 	CLOUD_SYNC_LAST_SYNC_KEY,
 	CLOUD_SYNC_ALGO_KEY,
+	CLOUD_SYNC_WRAPPED_KEY,
+	CLOUD_SYNC_KEY_SALT,
+	CLOUD_SYNC_KDF_ITERATIONS,
 	LEGACY_CLOUD_SYNC_ENCRYPTED_KEY,
 	LEGACY_CLOUD_SYNC_VERSION_KEY,
 	LEGACY_CLOUD_SYNC_LAST_SYNC_KEY,
@@ -57,8 +63,9 @@ export const PBKDF2_SALT_LENGTH = 32;
 // 4. Cloud Encryption Constants
 // ==========================================
 export const CLOUD_ENCRYPT_ALGO = 'aes-256-gcm';
-export const CLOUD_ENCRYPT_FORMAT_VERSION = '2.0';
+export const CLOUD_ENCRYPT_FORMAT_VERSION = '3.0';
 export const CLOUD_KEY_STORAGE = 'dotenvy.cloud.key';
+export const CLOUD_ENVELOPE_STORAGE_PREFIX = 'dotenvy.cloud.envelope';
 export const LAST_SYNC_STORAGE = 'dotenvy.cloud.last.sync';
 
 // ==========================================

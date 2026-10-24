@@ -1,0 +1,65 @@
+/* ── Stats Bar ── */
+.vm-stats-bar {
+    display: flex;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-xl);
+    background: rgba(102,126,234,0.07);
+    border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+}
+
+.stat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 5px 14px;
+    border-radius: 20px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    font-size: 0.8125rem;
+    line-height: 1.25;
+    font-family: var(--vscode-font-family, inherit);
+    transition: all var(--transition-fast);
+}
+
+.stat-chip:hover {
+    background: rgba(255,255,255,0.12);
+    transform: translateY(-1px);
+}
+
+.stat-icon { font-size: 0.9rem; }
+
+.vm-stats-bar .stat-value,
+.history-stats .stat-value {
+    font-weight: 600;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+    color: var(--vscode-foreground);
+    font-size: inherit;
+    line-height: inherit;
+}
+
+.stat-value {
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--vscode-foreground);
+}
+
+.vm-stats-bar .stat-label,
+.history-stats .stat-label {
+    color: var(--vscode-descriptionForeground);
+    font-size: inherit;
+    line-height: inherit;
+}
+
+.stat-label {
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.75rem;
+}
+
+.stat-chip--plain { border-color: rgba(16,185,129,0.3); }
+.stat-chip--plain .stat-value { color: #10b981; }
+
+.stat-chip--encrypted { border-color: rgba(102,126,234,0.4); }
+.stat-chip--encrypted .stat-value { color: #818cf8; }
+

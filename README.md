@@ -1,376 +1,104 @@
-# dotenvy – VS Code Environment Manager
+# DotEnvy — .env Manager & Secret Scanner for VS Code
 
-[![Source Version](https://img.shields.io/badge/source_version-2.2.4-blue.svg)](https://github.com/kareem2099/dotenvy/blob/main/package.json)
-[![Codename](https://img.shields.io/badge/codename-Aegis-orange.svg)](https://github.com/kareem2099/dotenvy/releases/tag/v2.2.2)
-[![Publisher](https://img.shields.io/badge/publisher-FreeRave-red.svg)](https://marketplace.visualstudio.com/publishers/FreeRave)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![VS Code Marketplace](https://img.shields.io/badge/vscode-marketplace-007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+> Switch, validate, encrypt and sync `.env` files without leaving VS Code — part of the [**DotSuite**](https://www.dotsuite.dev/en) developer toolkit.
+
+[![Ecosystem - DotSuite](https://img.shields.io/badge/Ecosystem-DotSuite-00b4d8?style=flat-square&labelColor=333333)](https://www.dotsuite.dev/en/product/dotenvy)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/FreeRave.dotenvy?style=flat-square&label=Marketplace&color=007ACC)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/FreeRave.dotenvy?style=flat-square&color=10b981)](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)
+[![Publisher](https://img.shields.io/badge/publisher-FreeRave-red?style=flat-square)](https://marketplace.visualstudio.com/publishers/FreeRave)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)](LICENSE)
 
 <div align="center">
-  <img width="128" height="128" alt="DotEnvy — DE monogram with a key" src="resources/icons/icon.png" />
-  <br />
-  <img width="800" alt="DotEnvy Variable Manager" src="https://github.com/user-attachments/assets/46565ce7-fa75-4d39-b582-e32ebcdee0f1" />
+  <img width="128" height="128" alt="DotEnvy logo — DE monogram with a key" src="resources/icons/icon.png" />
+  <br /><br />
+  <img width="800" alt="DotEnvy Variable Manager in VS Code" src="https://github.com/user-attachments/assets/46565ce7-fa75-4d39-b582-e32ebcdee0f1" />
+  <br /><br />
+
+**[📥 Install from the Marketplace](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)** •
+**[🌐 DotEnvy on DotSuite](https://www.dotsuite.dev/en/product/dotenvy)** •
+**[📝 Changelog](CHANGELOG.md)** •
+**[🐛 Report an Issue](https://github.com/kareem2099/dotenvy/issues)**
+
 </div>
 
-🚀 **dotenvy** makes it effortless to manage and switch between your `.env` files directly inside VS Code. No more manual renaming or copy-pasting—just pick your environment and start coding immediately!
+---
 
-**[📥 Install from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)** • **[📖 Documentation](https://github.com/kareem2099/dotenvy#readme)** • **[🐛 Report Issues](https://github.com/kareem2099/dotenvy/issues)**
+## Contents
+
+- [Why DotEnvy](#why-dotenvy)
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Commands](#commands)
+- [Configuration](#configuration)
+- [Secret Scanning & .dotenvyignore](#secret-scanning--dotenvyignore)
+- [Cloud Sync with Doppler](#cloud-sync-with-doppler)
+- [Privacy & Security](#privacy--security)
+- [Development](#development)
+- [Contributors](#contributors)
+- [Part of DotSuite](#part-of-dotsuite)
+- [License](#license)
 
 ---
 
-## Privacy: local AI, local corrections, and the role of DotAegis
+## Why DotEnvy
 
-**Applies to the DotEnvy 2.2.4 source release. Older installed versions can behave
- differently; check your installed version.**
-
-**DotEnvy classifies complete candidates locally. DotAegis remains the shared
-training server: users can voluntarily contribute numeric corrections, and
-clients download the resulting inference weights. Keys and source code are
-never submitted by this version's scanner, feedback, or model-update client.**
-
-### How detection and shared learning work
-
-1. DotEnvy reads workspace files and identifies candidates. A partial pattern
-   match inside a quoted value is expanded to the complete literal.
-2. It extracts 35 numeric properties from that original value, sanitized
-   surrounding context, and variable-name signals. These describe length,
-   character distributions, entropy, provider patterns and contextual signals.
-   The model takes these properties as input; it does not need the raw text.
-3. A local worker runs DotAegis' feature-token transformer. The extension bundles
-   synthetic bootstrap weights (about 916 KiB compressed), so scanning works
-   without a server. Failed inference uses local heuristics, with no cloud fallback.
-4. “Not a Secret” saves an immediate local negative correction. A successful
-   “Move to .env” saves a positive correction, even if the original model said
-   low confidence. The source is re-read and verified before moving a value.
-5. **Community learning is off by default.** After the first successful move
-   or false-positive correction, a one-time consent dialog offers to share the current correction
-   and future corrections. Only explicit acceptance enables uploads: a random
-   sample ID, schema number 2, 35 numbers, the user's action and chosen label. Earlier local corrections are
-   not backfilled. Keeping corrections local or dismissing the dialog leaves
-   sharing disabled and prevents repeated prompts, including after restarting.
-   No candidate, source code, context string, variable name,
-   file path, local fingerprint, complete-value hash or gradient is uploaded.
-6. DotAegis authenticates that upload with an installation credential and queues
-   it. Receipt is **not approval or immediate training**. An administrator reviews
-   pending observations before training; arbitrary user feedback cannot directly
-   change the shared model. Reviewed training updates the actual weights and
-   saves a durable checkpoint with numeric replay and optimizer state.
-7. DotAegis publishes the current trained inference weights at
-   `GET /model/release`. DotEnvy checks at startup and hourly when model updates
-   are enabled. It verifies checksum, feature schema, tensor shapes and finite
-   values, starts a replacement worker, and clears scan caches after a successful
-   switch. Bad updates leave the working local classifier in place.
-
-The shared model can generalize from corrected patterns to other values with
-similar properties. Local overrides handle that exact candidate immediately;
-reviewed server training handles broader learning for everyone. Properties are
-lossy, so two different values can look alike to the classifier. Improvements
-must be measured on independent examples; neither feedback nor synthetic
-validation guarantees fewer false positives in every project.
-
-“Local” means VS Code's extension host. With Remote SSH or containers this can
-be the workspace's remote machine/container, rather than your physical desktop.
-
-### Settings and consent
-
-| Setting | Default | Effect |
-| --- | --- | --- |
-| `dotenvy.secrets.enableCommunityLearning` | `false` | Share **new numeric corrections only**, using a registered installation and signed requests. |
-| `dotenvy.secrets.enableModelUpdates` | `true` | Download shared weights at startup/hourly. Sends no scanner inputs or device authentication; HTTPS and hosting still expose normal connection metadata. |
-| `dotenvy.secrets.enableCloudAnalysis` | Deprecated, ignored | Cannot re-enable complete-candidate uploads, even if an older version left it `true`. |
-
-A one-time consent dialog appears **after** the first successful “Move to .env”
-or “Not a Secret” action when sharing has not already been enabled or explicitly
-disabled in Settings. The local action completes first. It explains precisely
-what is shared and offers **Enable numeric learning** or **Keep corrections local**.
-Acceptance includes the correction that triggered the dialog and future
-corrections; earlier local history is never backfilled. Declining or dismissing
-is remembered across later corrections and restarts.
-
-Run **`DotEnvy: Toggle Community Learning (Numeric Feedback)`** to reopen consent
-later or disable sharing. The setting can also be changed in VS Code Settings.
-Disabling learning deletes pending numeric feedback locally and
-prevents new submissions. It cannot retract an already submitted request or
-remove server records/backups. Disable **both** new settings for an offline
-secret scanner; bundled or previously downloaded weights still work.
-
-Other features have their own network behavior: explicitly requested Doppler
-push/pull transfers environment data to your configured account. VS Code,
-extension update checks and other extensions are separate from this boundary.
-
-### What is stored, and where
-
-| Data | Handling |
-| --- | --- |
-| Complete candidate and source code | Read from existing workspace files and processed locally in memory; never included in this client's Aegis requests. Moving to .env writes a local file. |
-| Detection/cache | Redacted display text, sanitized context, source location/digest and numeric features in local memory. Scan cache: five minutes, at most 1,000 file entries. |
-| Local correction | A fingerprint derived from file, variable and complete-value digest, label/action and timestamp in VS Code state; at most 500 entries. No raw text or file names are stored in the correction record. |
-| Pending community sample | Only when opted in: numeric features, label/action, schema and random ID in local VS Code state; at most 500. Acknowledged batches are removed; failed requests retry the same IDs, in batches of 20, at startup/after corrections/every five minutes. |
-| Consent choice | VS Code state remembers that the one-time prompt was shown, including refusal/dismissal; the toggle command can reopen it later. |
-| Installation credential | SecretStorage holds a service authentication credential, separate from workspace keys. Installation ID is in VS Code state. Existing credentials are preserved; registration occurs only when submitting opted-in feedback. |
-| Downloaded model | Inference weights and manifest in extension global storage. One accepted downloaded release is retained alongside the bundled fallback. Replay records and optimizer state are never downloaded. |
-| DotAegis community data | Installation ID/credential record and versions, numeric feedback/sample IDs and review status, reviewed numeric replay, optimizer/checkpoints and operational metadata can persist on the server. No automatic retention deadline or deletion guarantee is promised. |
-
-**“No raw keys are sent by this client” is not “the server stores nothing.”**
-Numeric properties disclose information about a value and are not guaranteed
-anonymous or impossible to infer. Local hashes are not encryption. Hosting may
-retain IP addresses, request paths/times, user-agent information and backups.
-Checksums verify artifact consistency; HTTPS and the configured operator are
-still trusted for model delivery. Model downloads contain data, not executable code.
-
-Legacy raw-context and earlier feature queues are removed on upgrade rather than
-silently uploaded. Existing service credentials and local corrections remain.
-Older clients and administrator APIs can still submit full candidates; older
-server records, hashes/votes, caches and backups are not erased by upgrading.
-The privacy guarantees here describe this version's requests, not every legacy
-API or the behavior of a separately modified build.
-
-### Local correction scope and detection limits
-
-Corrections apply to the same **file, extracted variable name and complete
-value**. The latest decision replaces the previous one. Another file or changed
-value does not inherit it. **`DotEnvy: Reset Local Secret Corrections`** clears
-local overrides; it does not undo approved shared-model training or server data.
-
-A classification estimates whether a value resembles a secret. It does **not**
-verify that a provider issued it or that it is active, expired, revoked or has
-particular permissions. False positives and missed secrets remain possible.
-The bundled validation uses synthetic examples and is not a real-project accuracy
-guarantee. Moving to .env does not revoke a credential or erase Git history.
-Do not post live credentials or private source in support issues.
-[LICENSE](LICENSE) contains the license and warranty terms; this description
-adds no guarantee of complete detection or credential protection.
-
-### توضيح بالعربي
-
-**DotAegis ما اتشالش: دوره إنه يدرّب النموذج المشترك وينشر الأوزان المحسّنة.**
-DotEnvy يفحص المفتاح كاملًا محليًا، ويستخرج منه ٣٥ خاصية رقمية. نفس الخصائص
-هي مدخل النموذج؛ السيرفر مش محتاج نص المفتاح نفسه علشان يتعلم الأنماط.
-
-«مش سر» يصحّح الكشف فورًا لنفس الملف والمتغير والقيمة. إذا فعّلت التعلم
-الجماعي بإرادتك، التصحيحات الجديدة ترسل أرقام الخصائص والتصنيف فقط، مع معرف
-عينة وهوية تثبيت للمصادقة. **لا مفاتيح، لا كود، لا مسارات، لا أسماء متغيرات،
-ولا بصمة المفتاح في الطلب.** بعد أول نقل ناجح إلى `.env` أو اختيار «مش سر»، يظهر سؤال مرة واحدة بعد حفظ
-القرار المحلي. تقدر توافق على مشاركة التصحيح الحالي والتصحيحات القادمة، أو
-تختار «خلّي التصحيحات محلية». الرفض أو إغلاق السؤال محفوظ حتى بعد إعادة تشغيل
-الامتداد؛ تقدر تغيّر رأيك لاحقًا من أمر تبديل التعلم الجماعي. التصحيحات المحلية
-الأقدم لا تُرسل عند التفعيل.
-
-السيرفر يستقبل العينة في انتظار المراجعة. بعد اعتمادها يتدرّب ويحفظ النموذج
-وينشر أوزانه. DotEnvy ينزّل الأوزان عند البدء وكل ساعة، فيستفيد الجميع من
-التعلم. تعطيل مشاركة التصحيحات لا يمنع الاستفادة من أوزان النموذج المشترك.
-التعلم الجماعي مقفول افتراضيًا؛ تحديث الأوزان مفعّل افتراضيًا. أوقف الاثنين
-إذا أردت ماسحًا دون اتصالات بالشبكة. لو السيرفر تعطل، الفحص المحلي يكمل.
-
-**مش هنكتب «السيرفر مش بيخزن أي حاجة» لأنها معلومة غير صحيحة.** هو يحتفظ
-بالخصائص الرقمية والتصنيفات وحالة المراجعة وهوية التثبيت والنموذج وسجلات
-التشغيل المحتملة. الأرقام تكشف بعض خصائص القيمة وليست مضمونة إخفاء الهوية.
-تعطيل المشاركة يمسح الطابور المحلي، لكنه لا يمسح ما وصل سابقًا للسيرفر.
-الإصدارات القديمة قد ترسل القيمة كاملة عند تفعيل التحليل السحابي؛ راجع إصدارك.
-
-النموذج يتعلم تمييز الأنماط لتقليل الإنذارات الغلط، لكنه لا يثبت صلاحية المفتاح
-عند الشركة ولا يضمن اكتشاف كل سر. مشاركة Doppler منفصلة وتنقل بيانات البيئة
-للحساب الذي تضبطه. الفحص في Remote SSH/container يعمل في بيئة الامتداد هناك.
+- **One click to switch** between `.env.development`, `.env.staging`, `.env.production` or any custom file — no more renaming or copy-pasting.
+- **Catch leaked keys early** with an offline secret scanner, editor warnings and a pre-commit hook.
+- **Keep secrets encrypted** with AES-256-GCM backups, multi-user key wrapping and end-to-end encrypted Doppler sync.
+- **Never lose a value** thanks to local history, a timeline, analytics and a session Trash Bin.
+- **Works in your language**: English, Italian, Arabic (full RTL) and Russian.
 
 ---
 
-## ✨ Features
+## Features
 
-### 🔄 **Environment Switching**
-Effortlessly switch between `.env.development`, `.env.staging`, `.env.production`, or any custom `.env.*` file with a single click.
+### 🔄 Environment Switching
+Switch between `.env.*` files from the sidebar, the dashboard or the Command Palette. The selected file is copied to `.env` and the status bar shows the active environment. Map Git branches to environments to switch automatically (`develop` → `.env.development`, `main` → `.env.production`).
 
-### 🌐 **Full Deep Internationalization (New in v2.2.1!)**
-Native support for **English**, **Italian (`it`)**, **Arabic (`ar`)** (with full RTL support), and **Russian (`ru`)**, with a seamless sidebar dropdown to switch languages instantly across all dialogs, dashboards, and panels (Variable Manager, Trash Bin, History, Timeline, Analytics, and Secrets Scanner).
+<img width="100%" alt="DotEnvy environment switcher sidebar" src="https://github.com/user-attachments/assets/c2139b3c-4dfc-4a3c-86b5-adf0b7b7fa89" />
 
-### 🎨 **Compact Sidebar & Onboarding Banner (New!)**
-A modern, space-efficient sidebar design tailored for narrow split screens, complete with an interactive onboarding setup banner for newly opened repositories.
+### 🔍 Offline Secret Scanner
+Rule-based detection of API keys, tokens, passwords, private keys and database URLs — fully local, with no network requests.
 
-### ☁️ **Advanced Cloud Sync & Doppler Integration**
-Bidirectional cloud sync with Doppler Secrets Manager, supporting multi-file prefix routing (`BACKEND_`, `FRONTEND_`), orphan key cleanup, and automatic project discovery.
+- **Known key formats** for Stripe, AWS, GitHub, Slack, SendGrid, Google, OpenAI, Twilio, Mailgun, Sentry, SSH private keys and more.
+- **Entropy and context signals** — risky variable names (`DB_PASS`, `client_secret`) and surrounding code raise or lower each result to High, Medium or Low.
+- **Secrets Panel** with confidence filters, search and **View / Move to .env / Not a Secret** actions. View opens the original file and selects the complete value.
+- **Local corrections** — "Not a Secret" and "Move to .env" are remembered for the same file, variable and value.
+- **Fewer false positives** — import/require paths, URL fragments and file paths are not reported as Base64 secrets.
+- **Editor warnings** in the Problems panel and a **Review Secrets** notification when a changed file contains findings.
+- **Responsive on large workspaces** — at most four files scan at once and the UI stays usable.
 
-### 📂 **Auto Detection & Sync**
-Automatically scans your workspace for `.env` files and syncs seamlessly across multi-workspace setups.
+### 🛡️ Git Commit Protection
+A pre-commit hook blocks commits that contain secrets, validation errors or `.env` files. Git root discovery supports monorepos.
 
-### 🌿 **Git Branch Auto-Switching**
-Automatically switch environments based on Git branch changes (develop → `.env.development`, staging → `.env.staging`, etc.)
+### ✅ Validation & Diff
+Validate `.env` files for syntax errors, required variables and types (`number`, `boolean`, `url` or custom regex). Compare files side by side in VS Code's native diff before switching, and find the same key with different values across environments.
 
-### ✅ **Environment Validation**
-Validate .env files for syntax errors, required variables, and type checking with custom regex patterns.
+### ☁️ Doppler Cloud Sync
+Connect Doppler in the browser with no CLI or manual token copying. Push and pull with end-to-end encryption, multi-file prefix routing (`BACKEND_`, `FRONTEND_`), a read-only cloud diff, and pulls that keep your comments and layout. [Setup details ↓](#cloud-sync-with-doppler)
 
-### 📄 **Diff View**
-Compare environment files side-by-side before switching to preview changes and avoid surprises.
+### 🔐 Encryption & Backups
+- Automatic backups before switching, with portable AES-256-GCM encrypted backups that restore on any device.
+- Master keys in VS Code SecretStorage, and multi-user envelope encryption with per-user access and revocation.
 
-### 🛡️ **Git Commit Security & Monorepo Support**
-Prevent committing sensitive data with pre-commit hooks that scan for secrets, validation errors, and block `.env` files, featuring smart git root discovery for monorepos.
+### 📊 History, Timeline, Analytics & Trash Bin
+Review `.env` changes like Git commits, roll back from history, browse the timeline, track stability metrics and restore deleted variables from the session Trash Bin.
 
-### 💾 **Backup & Recovery**
-Automatic backup creation before switching, with portable AES-256-GCM encrypted backups that work across any device.
+<img width="100%" alt="DotEnvy session Trash Bin restoring a deleted variable" src="https://github.com/user-attachments/assets/7a84cb1a-2b6e-447e-9c7c-8510d266b4b0" />
+<img width="100%" alt="DotEnvy native diff of .env history" src="https://github.com/user-attachments/assets/d3905fa6-6b1c-478f-ba50-a993d45515d7" />
+<img width="100%" alt="DotEnvy analytics dashboard" src="https://github.com/user-attachments/assets/70b17cee-f866-42f0-922d-0942d181fe48" />
 
-### 📊 **Status Bar Integration**
-Real-time environment indicator in status bar showing current configuration, validation status, and cloud sync state.
+Analytics reads **local recorded history**. Switching an environment or saving an `.env`/`.env.*` file creates a record; actions from before installation cannot be reconstructed. History is stored under `.dotenvy/history` (or `history.storagePath`) and includes file contents, so keep that folder out of Git. Set `history.enabled: false` in `.dotenvy.json` to stop recording, or `history.trackManualEdits: false` to skip editor saves.
 
-## 🚀 What's New in v2.2.0?
-
-> ### 🌟 Community Spotlight & Thank You!
-> A heartfelt thank you to **[@FaberVi](https://github.com/FaberVi)** for contributing PR [#2](https://github.com/kareem2099/dotenvy/pull/2), bringing full Italian localization, sidebar UX modernization, Doppler multi-file prefix mapping, and monorepo git hooks. We apologize for the delay in reviewing and integrating your PR while we were re-architecting the core security engine. Your contributions are now a proud part of DotEnvy!
-
-### 🌐 Complete Italian Localization & Custom Switcher
-DotEnvy is now fully localized into Italian across the entire extension! Every command, notification, and webview panel (including Variable Manager, Trash Bin, Timeline, History, Analytics, and Secrets Scanner) supports seamless, instant switching between English and Italian from the sidebar without restarting your editor.
-
-### 🎨 Compact Sidebar Redesign & Toasts
-Redesigned with a compact responsive layout for sidebars, plus clean in-panel toast notifications and progress bars.
-
-### ☁️ Doppler Multi-File Sync & Cleanups
-Easily split and merge Doppler secrets across multiple `.env` files using environment prefixes, with automatic orphan variable cleanup.
-
-### 🗑️ Session Trash Bin (Lifesaver!)
-Deleted a crucial variable by mistake? No worries. Restore it with a single click from the new Session Trash Bin.
-<img width="100%" alt="Trash Bin Demo" src="https://github.com/user-attachments/assets/7a84cb1a-2b6e-447e-9c7c-8510d266b4b0" />
-
-### 🔍 Native VS Code Diff & History
-Review your `.env` changes exactly like you review Git commits. 
-<img width="100%" alt="Native Diff Demo" src="https://github.com/user-attachments/assets/d3905fa6-6b1c-478f-ba50-a993d45515d7" />
-
-### 📊 Environment Analytics
-Track your usage, stability metrics, and most active environments directly from your dashboard.
-<img width="100%" alt="Analytics Dashboard" src="https://github.com/user-attachments/assets/70b17cee-f866-42f0-922d-0942d181fe48" />
-
-### ⚙️ Compact Switcher & Settings
-Manage all your environments seamlessly from a clean, native sidebar.
-<img width="100%" alt="Environment Switcher" src="https://github.com/user-attachments/assets/c2139b3c-4dfc-4a3c-86b5-adf0b7b7fa89" />
-
-### 🧠 AI Secrets Guard 🔒
-
-Local secret detection with optional shared learning, an interactive Secrets Panel and a bundled
-trained transformer. See the [data-handling explanation](#privacy-local-ai-local-corrections-and-the-role-of-dotaegis).
-
-#### Key Engine Features:
-- **🔒 Offline Inference** — Bundled model runs in a local worker; no raw candidate submission or cloud fallback
-- **35-Feature ML Model (fixed)** — Feature count corrected from 31 → 35, entropy normalization verified against shared Python/TypeScript fixtures
-- **📋 Secrets Panel** — Full WebviewPanel shows all detected secrets (no more 5-item cap) with filter by confidence, search, View / Move to .env / Not a Secret buttons
-- **🧠 Local Corrections** — "Not a Secret" and "Move to .env" remember decisions locally for the same file, variable, and value; reset them from the Command Palette.
-- **🚫 .dotenvyignore** — New file (same syntax as `.gitignore`) lets you exclude files and folders from secret scanning
-- **📝 Centralized Logging** — All extension logs visible in VS Code Output panel → DotEnvy
-- **🔄 Smart Fallback** — Local fallback analysis uses all 35 features including variable name signals (e.g. `DB_PASS` increases risk even with low entropy)
-
-### 🔒 Data Privacy & Security (Secrets Guard)
-Classification and immediate corrections run locally. Optional community learning
-sends numeric properties only; model updates download shared weights. Keys and
-code are never submitted by the new scanner. See the [full privacy explanation](#privacy-local-ai-local-corrections-and-the-role-of-dotaegis)
-for consent, server storage, offline settings and detection limits.
+### 🌐 Localization
+English, Italian (`it`), Arabic (`ar`, full RTL) and Russian (`ru`) across every command, notification and panel. Switch languages instantly from the sidebar.
 
 ---
 
-## 📋 Commands
+## Quick Start
 
-All commands are accessible via the Command Palette (`Ctrl+Shift+P` / `⌘+Shift+P`).
-
-### 🔄 Environment Manager
-- **`DotEnvy: Switch Environment`** — Switch between `.env` files
-- **`DotEnvy: Open Variable Manager`** — Open the full-page variable editor tab
-- **`DotEnvy: Validate Environment Files`** — Validate for syntax errors and required variables
-
-### 📊 Explorers & Analytics
-- **`DotEnvy: View Environment History`** — View the dense history table and slide-over advanced filters
-- **`DotEnvy: Open Trash Bin`** — Recover accidental deletions or changes in real-time
-- **`DotEnvy: Open Analytics Panel`** — View heatmap and stability metrics
-- **`DotEnvy: Open Timeline Panel`** — View the SVG timeline viewer tab
-
-### 🛡️ Git Integration
-- **`DotEnvy: Install Git Commit Hook`** — Block commits containing secrets
-- **`DotEnvy: Remove Git Commit Hook`** — Remove the installed hook
-
-### ☁️ Cloud Sync
-- **`DotEnvy: Pull Environment from Cloud`** — Pull from Doppler
-- **`DotEnvy: Push Environment to Cloud`** — Push to Doppler
-
-### 🔍 Security
-- **`DotEnvy: Scan for Secrets`** — Scan workspace for secrets (runs 100% locally by default)
-- **`DotEnvy: Init .dotenvyignore`** — Create a pre-populated `.dotenvyignore` file
-- **`DotEnvy: Toggle Community Learning (Numeric Feedback)`** — Enable/disable voluntary numeric corrections for shared training
-- **`DotEnvy: Reset Local Secret Corrections`** — Clear remembered decisions and rescan without local overrides
-
-### 🖱️ Right-Click (Explorer)
-- **`DotEnvy: Ignore this path`** — Right-click any file or folder → add to `.dotenvyignore` instantly
-
-### 💬 Support
-- **`DotEnvy: Feedback & Support`** — Access feedback and support resources
-- **`DotEnvy: Show What's New`** — View changelog for current version
-
----
-
-## 🚫 .dotenvyignore
-
-Control which files DotEnvy skips when scanning for secrets — same syntax as `.gitignore`:
-
-```gitignore
-# .dotenvyignore
-
-# DotEnvy's own data (always recommended)
-.dotenvy/**
-.dotenvy-backups/**
-
-# Test files (often contain example secrets)
-**/*.test.ts
-**/*.spec.ts
-tests/**
-
-# Docs with example secrets
-docs/**
-README.md
-SECURITY.md
-
-# Specific files
-k8s/secrets.yaml
-```
-
-Run **`DotEnvy: Init .dotenvyignore`** to create a default file, or right-click any file/folder in the Explorer and choose **"DotEnvy: Ignore this path"**.
-
----
-
-## 📦 Installation
-
-### Quick Install
-1. Open VS Code
-2. Go to Extensions (`Ctrl+Shift+X` / `⌘+Shift+X`)
-3. Search for "**dotenvy**"
-4. Click **Install**
-
-### Alternative Methods
-- **[Download from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy)**
-- **Manual**: Download `.vsix` file and install via VS Code
-
-### Requirements
-- VS Code **1.90.0** or later
-
----
-
-## 🚀 Usage
-
-### Initialize a project
-
-Open a project folder in VS Code before using either setup button in the
-DotEnvy sidebar or dashboard. Both actions are also available in the Command Palette.
-
-- **Init Secure Project** asks for an optional project name, an admin username,
-  a password and password confirmation in VS Code's input box at the top of the
-  window. On success it creates `.dotenvy.lock.json` (the password-wrapped project
-  key and user entries) and opens `.dotenvy.json` for configuration. Cancelling
-  any setup prompt stops initialization; cancelling a reinitialization preserves
-  the existing key envelope. Reinitialization replaces existing keys only after
-  confirmation and completing all prompts.
-- **Init .dotenvyignore** creates the default ignore file in the workspace root
-  and opens it for editing. If the file already exists, it opens that file without
-  replacing your patterns. File access failures produce an error notification.
-
-With multiple folders open, these initialization commands use the first workspace
-folder. A GitHub push updates the source repository; an installed extension must
-be rebuilt/reinstalled to receive the change. For local development, run
-`npm install` and `npm run compile`, then press **F5** to open an Extension Development Host.
-
-### Switch environments
-
-1. Place your environment files in your project root:
+1. Install **DotEnvy** from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy), or search for "dotenvy" in the Extensions view (`Ctrl+Shift+X` / `⌘+Shift+X`). Requires VS Code **1.90.0** or later.
+2. Add environment files to your project root:
 
    ```bash
    .env.development
@@ -378,20 +106,59 @@ be rebuilt/reinstalled to receive the change. For local development, run
    .env.production
    ```
 
-2. Open the **Command Palette** (`Ctrl+Shift+P`).
+3. Run **`DotEnvy: Switch Environment`** from the Command Palette (`Ctrl+Shift+P` / `⌘+Shift+P`) and pick one. It is copied to `.env` and shown in the status bar.
 
-3. Run `DotEnvy: Switch Environment` and pick your environment.
+### Initialize a project (optional)
 
-4. The selected file is copied to `.env` automatically.
+- **Init Secure Project** asks for a project name, an admin username and a password. It creates `.dotenvy.lock.json` (the password-wrapped project key and users) and opens `.dotenvy.json`. Cancelling any prompt stops setup; reinitializing replaces existing keys only after confirmation.
+- **Init .dotenvyignore** creates a default ignore file, or opens your existing one without changing it.
 
-✅ The status bar updates to show the active environment.
+With several folders open, these commands use the first workspace folder.
 
 ---
 
-## ⚙️ Configuration
+## Commands
+
+All commands are available from the Command Palette.
+
+| Area | Command | What it does |
+| --- | --- | --- |
+| Environments | `DotEnvy: Open Main Dashboard` | Environment Manager dashboard |
+| | `DotEnvy: Switch Environment` | Switch between `.env` files |
+| | `DotEnvy: Open Variable Manager` | Full-page variable editor |
+| | `DotEnvy: Validate Environment Files` | Check syntax, required variables and types |
+| | `DotEnvy: Diff Environment Files` | Compare two files in VS Code's diff view |
+| | `DotEnvy: Compare Environments` | Find the same key with different values |
+| History | `DotEnvy: View Environment History` | History table with advanced filters and rollback |
+| | `DotEnvy: Open Timeline Panel` | Visual timeline of changes |
+| | `DotEnvy: Open Analytics Panel` | Heatmap and stability metrics |
+| | `DotEnvy: Open Session Trash Bin` | Restore deleted variables |
+| Backups | `DotEnvy: Backup Current Environment` | Create an (optionally encrypted) backup |
+| | `DotEnvy: Restore from Backup` | Restore a backup on any device |
+| Team | `DotEnvy: Init Secure Project` | Create the project key and admin user |
+| | `DotEnvy: Add User to Secure Project` | Give another user access |
+| | `DotEnvy: Revoke User Access` | Remove a user's access |
+| | `DotEnvy: Login to Secure Project` | Unlock the project key with your password |
+| Git | `DotEnvy: Install Git Commit Hook` | Block commits that contain secrets |
+| | `DotEnvy: Remove Git Commit Hook` | Remove the hook |
+| Cloud | `DotEnvy: Connect Doppler` | Browser sign-in and automatic setup |
+| | `DotEnvy: Pull Environment from Cloud` | Pull from Doppler |
+| | `DotEnvy: Push Environment to Cloud` | Push to Doppler |
+| | `DotEnvy: Diff Cloud Secrets` | Read-only comparison with Doppler |
+| Security | `DotEnvy: Scan for Secrets` | Scan the workspace (100% local) |
+| | `DotEnvy: Init .dotenvyignore` | Create a default `.dotenvyignore` |
+| | `DotEnvy: Reset Local Secret Corrections` | Forget "Not a Secret" / "Move to .env" decisions |
+| | `DotEnvy: Ignore this path` | Explorer right-click → add to `.dotenvyignore` |
+| Help | `DotEnvy: Feedback & Support` | Feedback and support links |
+| | `DotEnvy: Show What's New` | Open the changelog |
+
+---
+
+## Configuration
+
+Create `.dotenvy.json` in your project root:
 
 ```jsonc
-// .dotenvy.json
 {
   "environments": {
     "local": ".env.local",
@@ -422,49 +189,126 @@ be rebuilt/reinstalled to receive the change. For local development, run
 
 ---
 
-## ☁️ Cloud Sync Setup (Doppler)
+## Secret Scanning & .dotenvyignore
+
+**Scan for Secrets** checks supported source and configuration files in every open workspace folder, including `.env` variants, JSON files and files without an extension. Generated and dependency folders are skipped by default: `node_modules`, `build`, `dist`, `out`, `coverage`, `htmlcov`, Python environments/caches and DotEnvy's own data folders. Test files and common fixture names are skipped too. The same rules apply to automatic file watching.
+
+Git ignore rules do not decide what is scanned, because ignored config files can still hold real credentials. Use `.dotenvyignore` (same syntax as `.gitignore`) to skip more paths, or a negation such as `!test/integration.ts` to include one. Each file uses the `.dotenvyignore` of its own workspace folder.
+
+```gitignore
+# .dotenvyignore
+
+# DotEnvy's own data (always recommended)
+.dotenvy/**
+.dotenvy-backups/**
+
+# Test files (often contain example secrets)
+**/*.test.ts
+**/*.spec.ts
+tests/**
+
+# Docs with example secrets
+docs/**
+README.md
+
+# Specific files
+k8s/secrets.yaml
+```
+
+Run **`DotEnvy: Init .dotenvyignore`** to create a default file, or right-click a file or folder in the Explorer and choose **DotEnvy: Ignore this path**.
+
+---
+
+## Cloud Sync with Doppler
+
+### Connect in one step
+
+Click **Connect Doppler** in the Environment Manager, or run **`DotEnvy: Connect Doppler`**. DotEnvy opens Doppler's sign-in page with a one-time code (use **Copy Code**). After you approve access, DotEnvy:
+
+1. Uses your configured project/config, or for a fresh setup derives a lowercase project name from `package.json` or the folder name and uses `dev`.
+2. Connects to that exact project, creating it if needed, without selecting a production config or replacing remote secrets.
+3. Creates a read/write service token limited to that config, checks access without downloading secret values, and stores the token in VS Code SecretStorage.
+4. Revokes the temporary account credential used for setup. The button then becomes **Doppler** and opens your project dashboard.
+
+Connecting never uploads `.env` values or runs a push/pull. If setup fails or you cancel, your existing settings and token are kept; the notification names the failing step and HTTP status, and **View → Output → DotEnvy** shows credential-free diagnostics. All requests go directly to `api.doppler.com`. Sign-in uses the device authorization flow of the [official Doppler CLI](https://github.com/DopplerHQ/cli/blob/master/pkg/http/api.go) (compatible with `v3.77.0`).
+
+### Manual configuration
 
 ```jsonc
 {
   "cloudSync": {
     "provider": "doppler",
     "project": "your-project-name",
-    "config": "development",
-    "token": "dp.pt.your_token_here"
+    "config": "dev"
   }
 }
 ```
 
----
+Replace the example values with your Doppler project slug and a config your token can access. Project names are normalized to lowercase slugs (dots and spaces become hyphens).
 
-## 🗺️ Roadmap & Contributing
-
-For upcoming features, see [ROADMAP.md](ROADMAP.md).  
-Issues and PRs are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
-
----
-
-## 👥 Contributors & Special Thanks
-
-Special thanks to **[@FaberVi](https://github.com/FaberVi)** for authoring the Italian localization, custom dropdown language switcher, compact sidebar design, and Doppler multi-file sync improvements in PR #2.
+- **Tokens**: On an authentication error, choose **Set Doppler Token** to store a token in SecretStorage; the legacy `cloudSync.token` JSON field is removed. Precedence: project SecretStorage → `DOPPLER_TOKEN` environment variable → legacy config field.
+- **HTTP 401** means the token was rejected (example, expired or revoked). **HTTP 403** means it cannot access that project/config; pushing needs write access. See the [Doppler service token docs](https://docs.doppler.com/docs/service-tokens).
+- **Encryption**: Portable encryption is on by default. The first encrypted push asks for a sync passphrase (PBKDF2 + AES-256-GCM); another machine pulls with the same passphrase. DotEnvy cannot recover a lost passphrase.
+- **Pull** merges into existing files and keeps comments, layout, multiline values and CRLF line endings. It backs up each file to a sibling `.backup` and adds `.env*.backup` to `.gitignore`.
+- **Multiple files**: configure `envTargets` with `keyPrefix`, `prefixes` or `catchAll`. `pushMode: "replace"` removes remote keys missing locally, after confirmation.
+- A missing Doppler config asks you to choose one; DotEnvy never switches environments on its own.
 
 ---
 
-## 📜 License
+## Privacy & Security
 
-This project is licensed under the Apache License, Version 2.0 - see the [LICENSE](LICENSE) file for details.
-## Local model release (v2.2.4)
+**The secret scanner runs fully offline. Keys, code and corrections never leave your machine.**
 
-The scanner uses feature schema 2 and bundles inference-only weights exported
-from DotAegis' validated synthetic bootstrap. Model checksums and synthetic
-validation metadata are included in `resources/models/aegis-v2.manifest.json`.
-New numeric corrections can be uploaded with explicit opt-in. DotAegis reviews
-these before training, and publishes updated inference weights for clients.
+| Data | Where it stays |
+| --- | --- |
+| Source code and detected values | Read from your workspace and processed in memory. Move to .env writes a local file. |
+| Scan results | Redacted text, sanitized context and location in memory; cache lasts five minutes, up to 1,000 files. |
+| Local corrections | A fingerprint of file, variable and value digest plus the decision, in VS Code state (up to 500). No raw values or file names. |
 
-Validation: `npm ci`, `npm run compile`, `npm run lint`, and
-`node test/run-all-tests.js`. Tests compare all class probabilities with Python,
-exercise worker failures and corrupted models, block HTTP/fetch calls during
-initialization and scanning even with legacy cloud enabled, verify scoped local
-corrections/reset, authenticated numeric feedback retries and concurrent additions, post-action
-consent acceptance/decline/dismissal and persistence,
-model downloads/failure fallback, original-value .env writes and stale detections.
+Corrections apply only to the same file, variable and complete value. A changed value or another file does not inherit them. **`DotEnvy: Reset Local Secret Corrections`** clears them.
+
+The scanner estimates whether a value looks like a secret. It does not check whether a key is real, active or revoked, and false positives or missed secrets are possible. Moving a value to `.env` does not revoke it or remove it from Git history. Doppler push/pull sends environment data only to the Doppler account you configure. Please don't post live credentials or private code in issues.
+
+### Why DotAegis is no longer included
+
+Earlier versions bundled **DotAegis**, a small AI model that re-scored scanner results, plus an optional upload of numeric corrections to train it. It has been removed from DotEnvy completely. A useful model needs a large set of real, labelled keys, and nobody can or should hand over real secrets to train it. The bundled model was trained on synthetic data only, so DotEnvy now relies on transparent rules instead. DotAegis continues as a [separate DotSuite project](https://www.dotsuite.dev/en/product/dotaegis).
+
+Upgrading deletes any pending upload queue and consent state. The `dotenvy.secrets.enableCommunityLearning`, `dotenvy.secrets.enableModelUpdates` and `dotenvy.secrets.enableCloudAnalysis` settings no longer exist. Data an older version already sent is not erased by upgrading.
+
+---
+
+## Development
+
+```bash
+git clone https://github.com/kareem2099/dotenvy.git
+cd dotenvy
+npm ci
+npm run compile
+npm test
+```
+
+`npm test` compiles, lints and runs the full suite (`node test/run-all-tests.js`). Offline suites block all HTTP/fetch calls. Press **F5** in VS Code to launch an Extension Development Host. See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and pull request process.
+
+---
+
+## Contributors
+
+Issues and pull requests are welcome — read [CONTRIBUTING.md](CONTRIBUTING.md) first.
+
+Special thanks to **[@FaberVi](https://github.com/FaberVi)** for the Italian localization, language switcher, compact sidebar and Doppler multi-file sync ([#2](https://github.com/kareem2099/dotenvy/pull/2)), and for the module split, portable cloud encryption, cloud pull fixes and test suites ([#5](https://github.com/kareem2099/dotenvy/pull/5)).
+
+---
+
+## Part of DotSuite
+
+DotEnvy is one of the tools in **[DotSuite](https://www.dotsuite.dev/en)** — an ecosystem of modern, privacy-focused developer tools for VS Code and Linux.
+
+🌐 **DotSuite:** [www.dotsuite.dev](https://www.dotsuite.dev/en) · **DotEnvy page:** [dotsuite.dev/en/product/dotenvy](https://www.dotsuite.dev/en/product/dotenvy)
+
+> CodeTune · DotCommand · **DotEnvy** · DotFetch · DotReadme · DotSense · DotShare · DotScramble · DotAegis · DotGhostBoard
+
+---
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE). The license includes the warranty terms; this README adds no guarantee of complete secret detection or credential protection.

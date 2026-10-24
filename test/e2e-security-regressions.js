@@ -1,5 +1,6 @@
 const assert = require('assert/strict');
 const crypto = require('crypto');
+const path = require('path');
 const Module = require('module');
 let cloud = false;
 const state = new Map([['dotenvy.feedback.entries', [{context: 'old raw source context'}]]]);
@@ -9,6 +10,7 @@ const raw = 'sk-SyntheticReviewValue0123456789AbCdEf';
 let currentLine = 'const API_KEY = "' + raw + '";';
 const workspace = {uri: {fsPath: '/synthetic-workspace'}};
 const vscode = {
+  EventEmitter: class { event = () => ({dispose(){}}); fire() {} dispose() {} },
   ExtensionMode: {Development: 1},
   workspace: {
     getConfiguration: () => ({get: key => key === 'secrets.enableCloudAnalysis' ? cloud : false, inspect: () => ({globalValue:false})}),
@@ -18,7 +20,7 @@ const vscode = {
     asRelativePath: () => 'sample.ts',
     fs: {readFile: async () => {throw new Error('missing');}, writeFile: async (_uri, data) => writes.push(data.toString())}
   },
-  Uri: {file: value => ({fsPath: value}), joinPath: (uri, name) => ({fsPath: uri.fsPath + '/' + name})},
+  Uri: {file: value => ({fsPath: value}), joinPath: (uri, ...parts) => ({fsPath: path.join(uri.fsPath, ...parts)})},
   window: {
     createOutputChannel: () => ({appendLine() {}, show() {}, clear() {}}),
     showInformationMessage() {}, showErrorMessage() {}
@@ -27,11 +29,9 @@ const vscode = {
 };
 const original = Module.prototype.require;
 Module.prototype.require = function(name) { return name === 'vscode' ? vscode : original.apply(this, arguments); };
-const {LLMAnalyzer} = require('../out/utils/llmAnalyzer');
 const {FeedbackManager} = require('../out/utils/feedbackManager');
 const {SecretDetector} = require('../out/utils/secretDetector');
 const {SecretsPanel} = require('../out/providers/SecretsPanel');
-const {FeatureExtractor} = require('../out/utils/featureExtractor');
 const {readDetectedValue, encodeEnvValue} = require('../out/utils/detectedSecretValue');
 const context = {
   extensionMode: 1,
@@ -42,21 +42,31 @@ const context = {
   }
 };
 async function main() {
-  for (const test of require('./feature-parity.json')) {
-    const actual = FeatureExtractor.extract(test.value, test.context, test.name || undefined);
-    actual.forEach((value, i) => assert.ok(Math.abs(value - test.features[i]) < 1e-6,
-      `Python/TypeScript feature ${i} mismatch for the synthetic parity fixture`));
-  }
-  const analyzer = await LLMAnalyzer.initialize(context);
   await FeedbackManager.init(context);
   assert.equal(state.has('dotenvy.feedback.entries'), false, 'legacy raw queue must be purged');
 
   const detections = await SecretDetector.scanLine(currentLine, 0, [currentLine], '/synthetic-workspace/sample.ts');
   assert.ok(detections.length);
+  assert.equal(detections[0].analysisSource, 'heuristics');
+  assert.equal(detections[0].confidence, 'high', 'a known key format with high entropy is high confidence');
+  assert.equal('features' in detections[0], false, 'no feature vector is computed without a model');
+  const render = Object.create(SecretsPanel.prototype);
+  render._extensionUri = {fsPath: path.resolve(__dirname, '..')};
+  render._panel = {webview: {cspSource: 'test-webview', asWebviewUri: uri => uri.fsPath}};
+  render._secrets = await SecretDetector.scanText('/synthetic-workspace/provenance.ts', currentLine);
+  assert.ok(render._secrets.length);
+  assert.ok(render._secrets.every(s => s.analysisSource === 'heuristics'));
+  const html = await render._getHtml();
+  assert.ok(html.includes('🔎 Local rules'));
+  assert.ok(html.includes(`Rules ${render._secrets.length}`));
+  assert.ok(!html.includes('DotAegis'));
+  assert.ok(!html.includes('📊 Statistical</span>'));
+  assert.ok(!html.includes(raw));
+  render._secrets = [];
+  assert.ok((await render._getHtml()).includes('nothing leaves your machine'), 'Local status remains visible with no findings');
   const secret = {...detections[0], confidence: 'low', suggestedEnvVar: 'API_KEY'};
   assert.equal(secret.content.includes(raw), false);
   assert.equal(secret.context.includes(raw), false);
-  assert.deepEqual(secret.features, FeatureExtractor.extract(raw, secret.context, secret.variableName));
   const originalValue = await readDetectedValue(secret);
   assert.equal(originalValue.value, raw);
   const passwordLine = 'const password = "SyntheticPassword012345ABCD";';
@@ -84,8 +94,11 @@ async function main() {
   cloud = true; // Obsolete settings must not enable any upload.
   await FeedbackManager.recordConfirmed(secret);
   entries = state.get('dotenvy.corrections.local.v1');
-  assert.equal(entries[0].label, 'high', 'confirmation overrides a low model prediction');
+  assert.equal(entries[0].label, 'high', 'confirmation overrides a low rule-based score');
   assert.equal(FeedbackManager.decision(secret.sourceFile, secret.variableName, secret.valueDigest), 'high');
+  render._secrets = await SecretDetector.scanText(secret.sourceFile, currentLine);
+  assert.ok(render._secrets.every(s => s.analysisSource === 'user-confirmed'));
+  assert.ok((await render._getHtml()).includes('✓ Confirmed by you'));
   assert.equal(state.has('dotenvy.feedback.features.v2'), false);
 
   const panel = Object.create(SecretsPanel.prototype);
@@ -104,7 +117,6 @@ async function main() {
   await FeedbackManager.clear();
   assert.equal(FeedbackManager.decision(secret.sourceFile, secret.variableName, secret.valueDigest), undefined);
   assert.equal(state.has('dotenvy.corrections.local.v1'), false);
-  analyzer.dispose();
-  console.log('✅ Security regressions: feature parity, local correction persistence/scope/reset, concurrent writes, private records, original .env values and stale-source rejection.');
+  console.log('✅ Security regressions: rule-based classification, local correction persistence/scope/reset, concurrent writes, private records, original .env values and stale-source rejection.');
 }
 main().then(() => process.exit(0)).catch(error => {console.error(error); process.exit(1);});

@@ -6,9 +6,11 @@ import { CloudSyncManager } from '../utils/cloudSyncManager';
 import { EnvSyncUtils } from '../utils/envSyncUtils';
 import { StatusBarProvider } from '../providers/statusBarProvider';
 import { extensionContext } from '../extension';
-import { createCloudSyncManager } from '../utils/encryptedCloudSyncManager';
+import { createCloudSyncManager } from '../utils/cloudSyncManagerFactory';
 import { showActionStart, showSyncToast } from '../utils/panelNotification';
 import { t } from '../i18n';
+import { GitUtils } from '../utils/gitUtils';
+import { DopplerWatcherRegistry } from '../utils/dopplerWatcher';
 
 export class PullFromCloudCommand implements vscode.Disposable {
 	public async execute(preferredWorkspacePath?: string): Promise<void> {
@@ -44,7 +46,7 @@ export class PullFromCloudCommand implements vscode.Disposable {
 		progress.report({ message: t('pull.progress.readingConfig') });
 		const config = await ConfigUtils.readQuickEnvConfig(rootPath);
 
-		if (!config?.cloudSync || !config.cloudSync.project || !config.cloudSync.config || !config.cloudSync.token) {
+        if (!config?.cloudSync || !config.cloudSync.project || !config.cloudSync.config) {
 			await ConfigUtils.ensureWorkspaceConfigFile(rootPath, undefined, true);
 			showSyncToast(
 				t('pull.configCreated'),
@@ -70,12 +72,13 @@ export class PullFromCloudCommand implements vscode.Disposable {
 				return;
 			}
 
-			const connectionResult = await cloudManager.testConnection();
+			let connectionResult = await cloudManager.testConnection();
 			if (!connectionResult.success) {
 				const updatedSyncConfig = await DopplerSyncManager.handleConnectionFailure(
 					rootPath,
 					syncConfig,
-					connectionResult.error
+					connectionResult.error,
+					connectionResult.errorCode
 				);
 
 				if (!updatedSyncConfig) {
@@ -85,21 +88,35 @@ export class PullFromCloudCommand implements vscode.Disposable {
 
 				syncConfig = updatedSyncConfig;
 				cloudManager = await createCloudSyncManager(syncConfig, extensionContext);
-				const retryResult = await cloudManager.testConnection();
-				if (!retryResult.success) {
+				connectionResult = await cloudManager.testConnection();
+				if (!connectionResult.success) {
 					showSyncToast(
-						retryResult.error ?? t('pull.connectionFailed'),
+						connectionResult.error ?? t('pull.connectionFailed'),
 						'error'
 					);
 					return;
 				}
 			}
 
+			syncConfig = await DopplerSyncManager.applyResolvedConfig(
+				rootPath,
+				syncConfig,
+				connectionResult.resolvedConfig
+			);
+			if (connectionResult.resolvedConfig) {
+				cloudManager = await createCloudSyncManager(syncConfig, extensionContext);
+			}
+
 			progress.report({ message: t('pull.progress.downloading', { provider: syncConfig.provider }) });
 			const result = await cloudManager.fetchSecrets(extensionContext);
 
 			if (!result.success || !result.secrets) {
-				showSyncToast(t('pull.downloadFailed', { error: result.error ?? 'no secrets received' }), 'error');
+				const errorText = result.error ?? t('pull.noSecrets');
+				if (errorText.includes('Failed to decrypt cloud secrets')) {
+					showSyncToast(t('pull.legacyLocalKeyDecrypt'), 'error');
+					return;
+				}
+				showSyncToast(t('pull.downloadFailed', { error: errorText }), 'error');
 				return;
 			}
 
@@ -111,6 +128,8 @@ export class PullFromCloudCommand implements vscode.Disposable {
 				);
 				return;
 			}
+
+			await GitUtils.ensureGitignoreEntries(rootPath, [GitUtils.envBackupGitignorePattern]);
 
 			const secrets = EnvSyncUtils.filterCloudMetadataKeys(
 				EnvSyncUtils.filterDopplerReservedKeys(result.secrets)
@@ -220,6 +239,9 @@ export class PullFromCloudCommand implements vscode.Disposable {
 				statusBarProvider.setWorkspace(rootPath);
 				statusBarProvider.forceRefresh();
 			}
+
+			// Re-check Doppler immediately so the badge clears without waiting for the next poll interval
+			void DopplerWatcherRegistry.get(rootPath)?.check();
 
 			showSyncToast(
 				t('pull.completed', {

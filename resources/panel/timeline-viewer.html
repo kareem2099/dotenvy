@@ -10,20 +10,24 @@
 <body class="timeline-only">
     <div class="history-container">
         <div class="history-header">
-            <h3 data-i18n="timeline.title">📊 Environment Timeline</h3>
-            <div class="history-stats" id="stats"></div>
+            <div class="header-left">
+                <h3 data-i18n="timeline.title">📊 Environment Timeline</h3>
+                <div class="history-stats" id="stats"></div>
+            </div>
+            <div class="header-actions">
+                <button type="button" id="refresh-btn" class="btn-icon-pill" data-i18n-title="history.refreshTitle" data-i18n="timeline.refresh">🔄 Refresh</button>
+            </div>
         </div>
 
         <div class="history-toolbar">
             <div class="view-info" data-i18n="timeline.subtitle">Visualizing environment lifecycle and changes</div>
-            <button id="refresh-btn" class="btn-secondary" data-i18n="timeline.refresh">🔄 Refresh</button>
         </div>
 
         <div class="timeline-container standalone" id="timeline-container">
             <div class="timeline-controls">
-                <button id="zoom-in-btn" class="btn-secondary" title="Zoom In" data-i18n-title="timeline.zoomIn">🔍+</button>
-                <button id="zoom-out-btn" class="btn-secondary" title="Zoom Out" data-i18n-title="timeline.zoomOut">🔍-</button>
-                <button id="fit-to-screen-btn" class="btn-secondary" title="Fit to Screen" data-i18n-title="timeline.fitToScreen">📐</button>
+                <button type="button" id="zoom-in-btn" class="btn btn-secondary btn-sm" title="Zoom In" data-i18n-title="timeline.zoomIn">🔍+</button>
+                <button type="button" id="zoom-out-btn" class="btn btn-secondary btn-sm" title="Zoom Out" data-i18n-title="timeline.zoomOut">🔍-</button>
+                <button type="button" id="fit-to-screen-btn" class="btn btn-secondary btn-sm" title="Fit to Screen" data-i18n-title="timeline.fitToScreen">📐</button>
                 <span class="zoom-level" id="zoom-level">100%</span>
             </div>
             <div class="timeline-wrapper">

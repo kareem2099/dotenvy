@@ -1,0 +1,17 @@
+# Uniform line endings: LF in the repository on all platforms.
+* text=auto eol=lf
+
+# Windows-only launchers keep CRLF when checked out on Windows.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets (do not alter line endings).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.vsix binary
+*.woff binary
+*.woff2 binary

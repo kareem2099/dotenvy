@@ -1,0 +1,20 @@
+/* Timeline Responsive Design */
+@media (max-width: 768px) {
+    .timeline-controls {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .timeline-wrapper {
+        height: 300px;
+    }
+
+    .timeline-svg {
+        height: 300px;
+    }
+
+    .time-label {
+        font-size: 9px;
+    }
+}
+

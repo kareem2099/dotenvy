@@ -1,0 +1,9 @@
+/* Performance optimizations */
+.history-item,
+.timeline-node,
+.btn,
+.diff-container {
+    will-change: transform;
+    backface-visibility: hidden;
+}
+

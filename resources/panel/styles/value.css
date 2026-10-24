@@ -1,0 +1,40 @@
+/* ── Value ── */
+.vm-value-wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    min-width: 0;
+    width: 100%;
+}
+
+.vm-value-text {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--vscode-descriptionForeground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.vm-value-text.is-encrypted {
+    color: #818cf8;
+    letter-spacing: 3px;
+    opacity: 0.85;
+}
+
+.vm-btn-peek {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    opacity: 0.5;
+    transition: opacity var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.vm-btn-peek:hover { opacity: 1; }
+

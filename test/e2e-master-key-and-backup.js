@@ -54,6 +54,7 @@ const mockContext = {
 const registeredCommands = new Map();
 
 const vscodeMock = {
+  EventEmitter: class { event = () => ({dispose(){}}); fire() {} dispose() {} },
     ExtensionMode: { Development: 1, Test: 2, Production: 3 },
     ProgressLocation: { SourceControl: 1, Window: 10, Notification: 15 },
     Uri: {

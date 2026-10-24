@@ -1,15 +1,21 @@
 import * as https from 'https';
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 import { CloudSyncConfig } from '../types/environment';
 
 export interface CloudSecrets {
 	[key: string]: string;
 }
 
+export type CloudSyncErrorCode = 'CONFIG_NOT_FOUND' | 'INVALID_PROJECT';
+
 export interface CloudSyncResult {
 	success: boolean;
 	secrets?: CloudSecrets;
 	error?: string;
+	/** Doppler config slug used after alias/API resolution */
+	resolvedConfig?: string;
+	errorCode?: CloudSyncErrorCode;
 }
 
 /**
@@ -21,8 +27,8 @@ export abstract class CloudSyncManager {
 
 	constructor(config: CloudSyncConfig, token?: string) {
 		this.config = config;
-		// Use provided token or config token, will fetch from storage/envs if needed
-		this.token = token || config.token;
+        // Explicit overrides take precedence; legacy config values are a fallback.
+        this.token = token?.trim() || undefined;
 	}
 
 	/**
@@ -32,22 +38,21 @@ export abstract class CloudSyncManager {
 		// First check if provided in constructor
 		if (this.token) return this.token;
 
-		// Try environment variable
-		const envVarName = `${this.config.provider.toUpperCase()}_TOKEN`;
-		const envToken = process.env[envVarName];
-		if (envToken) return envToken;
-
-		// Try secret storage
-		if (this.config.provider && this.config.project) {
+        // Project-scoped credentials set in the UI take precedence over process-wide defaults.
+        if (this.config.provider && this.config.project) {
 			const { ConfigUtils } = await import('../utils/configUtils');
-			const secretToken = await ConfigUtils.getSecret(`${this.config.provider}:${this.config.project}:token`);
-			if (secretToken) return secretToken;
-		}
+            const secretToken = (await ConfigUtils.getSecret(`${this.config.provider}:${this.config.project}:token`))?.trim();
+            if (secretToken) return secretToken;
+        }
+
+        const envVarName = `${this.config.provider.toUpperCase()}_TOKEN`;
+        const envToken = process.env[envVarName]?.trim();
+        if (envToken) return envToken;
 
 		// Try config file's token field (for backward compatibility)
-		if (this.config.token) return this.config.token;
+        if (this.config.token?.trim()) return this.config.token.trim();
 
-		throw new Error(`${envVarName} environment variable is required, or specify token in config or VSCode secrets`);
+		throw new Error(t('doppler.tokenRequired', { name: envVarName }));
 	}
 
 	/**

@@ -117,7 +117,7 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 			} catch (error) {
 				validationResults.set(env.name, {
 					environment: env,
-					errors: [{ message: `Failed to validate: ${(error as Error).message}` }],
+					errors: [{ message: t('validate.attemptFailed', { message: (error as Error).message }) }],
 					isValid: false
 				});
 			}
@@ -155,7 +155,7 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 
 			if (showDetails === showDetailsLabel) {
 				const doc = await vscode.workspace.openTextDocument({
-					content: `Validation Report for ${envName}:\n\n${errorDetails}`,
+					content: `${t('validate.reportTitle', { name: envName })}\n\n${errorDetails}`,
 					language: 'text'
 				});
 				await vscode.window.showTextDocument(doc, { preview: true });
@@ -166,7 +166,7 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 				const env = resultRecord.environment as Record<string, unknown>;
 				return {
 					label: `❌ ${env.name as string}`,
-					description: `${(resultRecord.errors as Array<unknown>).length} validation error(s)`,
+					description: t('validate.errorCount', { count: (resultRecord.errors as Array<unknown>).length }),
 					detail: env.fileName as string,
 					result: result
 				};
@@ -190,7 +190,7 @@ export class ValidateEnvironmentCommand implements vscode.Disposable {
 				const env = selectedRecord.environment as Record<string, unknown>;
 				const errorDetails = EnvironmentValidator.formatErrors(selectedRecord.errors as Array<{ type: 'type' | 'syntax' | 'missing' | 'custom'; message: string; [key: string]: unknown }>);
 				const doc = await vscode.workspace.openTextDocument({
-					content: `Validation Report for ${env.name as string}:\n\n${errorDetails}`,
+					content: `${t('validate.reportTitle', { name: env.name as string })}\n\n${errorDetails}`,
 					language: 'text'
 				});
 				await vscode.window.showTextDocument(doc, { preview: true });

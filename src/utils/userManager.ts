@@ -18,6 +18,7 @@ import {
   ProjectKeyAccessResult
 } from '../types/user';
 import { logger } from './logger';
+import { t } from '../i18n';
 
 export class UserManager {
 
@@ -76,7 +77,7 @@ export class UserManager {
   private static async saveEnvelope(envelope: ProjectKeyEnvelope): Promise<void> {
     const filePath = this.getUsersFilePath();
     if (!filePath) {
-      throw new Error('No workspace found');
+      throw new Error(t('users.noWorkspace'));
     }
 
     const content = JSON.stringify(envelope, null, 2);
@@ -144,7 +145,7 @@ export class UserManager {
   ): Promise<UserManagementResult> {
     try {
       if (await this.isSecureProjectInitialized()) {
-        return { success: false, message: 'Project is already initialized with secure access' };
+        return { success: false, message: t('users.alreadyInitialized') };
       }
 
       // Generate the Holy Grail (Project Key)
@@ -182,14 +183,14 @@ export class UserManager {
 
       return {
         success: true,
-        message: `Secure project initialized successfully. Admin: ${adminCredentials.username}`,
+        message: t('users.initialized', { username: adminCredentials.username }),
         user: adminUser
       };
 
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to initialize secure project',
+        message: t('users.initFailed'),
         error: (error as Error).message
       };
     }
@@ -205,7 +206,7 @@ export class UserManager {
     try {
       const envelope = await this.loadEnvelope();
       if (!envelope) {
-        return { success: false, message: 'Project not initialized. Run "Init Secure Project" first.' };
+        return { success: false, message: t('users.notInitialized') };
       }
 
       // Verify admin credentials and get project key
@@ -220,7 +221,7 @@ export class UserManager {
 
       // Check if user already exists
       if (envelope.users.find(u => u.username === newUserCredentials.username)) {
-        return { success: false, message: `User ${newUserCredentials.username} already exists` };
+        return { success: false, message: t('users.alreadyExists', { username: newUserCredentials.username }) };
       }
 
       // Generate key for new user (with new salt)
@@ -245,14 +246,14 @@ export class UserManager {
 
       return {
         success: true,
-        message: `User ${newUserCredentials.username} added successfully`,
+        message: t('users.added', { username: newUserCredentials.username }),
         user: newUser
       };
 
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to add user',
+        message: t('users.addFailed'),
         error: (error as Error).message
       };
     }
@@ -268,7 +269,7 @@ export class UserManager {
     try {
       const envelope = await this.loadEnvelope();
       if (!envelope) {
-        return { success: false, message: 'Project not initialized' };
+        return { success: false, message: t('users.projectNotInitialized') };
       }
 
       // Verify admin credentials
@@ -284,14 +285,14 @@ export class UserManager {
       // Find user to revoke
       const userIndex = envelope.users.findIndex(u => u.username === usernameToRevoke);
       if (userIndex === -1) {
-        return { success: false, message: `User ${usernameToRevoke} not found` };
+        return { success: false, message: t('users.notFound', { username: usernameToRevoke }) };
       }
 
       const user = envelope.users[userIndex];
 
       // Cannot revoke the last admin
       if (user.role === 'admin' && envelope.users.filter(u => u.role === 'admin').length === 1) {
-        return { success: false, message: 'Cannot revoke the last admin user' };
+        return { success: false, message: t('users.cannotRevokeLastAdmin') };
       }
 
       // Remove user
@@ -300,14 +301,14 @@ export class UserManager {
 
       return {
         success: true,
-        message: `User ${usernameToRevoke} access revoked successfully`,
+        message: t('users.revoked', { username: usernameToRevoke }),
         user
       };
 
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to revoke user',
+        message: t('users.revokeFailed'),
         error: (error as Error).message
       };
     }
@@ -320,13 +321,13 @@ export class UserManager {
     try {
       const envelope = await this.loadEnvelope();
       if (!envelope) {
-        return { success: false, message: 'Project not initialized. Run "Init Secure Project" first.' };
+        return { success: false, message: t('users.notInitialized') };
       }
 
       // Find user
       const user = envelope.users.find(u => u.username === credentials.username);
       if (!user) {
-        return { success: false, message: `User ${credentials.username} not found` };
+        return { success: false, message: t('users.notFound', { username: credentials.username }) };
       }
 
       // Derive key using the STORED salt (critical!)
@@ -347,21 +348,21 @@ export class UserManager {
         return {
           success: true,
           projectKey,
-          message: 'Project key accessed successfully'
+          message: t('users.keyAccessed')
         };
 
       } catch (error) {
         return {
           success: false,
-          message: 'Invalid password',
-          error: 'Decryption failed'
+          message: t('users.invalidPassword'),
+          error: t('users.invalidPassword')
         };
       }
 
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to access project key',
+        message: t('users.accessFailed'),
         error: (error as Error).message
       };
     }

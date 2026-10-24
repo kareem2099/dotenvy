@@ -6,6 +6,8 @@ import { SwitchEnvironmentCommand } from './commands/switchEnvironment';
 import { OpenEnvironmentPanelCommand } from './commands/openEnvironmentPanel';
 import { ValidateEnvironmentCommand } from './commands/validateEnvironment';
 import { DiffEnvironmentCommand } from './commands/diffEnvironment';
+import { CompareEnvironmentsCommand } from './commands/compareEnvironments';
+import { DiffCloudCommand } from './commands/diffCloud';
 import { InstallGitHookCommand } from './commands/installGitHook';
 import { RemoveGitHookCommand } from './commands/removeGitHook';
 import { PullFromCloudCommand } from './commands/pullFromCloud';
@@ -14,7 +16,6 @@ import { ScanSecretsCommand } from './commands/scanSecrets';
 import { FeedbackCommand } from './commands/feedback';
 import { ViewEnvironmentHistoryCommand } from './commands/viewEnvironmentHistory';
 import { SetMasterPasswordCommand } from './commands/setMasterPassword';
-import { ExportEnvironmentCommand } from './commands/exportEnvironment';
 import { InitSecureProjectCommand } from './commands/initSecureProject';
 import { AddUserCommand } from './commands/addUser';
 import { RevokeUserCommand } from './commands/revokeUser';
@@ -23,6 +24,7 @@ import { LoginToSecureProjectCommand } from './commands/loginToSecureProject';
 // Import Providers & Managers
 import { HistoryWebviewProvider } from './providers/historyWebviewProvider';
 import { AnalyticsWebviewProvider } from './providers/analyticsWebviewProvider';
+import { recordSavedEnvironment } from './utils/environmentHistory';
 import { TimelineWebviewProvider } from './providers/timelineWebviewProvider';
 import { WorkspaceManager } from './providers/workspaceManager';
 import { EnvironmentWebviewProvider } from './providers/environmentWebviewProvider';
@@ -31,11 +33,11 @@ import { EnvironmentCompletionProvider } from './providers/environmentCompletion
 import { TrashBinWebviewProvider } from './providers/trashBinWebviewProvider';
 import { VariableWebviewProvider } from './providers/variableWebviewProvider';
 import { SecretDetector } from './utils/secretDetector';
-import { HistoryManager } from './utils/historyManager';
+import { registerSecretDiagnostics } from './providers/secretDiagnostics';
 import { UpdateManager } from './managers/UpdateManager';
+import { DopplerWatcherRegistry } from './utils/dopplerWatcher';
 
-// Bundled offline classifier and local user corrections.
-import { LLMAnalyzer } from './utils/llmAnalyzer';
+// Local user corrections for the secrets scanner.
 import { FeedbackManager } from './utils/feedbackManager';
 import { logger, LogLevel } from './utils/logger';
 import { InitDotenvyIgnoreCommand } from './commands/initDotenvyIgnore';
@@ -56,23 +58,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const localization = LocalizationService.getInstance();
     await localization.initialize(context);
 
-    await LLMAnalyzer.initialize(context);
     await FeedbackManager.init(context);
-    // Updates only download weights; corrections upload only after explicit opt-in.
-    const syncAegis = () => { void LLMAnalyzer.getInstance().refreshModel(); void FeedbackManager.flush(); };
-    syncAegis();
-    const feedbackTimer = setInterval(() => { void FeedbackManager.flush(); }, 5 * 60 * 1000);
-    const modelTimer = setInterval(() => { void LLMAnalyzer.getInstance().refreshModel(); }, 60 * 60 * 1000);
-    feedbackTimer.unref(); modelTimer.unref();
-    context.subscriptions.push({dispose: () => { clearInterval(feedbackTimer); clearInterval(modelTimer); }},
-        vscode.workspace.onDidChangeConfiguration(event => {
-            if (event.affectsConfiguration('dotenvy.secrets.enableCommunityLearning')) {
-                void FeedbackManager.markCommunityChoice();
-                if (LLMAnalyzer.isCommunityLearningEnabled()) { void FeedbackManager.flush(); }
-                else { void FeedbackManager.clearQueue(); }
-            }
-            if (event.affectsConfiguration('dotenvy.secrets.enableModelUpdates')) { void LLMAnalyzer.getInstance().refreshModel(); }
-        }));
 
     // ─── 1. Initialize workspace manager ──────────────────────────────────────
     const workspaceManager = WorkspaceManager.getInstance();
@@ -124,7 +110,7 @@ export async function activate(context: vscode.ExtensionContext) {
         // Command to open the History panel as a full WebviewPanel (tab)
         vscode.commands.registerCommand('dotenvy.openHistoryPanel', () => HistoryWebviewProvider.openOrReveal()),
         // Command to open the Analytics panel as a full WebviewPanel (tab)
-        vscode.commands.registerCommand('dotenvy.openAnalyticsPanel', () => AnalyticsWebviewProvider.openOrReveal()),
+        vscode.commands.registerCommand('dotenvy.openAnalyticsPanel', (rootPath?: string) => AnalyticsWebviewProvider.openOrReveal(rootPath)),
         // Command to open the Timeline panel as a full WebviewPanel (tab)
         vscode.commands.registerCommand('dotenvy.openTimelinePanel', () => TimelineWebviewProvider.openOrReveal()),
         // Command to open the Variable Manager panel as a full WebviewPanel (tab)
@@ -153,9 +139,11 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.workspace.onDidChangeWorkspaceFolders(async (event) => {
             for (const removed of event.removed) {
                 workspaceManager.removeWorkspace(removed.uri.fsPath);
+                DopplerWatcherRegistry.remove(removed.uri.fsPath);
             }
             for (const added of event.added) {
                 await workspaceManager.addWorkspace(added);
+                DopplerWatcherRegistry.getOrCreate(added.uri.fsPath);
             }
         }),
     );
@@ -163,8 +151,9 @@ export async function activate(context: vscode.ExtensionContext) {
     // ─── Commands Initialization ───────────────────────────────────────────────
     const switchEnvCommand = new SwitchEnvironmentCommand();
     const openPanelCommand = new OpenEnvironmentPanelCommand();
-    const validateEnvCommand = new ValidateEnvironmentCommand();
     const diffEnvCommand = new DiffEnvironmentCommand();
+    const compareEnvironmentsCommand = new CompareEnvironmentsCommand();
+    const diffCloudCommand = new DiffCloudCommand();
     const installHookCommand = new InstallGitHookCommand();
     const removeHookCommand = new RemoveGitHookCommand();
     const pullFromCloudCommand = new PullFromCloudCommand();
@@ -173,19 +162,54 @@ export async function activate(context: vscode.ExtensionContext) {
     const feedbackCommand = new FeedbackCommand();
     const viewHistoryCommand = new ViewEnvironmentHistoryCommand();
     const setMasterPasswordCommand = new SetMasterPasswordCommand(context);
-    const exportEnvironmentCommand = new ExportEnvironmentCommand();
-
     const initSecureProjectCommand = new InitSecureProjectCommand();
     const addUserCommand = new AddUserCommand();
     const revokeUserCommand = new RevokeUserCommand();
     const loginToSecureProjectCommand = new LoginToSecureProjectCommand();
 
     context.subscriptions.push(
-        switchEnvCommand, openPanelCommand, validateEnvCommand, diffEnvCommand,
-        installHookCommand, removeHookCommand, pullFromCloudCommand, pushToCloudCommand,
+        switchEnvCommand,
+        viewHistoryCommand,
+        setMasterPasswordCommand,
+        initIgnoreCommand,
+        vscode.commands.registerCommand('dotenvy.openEnvironmentPanel', () => openPanelCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.connectDoppler', async () => {
+            const root = await WorkspaceManager.resolveWorkspacePath(undefined, t('common.selectWorkspace'));
+            if (root) {
+                await (await import('./utils/dopplerOnboarding')).DopplerOnboarding.connect(root);
+                await webviewProvider.refreshEnvironments();
+            }
+        }),
+        vscode.commands.registerCommand('dotenvy.validateEnvironment', () =>
+            ValidateEnvironmentCommand.manageValidation()),
+        vscode.commands.registerCommand('dotenvy.diffEnvironment', () => diffEnvCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.compareEnvironments', () => compareEnvironmentsCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.installGitHook', () => installHookCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.removeGitHook', () => removeHookCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.pullFromCloud', () => pullFromCloudCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.diffCloud', () => diffCloudCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.pushToCloud', () => pushToCloudCommand.execute()),
         vscode.commands.registerCommand('dotenvy.scanSecrets', () => scanSecretsCommand.execute()),
-        feedbackCommand, viewHistoryCommand, setMasterPasswordCommand,
-        exportEnvironmentCommand, initIgnoreCommand,
+        vscode.commands.registerCommand('dotenvy.feedback', () => feedbackCommand.execute()),
+        vscode.commands.registerCommand('dotenvy.backup', async () => {
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage(t('common.noWorkspace'));
+                return;
+            }
+            const envPath = path.join(workspaceFolder.uri.fsPath, '.env');
+            const { BackupCommands } = await import('./commands/backupCommands');
+            await BackupCommands.backupEnv(context, envPath);
+        }),
+        vscode.commands.registerCommand('dotenvy.restore', async () => {
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage(t('common.noWorkspace'));
+                return;
+            }
+            const { BackupCommands } = await import('./commands/backupCommands');
+            await BackupCommands.restoreFromBackup(context, workspaceFolder.uri.fsPath);
+        }),
     );
 
     context.subscriptions.push(
@@ -200,27 +224,9 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('dotenvy.showChangelog',
             () => UpdateManager.showChangelog(context)),
 
-        // Old keybindings remain safe: they cannot restore cloud transmission.
-        vscode.commands.registerCommand('dotenvy.setupLLMSecret', async () => {
-            vscode.window.showInformationMessage(t('extension.localModel.info'));
-        }),
-        vscode.commands.registerCommand('dotenvy.toggleCloudAnalysis', async () => {
-            vscode.window.showInformationMessage(t('extension.localModel.info'));
-        }),
-        vscode.commands.registerCommand('dotenvy.toggleCommunityLearning', async () => {
-            const config = vscode.workspace.getConfiguration('dotenvy');
-            if (LLMAnalyzer.isCommunityLearningEnabled()) {
-                await FeedbackManager.markCommunityChoice();
-                await config.update('secrets.enableCommunityLearning', false, vscode.ConfigurationTarget.Global);
-                await FeedbackManager.clearQueue();
-                vscode.window.showInformationMessage(t('extension.community.disabled'));
-                return;
-            }
-            await FeedbackManager.requestCommunityConsent();
-        }),
         vscode.commands.registerCommand('dotenvy.resetSecretCorrections', async () => {
             await FeedbackManager.clear();
-            vscode.window.showInformationMessage(t('extension.localModel.correctionsCleared'));
+            vscode.window.showInformationMessage(t('extension.secretCorrections.cleared'));
         }),
 
         vscode.commands.registerCommand('dotenvy.addToIgnore', async (uri: vscode.Uri) => {
@@ -257,35 +263,11 @@ export async function activate(context: vscode.ExtensionContext) {
     // ─── History Recorder ──────────────────────────────────────────────────────
     context.subscriptions.push(
         vscode.workspace.onDidSaveTextDocument(async (document: vscode.TextDocument) => {
-            const fileName = path.basename(document.uri.fsPath);
-
-            if (fileName === '.env' || fileName.startsWith('.env.')) {
-                const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
-                if (!workspaceFolder) { return; }
-
-                if (path.dirname(document.uri.fsPath) !== workspaceFolder.uri.fsPath) {
-                    return;
-                }
-
-                const environmentName =
-                    fileName === '.env' ? 'local' : fileName.substring(5);
-
-                try {
-                    await HistoryManager.recordEntry(
-                        workspaceFolder.uri.fsPath,
-                        'modify',
-                        environmentName,
-                        document.getText(),
-                        fileName,
-                        { source: 'auto' },
-                    );
-                    logger.info(`History recorded for ${fileName}`, 'extension');
-
-                    // Real-time update: Refresh the history webview if it's open
-                    await HistoryWebviewProvider.loadHistory(workspaceFolder.uri.fsPath);
-                } catch (error) {
-                    logger.error('Failed to record history:', error, 'extension');
-                }
+            try {
+                const rootPath = await recordSavedEnvironment(document);
+                if (rootPath) await HistoryWebviewProvider.loadHistory(rootPath);
+            } catch (error) {
+                logger.error('Failed to record history:', error, 'extension');
             }
         }),
     );
@@ -296,6 +278,14 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Start real-time secret monitoring
     SecretDetector.startFileWatcher();
+    registerSecretDiagnostics(context);
+
+    // ─── Doppler background watcher ───────────────────────────────────────────
+    // Starts polling for each open workspace so the status bar badge stays live.
+    for (const folder of vscode.workspace.workspaceFolders ?? []) {
+        DopplerWatcherRegistry.getOrCreate(folder.uri.fsPath);
+    }
+    context.subscriptions.push({ dispose: () => DopplerWatcherRegistry.disposeAll() });
 }
 
 export function deactivate() {

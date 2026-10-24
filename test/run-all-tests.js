@@ -1,21 +1,28 @@
 #!/usr/bin/env node
 
 /**
- * DotEnvy Master Test Runner
- * Executes all test suites and reports unified status.
+ * DotEnvy test runner.
+ * Lists test files explicitly so `node --test` does not rediscover helpers
+ * or leftover scripts under test/.
  */
 
 const { spawnSync } = require('child_process');
 const path = require('path');
 
 const testSuites = [
+    { name: 'Automatic Doppler Connection', file: 'e2e-doppler-onboarding.js', offline: true },
+    { name: 'Base64 URL and Token Boundaries', file: 'e2e-base64-candidates.js', offline: true },
+    { name: 'Module Specifier False Positives', file: 'e2e-module-specifiers.js', offline: true },
+    { name: 'Analytics History and Dashboard Recording', file: 'e2e-analytics-history.js', offline: true },
+    { name: "PR Integration Regressions", file: "e2e-pr-integration.js", offline: true },
+    { name: 'Doppler Connection and Dashboard', file: 'e2e-doppler-connection.js', offline: true },
+    { name: 'File Change Review Notification', file: 'e2e-secret-notification.js', offline: true },
+    { name: 'Generated Files and Workspace Ignore Rules', file: 'e2e-scan-exclusions.js', offline: true },
+    { name: 'Scanner Event Loop Responsiveness', file: 'e2e-scan-responsiveness.js', offline: true },
+    { name: 'Secrets Scanner Source Navigation', file: 'e2e-secret-navigation.js', offline: true },
     { name: 'Dashboard Initialization Actions', file: 'e2e-init-actions.js', offline: true },
-    { name: 'Post-Correction Community Consent', file: 'e2e-community-consent.js', offline: true },
-    { name: 'Private Community Learning and Model Updates', file: 'e2e-community-learning.js' },
-    { name: 'Local Transformer and Worker Parity', file: 'e2e-local-model.js', offline: true },
     { name: 'Security and Feedback Regressions', file: 'e2e-security-regressions.js', offline: true },
     { name: 'Encryption Algorithms & PBKDF2 Standalone', file: 'encryption-test-standalone.js' },
-    { name: 'Offline AI Scanner and No-Network Contract', file: 'e2e-llm-logic.js', offline: true },
     { name: 'Master Key Lifecycle, Password Migration & Backups', file: 'e2e-master-key-and-backup.js' }
 ];
 
@@ -40,6 +47,11 @@ for (const suite of testSuites) {
         allPassed = false;
     }
 }
+
+const nodeTests = ['cloudAndSession.test.js', 'commandPasswords.test.js', 'dopplerProjectSlug.test.js', 'encryption.test.js', 'envFiles.test.js', 'historyAndTrash.test.js', 'releaseSafety.test.js', 'secretsAndHook.test.js', 'userManager.test.js'].map(file => path.join(__dirname, file));
+const nodeResult = spawnSync(process.execPath,
+    ['--test', '--test-concurrency=1', '--test-force-exit', ...nodeTests], { stdio: 'inherit' });
+if (nodeResult.status !== 0) allPassed = false;
 
 console.log('==============================================');
 if (allPassed) {

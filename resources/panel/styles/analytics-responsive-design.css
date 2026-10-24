@@ -1,0 +1,73 @@
+/* Analytics Responsive Design */
+@media (max-width: 768px) {
+    .analytics-container {
+        padding: var(--space-md);
+    }
+
+    .analytics-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-md);
+    }
+
+    .analytics-card.full-width {
+        grid-column: 1;
+    }
+
+    .variable-item {
+        flex-direction: column;
+        gap: var(--space-sm);
+        align-items: flex-start;
+    }
+
+    .variable-stats {
+        flex-direction: row;
+        align-items: center;
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .heatmap-grid {
+        grid-template-columns: repeat(20, 1fr);
+        max-width: 100%;
+    }
+
+    .heatmap-cell {
+        width: 10px;
+        height: 10px;
+    }
+
+    .legend-color {
+        width: 10px;
+        height: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .analytics-section h3 {
+        font-size: 1.1rem;
+        padding: var(--space-md);
+    }
+
+    .analytics-grid {
+        padding: var(--space-md);
+    }
+
+    .analytics-card {
+        padding: var(--space-md);
+    }
+
+    .heatmap-grid {
+        grid-template-columns: repeat(15, 1fr);
+    }
+
+    .heatmap-cell {
+        width: 8px;
+        height: 8px;
+    }
+
+    .legend-color {
+        width: 8px;
+        height: 8px;
+    }
+}
+

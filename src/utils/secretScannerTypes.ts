@@ -14,9 +14,9 @@ export interface DetectedSecret {
     context: string;
     riskScore: number;
     detectionMethod: string;
+    /** Classification path for this result; absent means only the baseline entropy score applied. */
+    analysisSource?: 'heuristics' | 'user-confirmed';
     reasoning: string[];
-    /** Numeric properties of the ORIGINAL value, safe to use for feedback. */
-    features?: number[];
     sourceFile?: string;
     valueLength?: number;
     valueDigest?: string;

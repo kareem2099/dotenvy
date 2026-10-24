@@ -10,6 +10,7 @@ import { ConfigUtils } from '../utils/configUtils';
 import { WorkspaceManager } from '../providers/workspaceManager';
 import { HistoryManager } from '../utils/historyManager';
 import { logger } from '../utils/logger';
+import { t } from '../i18n';
 
 export class SwitchEnvironmentCommand implements vscode.Disposable {
 	private disposables: vscode.Disposable[] = [];
@@ -34,7 +35,7 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 		const allWorkspaces = workspaceManager.getAllWorkspaces();
 
 		if (allWorkspaces.length === 0) {
-			vscode.window.showErrorMessage('No workspace folder open.');
+			vscode.window.showErrorMessage(t('common.noWorkspace'));
 			return;
 		}
 
@@ -45,7 +46,7 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 		} else {
 			const workspaceItems = workspaceManager.getWorkspaceQuickPickItems();
 			const selectedItem = await vscode.window.showQuickPick(workspaceItems, {
-				placeHolder: 'Select workspace to operate on'
+				placeHolder: t('envSwitch.workspacePlaceholder')
 			});
 
 			if (!selectedItem) return;
@@ -71,7 +72,7 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 		const statusBarProvider: StatusBarProvider | undefined = selectedWorkspace.statusBarProvider;
 		if (!statusBarProvider) {
 			// Enhanced error message when status bar provider is unavailable
-			vscode.window.showWarningMessage('⚠️ Status bar provider unavailable. Some UI updates may not be visible.');
+			vscode.window.showWarningMessage(t('envSwitch.statusBarUnavailable'));
 		} else {
 			statusBarProvider.setWorkspace(rootPath);
 		}
@@ -80,7 +81,7 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 		const environments: Environment[] = await environmentProvider.getEnvironments();
 
 		if (environments.length === 0) {
-			vscode.window.showInformationMessage(`No .env.* files found in workspace "${workspace.name}".`);
+			vscode.window.showInformationMessage(t('envSwitch.noEnvFiles', { name: workspace.name }));
 			return;
 		}
 
@@ -93,7 +94,7 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 		}));
 
 		const selected = await vscode.window.showQuickPick(items, {
-			placeHolder: `Switch environment in "${workspace.name}"`
+			placeHolder: t('envSwitch.placeholder', { name: workspace.name })
 		});
 
 		if (selected) {
@@ -105,11 +106,11 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 				if (await this.fileExists(currentEnvPath)) {
 					const action = await vscode.window.showQuickPick(
 						[
-							{ label: 'Switch Directly', description: 'Switch without preview', action: 'switch' },
-							{ label: 'Preview Changes', description: 'Show diff before switching', action: 'preview' }
+							{ label: t('envSwitch.direct'), description: t('envSwitch.directDesc'), action: 'switch' },
+							{ label: t('envSwitch.preview'), description: t('envSwitch.previewDesc'), action: 'preview' }
 						],
 						{
-							placeHolder: `Switch to ${selected.env.name} - choose an action`
+							placeHolder: t('envSwitch.chooseAction', { name: selected.env.name })
 						}
 					);
 
@@ -124,17 +125,23 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 						const diff = EnvironmentDiffer.compareFiles(currentEnvPath, selected.env.filePath);
 						const summary = EnvironmentDiffer.getDiffSummary(diff);
 
+						const viewDiff = t('envSwitch.viewDiff');
+						const switchNow = t('envSwitch.switchNow');
+						const cancelLabel = t('common.cancel');
 						const proceed = await vscode.window.showInformationMessage(
-							`Switch to ${selected.env.name}\n\n` +
-							`Changes: +${summary.addedCount} added, -${summary.removedCount} removed, ~${summary.changedCount} changed\n\n` +
-							`Would you like to proceed or view detailed diff?`,
-							'View Diff',
-							'Switch Now',
-							'Cancel'
+							t('envSwitch.summary', {
+								name: selected.env.name,
+								added: summary.addedCount,
+								removed: summary.removedCount,
+								changed: summary.changedCount
+							}),
+							viewDiff,
+							switchNow,
+							cancelLabel
 						);
 
-						if (proceed === 'Cancel') return;
-						if (proceed === 'View Diff') {
+						if (proceed === cancelLabel) return;
+						if (proceed === viewDiff) {
 							const diffText = EnvironmentDiffer.formatDiffForDisplay(diff, 'Current', selected.env.name);
 							const doc = await vscode.workspace.openTextDocument({
 								content: diffText,
@@ -143,13 +150,14 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 							await vscode.window.showTextDocument(doc, { preview: true });
 
 							// Ask again after showing diff
+							const yesSwitch = t('envSwitch.yesSwitch');
 							const finalDecision = await vscode.window.showInformationMessage(
-								`Still want to switch to ${selected.env.name}?`,
-								'Yes, Switch',
-								'Cancel'
+								t('envSwitch.confirmAgain', { name: selected.env.name }),
+								yesSwitch,
+								t('common.cancel')
 							);
 
-							if (finalDecision !== 'Yes, Switch') return;
+							if (finalDecision !== yesSwitch) return;
 						}
 					} catch (error) {
 						// If diff fails, continue with switch
@@ -163,13 +171,14 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 					const validationErrors = EnvironmentValidator.validateFile(selected.env.filePath, validationRules);
 					if (validationErrors.length > 0) {
 						const errorDetails = EnvironmentValidator.formatErrors(validationErrors);
+						const continueAnyway = t('envSwitch.continueAnyway');
 						const continueSwitch = await vscode.window.showWarningMessage(
-							`⚠️ Validation errors found in ${selected.env.name}:\n\n${errorDetails}\n\nContinue switching anyway?`,
-							'Continue Anyway',
-							'Cancel'
+							t('envSwitch.validationErrors', { name: selected.env.name, details: errorDetails }),
+							continueAnyway,
+							t('common.cancel')
 						);
 
-						if (continueSwitch !== 'Continue Anyway') {
+						if (continueSwitch !== continueAnyway) {
 							return; // User cancelled
 						}
 					}
@@ -247,15 +256,14 @@ export class SwitchEnvironmentCommand implements vscode.Disposable {
 				// Warn if secrets detected in selected file
 				const warnings = SecretsGuard.checkFile(selected.env.filePath);
 				if (warnings.length > 0) {
-					const msg = `⚠️ Selected environment file contains potential secrets: ${warnings.join(', ')}`;
-					vscode.window.showWarningMessage(msg);
+					vscode.window.showWarningMessage(t('envSwitch.secrets', { warnings: warnings.join(', ') }));
 				} else {
-					vscode.window.showInformationMessage(`Environment switched to ${selected.label} (workspace: "${workspace.name}")`);
+					vscode.window.showInformationMessage(t('envSwitch.switchedWorkspace', { name: selected.label, workspace: workspace.name }));
 				}
 
 				statusBarProvider.forceRefresh();
 			} catch (error) {
-				vscode.window.showErrorMessage(`Failed to switch environment: ${(error as Error).message}`);
+				vscode.window.showErrorMessage(t('envSwitch.failed', { message: (error as Error).message }));
 			}
 		}
 	}

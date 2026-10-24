@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { EXTENSION_VERSION_KEY } from '../constants';
 import { logger } from '../utils/logger';
+import { t } from '../i18n';
 
 export class UpdateManager {
     private static readonly VERSION_KEY = EXTENSION_VERSION_KEY;
@@ -31,8 +32,8 @@ export class UpdateManager {
     }
 
     private static async showUpdateNotification(version: string, context: vscode.ExtensionContext) {
-        const action = 'See What\'s New';
-        const message = `DotEnvy updated to v${version}! 🚀 Check out the new features (Encryption V2 & Cloud Sync).`;
+        const action = t('update.action');
+        const message = t('update.notice', { version });
 
         const result = await vscode.window.showInformationMessage(message, action);
 
@@ -42,7 +43,7 @@ export class UpdateManager {
     }
 
     private static showWelcomeMessage() {
-        vscode.window.showInformationMessage('Welcome to DotEnvy! 🛡️ The best way to manage your .env files.');
+        vscode.window.showInformationMessage(t('update.welcome'));
     }
 
     // We receive the context to get the extension path correctly

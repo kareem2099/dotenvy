@@ -18,16 +18,16 @@
         </div>
         <div class="vm-header-right">
             <input type="text" id="search-box" placeholder="🔍  Search keys or values..." data-i18n-placeholder="variableManager.searchPlaceholder" class="vm-search-input">
-            <button id="add-var-btn" class="btn btn-primary vm-btn-add" data-i18n="variableManager.addBtn">＋ Add Variable</button>
-            <button id="refresh-btn" class="btn btn-secondary vm-btn-refresh" data-i18n="variableManager.refreshBtn">↺ Refresh</button>
+            <button type="button" id="add-var-btn" class="btn btn-primary vm-btn-add" data-i18n="variableManager.addBtn">＋ Add Variable</button>
+            <button type="button" id="refresh-btn" class="btn btn-secondary vm-btn-refresh" data-i18n="variableManager.refreshBtn">↺ Refresh</button>
         </div>
     </div>
 
     <div class="vm-backup-bar" style="padding: 10px 20px; background: var(--vscode-sideBar-background); border-bottom: 1px solid var(--vscode-panel-border); display: flex; gap: 10px; align-items: center;">
         <span style="font-size: 12px; color: var(--vscode-descriptionForeground); font-weight: 600;" data-i18n="variableManager.backups">BACKUPS:</span>
-        <button id="backup-selected-btn" class="btn btn-secondary btn-sm" data-i18n="variableManager.backupSelected">💾 Backup Selected</button>
-        <button id="restore-backup-btn" class="btn btn-secondary btn-sm" data-i18n="variableManager.restoreBackup">⏳ Restore from Backup</button>
-        <button id="set-backup-location-btn" class="btn btn-secondary btn-sm" data-i18n="variableManager.setLocation">📁 Set Location</button>
+        <button type="button" id="backup-selected-btn" class="btn btn-secondary btn-sm" data-i18n="variableManager.backupSelected">💾 Backup Selected</button>
+        <button type="button" id="restore-backup-btn" class="btn btn-secondary btn-sm" data-i18n="variableManager.restoreBackup">⏳ Restore from Backup</button>
+        <button type="button" id="set-backup-location-btn" class="btn btn-secondary btn-sm" data-i18n="variableManager.setLocation">📁 Set Location</button>
     </div>
 
     <div class="vm-stats-bar" id="stats-bar">
@@ -42,6 +42,7 @@
     </div>
 
     <script nonce="{{NONCE}}" src="{{I18N_SCRIPT_URI}}"></script>
+    <script nonce="{{NONCE}}" src="{{MODAL_SCRIPT_URI}}"></script>
     <script nonce="{{NONCE}}" src="{{SCRIPT_URI}}"></script>
 </body>
 </html>

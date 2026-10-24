@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { Environment } from '../types/environment';
 import { ConfigUtils } from '../utils/configUtils';
+import { envFileNameForWorkspace, resolveConfiguredEnvPath } from '../utils/environmentDiscovery';
 import { logger } from '../utils/logger';
 
 export class EnvironmentProvider {
@@ -18,11 +19,14 @@ export class EnvironmentProvider {
 	public async getEnvironments(): Promise<Environment[]> {
 		const customEnvs = await ConfigUtils.getCustomEnvironments(this.rootPath);
 		if (customEnvs) {
-			return Array.from(customEnvs.entries()).map(([name, fileName]) => ({
-				name,
-				fileName,
-				filePath: path.join(this.rootPath, fileName)
-			}));
+			return Array.from(customEnvs.entries()).map(([name, configuredPath]) => {
+				const filePath = resolveConfiguredEnvPath(this.rootPath, configuredPath);
+				return {
+					name,
+					fileName: envFileNameForWorkspace(this.rootPath, filePath),
+					filePath
+				};
+			});
 		}
 
 		try {

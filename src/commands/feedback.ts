@@ -1,42 +1,43 @@
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 
 export class FeedbackCommand implements vscode.Disposable {
 	public async execute(): Promise<void> {
 		const feedbackOption = await vscode.window.showQuickPick(
 			[
 				{
-					label: '🐛 Report Bug',
-					description: 'Found an issue or bug',
+					label: t('feedback.bug'),
+					description: t('feedback.bugDesc'),
 					action: 'bug'
 				},
 				{
-					label: '💡 Feature Request',
-					description: 'Suggest a new feature',
+					label: t('feedback.feature'),
+					description: t('feedback.featureDesc'),
 					action: 'feature'
 				},
 				{
-					label: '⭐ Rate Extension',
-					description: 'Rate on Visual Studio Marketplace',
+					label: t('feedback.rate'),
+					description: t('feedback.rateDesc'),
 					action: 'rate'
 				},
 				{
-					label: '📝 Write Review',
-					description: 'Leave a review on Marketplace',
+					label: t('feedback.review'),
+					description: t('feedback.reviewDesc'),
 					action: 'review'
 				},
 				{
-					label: '💬 Discussions',
-					description: 'Share ideas and feedback',
+					label: t('feedback.discuss'),
+					description: t('feedback.discussDesc'),
 					action: 'discuss'
 				},
 				{
-					label: '📧 Contact Developer',
-					description: 'Send direct message',
+					label: t('feedback.contact'),
+					description: t('feedback.contactDesc'),
 					action: 'contact'
 				}
 			],
 			{
-				placeHolder: 'How can we help you?',
+				placeHolder: t('feedback.placeholder'),
 				matchOnDescription: true
 			}
 		);
@@ -69,22 +70,22 @@ export class FeedbackCommand implements vscode.Disposable {
 		const reportBug = await vscode.window.showQuickPick(
 			[
 				{
-					label: '📋 Use Bug Report Template',
-					description: 'Structured bug report (recommended)',
+					label: t('feedback.bugTemplate'),
+					description: t('feedback.bugTemplateDesc'),
 					action: 'template'
 				},
 				{
-					label: '🐛 Quick Bug Report',
-					description: 'Simple bug description',
+					label: t('feedback.bugQuick'),
+					description: t('feedback.bugQuickDesc'),
 					action: 'quick'
 				},
 				{
-					label: '🔍 Check Known Issues',
-					description: 'Search existing bug reports',
+					label: t('feedback.bugExisting'),
+					description: t('feedback.bugExistingDesc'),
 					action: 'existing'
 				}
 			],
-			{ placeHolder: 'Choose bug reporting method' }
+			{ placeHolder: t('feedback.bugMethodPlaceholder') }
 		);
 
 		switch (reportBug?.action) {
@@ -95,8 +96,8 @@ export class FeedbackCommand implements vscode.Disposable {
 				break;
 			case 'quick':
 				const bugDescription = await vscode.window.showInputBox({
-					prompt: 'Describe the bug briefly',
-					placeHolder: 'What happened and what you expected...'
+					prompt: t('feedback.bugPrompt'),
+					placeHolder: t('feedback.bugPlaceholder')
 				});
 				if (bugDescription) {
 					const url = `https://github.com/kareem2099/dotenvy/issues/new?title=Bug:+${encodeURIComponent(bugDescription.substring(0, 50))}`;
@@ -113,8 +114,8 @@ export class FeedbackCommand implements vscode.Disposable {
 
 	private async suggestFeature(): Promise<void> {
 		const featureSuggestion = await vscode.window.showInputBox({
-			prompt: 'Describe your feature request',
-			placeHolder: 'What new feature would you like to see...'
+			prompt: t('feedback.featurePrompt'),
+			placeHolder: t('feedback.featurePlaceholder')
 		});
 
 		if (featureSuggestion) {
@@ -124,13 +125,14 @@ export class FeedbackCommand implements vscode.Disposable {
 	}
 
 	private async rateExtension(): Promise<void> {
+		const rateNow = t('feedback.rateNow');
 		const action = await vscode.window.showInformationMessage(
-			'Would you like to rate dotenvy on the Visual Studio Marketplace?',
-			'Rate Now',
-			'Later'
+			t('feedback.rateQuestion'),
+			rateNow,
+			t('feedback.later')
 		);
 
-		if (action === 'Rate Now') {
+		if (action === rateNow) {
 			await vscode.env.openExternal(
 				vscode.Uri.parse('https://marketplace.visualstudio.com/items?itemName=FreeRave.dotenvy#review-details')
 			);
@@ -154,24 +156,24 @@ export class FeedbackCommand implements vscode.Disposable {
 		const contactMethod = await vscode.window.showQuickPick(
 			[
 				{
-					label: '📧 Email',
-					description: 'Send email to developer',
+					label: t('feedback.email'),
+					description: t('feedback.emailDesc'),
 					action: 'email'
 				},
 				{
-					label: '🐛 GitHub Issue',
-					description: 'Use GitHub for support',
+					label: t('feedback.github'),
+					description: t('feedback.githubDesc'),
 					action: 'github'
 				}
 			],
-			{ placeHolder: 'Choose contact method' }
+			{ placeHolder: t('feedback.contactPlaceholder') }
 		);
 
 		switch (contactMethod?.action) {
 			case 'email':
 				// Replace with actual email
 				await vscode.window.showInformationMessage(
-					'You can contact the developer at: support@kareemdev.com'
+					t('feedback.emailAddress', { email: 'support@kareemdev.com' })
 				);
 				break;
 			case 'github':

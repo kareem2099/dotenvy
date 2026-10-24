@@ -52,6 +52,7 @@
 
     window.dotenvyI18n = {
         tr: tr,
+        getLocale: function () { return currentLocale; },
         applyTranslations: applyTranslations,
         setLocalePayload: setLocalePayload,
         handleMessage: function (message) {

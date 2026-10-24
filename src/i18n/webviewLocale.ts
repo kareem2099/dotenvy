@@ -4,6 +4,7 @@ import { LocalizationService } from './localization';
 export function getWebviewLocalePayload(prefix?: string): {
 	locale: string;
 	strings: Record<string, string>;
+	locales: Array<{ code: string; label: string }>;
 } {
 	const localization = LocalizationService.getInstance();
 	const strings = prefix
@@ -13,6 +14,7 @@ export function getWebviewLocalePayload(prefix?: string): {
 	return {
 		locale: localization.getLocale(),
 		strings,
+		locales: localization.getAvailableLocales(),
 	};
 }
 

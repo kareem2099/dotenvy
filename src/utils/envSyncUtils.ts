@@ -1,11 +1,15 @@
-import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as path from 'path';
-import { Environment, EnvSyncTarget, QuickEnvConfig } from '../types/environment';
-import { EnvironmentProvider } from '../providers/environmentProvider';
+import { QuickEnvConfig } from '../types/environment';
 import { CloudSecrets } from './cloudSyncManager';
-import { ConfigUtils } from './configUtils';
 import { isCloudMetadataKey } from '../constants';
+import { resolveSyncTargets as resolveSyncTargetList } from './syncTargetResolver';
+import {
+	backupEnvFile as backupEnvFileOnDisk,
+	formatEnvFileContent as formatEnvFileContentText,
+	parseEnvFile as parseEnvFileContent,
+	resolveEnvFileForSync as resolveEnvFileForSyncTarget,
+	writeSecretsToTargets as writeSecretsToTargetFiles,
+} from './envFileContent';
 
 export interface ResolvedEnvFile {
 	envPath: string;
@@ -42,21 +46,6 @@ export interface PullChangeSummary {
 	byFile: Record<string, { newKeys: string[]; changedKeys: string[]; removedKeys: string[] }>;
 }
 
-const CONFIG_ENV_ALIASES: Record<string, string[]> = {
-	dev: ['dev', 'development', 'develop'],
-	development: ['development', 'dev', 'develop'],
-	develop: ['develop', 'dev', 'development'],
-	stg: ['stg', 'staging', 'stage'],
-	staging: ['staging', 'stg', 'stage'],
-	stage: ['stage', 'staging', 'stg'],
-	prd: ['prd', 'production', 'prod'],
-	prod: ['prod', 'production', 'prd'],
-	production: ['production', 'prod', 'prd']
-};
-
-const AUTO_FRONTEND_PATH_PATTERN = /(?:^|\/)(frontend|client|web|ui|app)(?:\/|$)/i;
-const AUTO_FRONTEND_PREFIXES = ['VITE_', 'NEXT_PUBLIC_', 'NUXT_PUBLIC_', 'REACT_APP_', 'PUBLIC_'];
-
 export const DOPPLER_RESERVED_KEYS = [
 	'DOPPLER_CONFIG',
 	'DOPPLER_ENVIRONMENT',
@@ -69,133 +58,15 @@ export const DOPPLER_RESERVED_KEYS = [
 ];
 
 export class EnvSyncUtils {
+	/**
+	 * Chooses the environment files and key prefixes for a cloud sync.
+	 */
 	static async resolveSyncTargets(
 		rootPath: string,
 		dopplerConfig?: string,
 		config?: QuickEnvConfig | null
 	): Promise<ResolvedSyncTarget[]> {
-		const quickConfig = config ?? await ConfigUtils.readQuickEnvConfig(rootPath);
-		const explicitTargets = quickConfig?.cloudSync?.envTargets;
-
-		if (explicitTargets && explicitTargets.length > 0) {
-			return this.applyKeyPrefixes(this.normalizeTargets(rootPath, explicitTargets));
-		}
-
-		const discoveredFiles = await this.collectEnvFilesForConfig(rootPath, dopplerConfig, quickConfig);
-		if (discoveredFiles.length > 1) {
-			return this.applyKeyPrefixes(this.buildAutoTargets(rootPath, discoveredFiles));
-		}
-
-		if (discoveredFiles.length === 1) {
-			return this.applyKeyPrefixes(discoveredFiles);
-		}
-
-		return this.applyKeyPrefixes(await this.resolveFallbackSingleTarget(rootPath, dopplerConfig));
-	}
-
-	private static async resolveFallbackSingleTarget(
-		rootPath: string,
-		dopplerConfig?: string
-	): Promise<ResolvedSyncTarget[]> {
-		const rootEnvPath = path.join(rootPath, '.env');
-		if (fs.existsSync(rootEnvPath)) {
-			return [{
-				file: '.env',
-				absolutePath: rootEnvPath,
-				keyPrefix: '',
-				prefixes: [],
-				catchAll: true,
-				label: 'local'
-			}];
-		}
-
-		const provider = new EnvironmentProvider(rootPath);
-		const environments = await provider.getEnvironments().then(envs =>
-			envs.filter(env => fs.existsSync(env.filePath))
-		);
-
-		if (environments.length === 0) {
-			return [];
-		}
-
-		const current = await provider.getCurrentEnvironment();
-		if (current && fs.existsSync(current.filePath)) {
-			const resolved = this.toResolvedEnvFile(rootPath, current);
-			return [{
-				file: resolved.relativePath,
-				absolutePath: resolved.envPath,
-				keyPrefix: '',
-				prefixes: [],
-				catchAll: true,
-				label: resolved.envName
-			}];
-		}
-
-		if (dopplerConfig) {
-			const matched = environments.filter(env => this.environmentMatchesConfig(env, dopplerConfig));
-			if (matched.length === 1) {
-				const resolved = this.toResolvedEnvFile(rootPath, matched[0]);
-				return [{
-					file: resolved.relativePath,
-					absolutePath: resolved.envPath,
-					keyPrefix: '',
-					prefixes: [],
-					catchAll: true,
-					label: resolved.envName
-				}];
-			}
-			if (matched.length > 1) {
-				return this.buildAutoTargets(
-					rootPath,
-					matched.map(env => {
-						const resolved = this.toResolvedEnvFile(rootPath, env);
-						return {
-							file: resolved.relativePath,
-							absolutePath: resolved.envPath,
-							keyPrefix: '',
-							prefixes: [],
-							catchAll: false,
-							label: resolved.envName
-						};
-					})
-				);
-			}
-		}
-
-		if (environments.length === 1) {
-			const resolved = this.toResolvedEnvFile(rootPath, environments[0]);
-			return [{
-				file: resolved.relativePath,
-				absolutePath: resolved.envPath,
-				keyPrefix: '',
-				prefixes: [],
-				catchAll: true,
-				label: resolved.envName
-			}];
-		}
-
-		const selected = await vscode.window.showQuickPick(
-			environments.map(env => ({
-				label: env.name,
-				description: env.fileName,
-				env
-			})),
-			{ placeHolder: 'Select environment file to sync with cloud' }
-		);
-
-		if (!selected) {
-			return [];
-		}
-
-		const resolved = this.toResolvedEnvFile(rootPath, selected.env);
-		return [{
-			file: resolved.relativePath,
-			absolutePath: resolved.envPath,
-			keyPrefix: '',
-			prefixes: [],
-			catchAll: true,
-			label: resolved.envName
-		}];
+		return resolveSyncTargetList(rootPath, dopplerConfig, config);
 	}
 
 	static mergeTargetsSecretsForCloud(rootPath: string, targets: ResolvedSyncTarget[]): MergedEnvSecrets {
@@ -330,178 +201,45 @@ export class EnvSyncUtils {
 		return filtered;
 	}
 
+	/**
+	 * Serializes secrets as KEY=value lines.
+	 */
 	static formatEnvFileContent(secrets: CloudSecrets): string {
-		return Object.entries(secrets)
-			.map(([key, value]) => `${key}=${value}`)
-			.join('\n') + (Object.keys(secrets).length > 0 ? '\n' : '');
+		return formatEnvFileContentText(secrets);
 	}
 
+	/**
+	 * Splits cloud secrets across targets and writes each file.
+	 */
 	static async writeSecretsToTargets(
 		targets: ResolvedSyncTarget[],
 		cloudSecrets: CloudSecrets
 	): Promise<string[]> {
-		const splitSecrets = this.splitSecretsAcrossTargets(cloudSecrets, targets, '');
-		const writtenFiles: string[] = [];
-
-		for (const target of targets) {
-			const secrets = splitSecrets.get(target.file) ?? {};
-			await this.backupEnvFile(target.absolutePath);
-			await fs.promises.mkdir(path.dirname(target.absolutePath), { recursive: true });
-			await fs.promises.writeFile(
-				target.absolutePath,
-				this.formatEnvFileContent(secrets),
-				'utf8'
-			);
-			writtenFiles.push(target.file);
-		}
-
-		return writtenFiles;
+		return writeSecretsToTargetFiles(targets, cloudSecrets);
 	}
 
+	/**
+	 * Resolves the single environment file a sync should use.
+	 */
 	static async resolveEnvFileForSync(
 		rootPath: string,
 		dopplerConfig?: string
 	): Promise<ResolvedEnvFile | null> {
-		const targets = await this.resolveSyncTargets(rootPath, dopplerConfig);
-		if (targets.length === 1) {
-			return {
-				envPath: targets[0].absolutePath,
-				envName: targets[0].label,
-				relativePath: targets[0].file
-			};
-		}
-
-		if (targets.length > 1) {
-			return null;
-		}
-
-		const rootEnvPath = path.join(rootPath, '.env');
-		if (fs.existsSync(rootEnvPath)) {
-			const provider = new EnvironmentProvider(rootPath);
-			const current = await provider.getCurrentEnvironment();
-			return {
-				envPath: rootEnvPath,
-				envName: current?.name ?? 'local',
-				relativePath: '.env'
-			};
-		}
-
-		const provider = new EnvironmentProvider(rootPath);
-		const environments = await provider.getEnvironments().then(envs =>
-			envs.filter(env => fs.existsSync(env.filePath))
-		);
-
-		if (environments.length === 0) {
-			return null;
-		}
-
-		const current = await provider.getCurrentEnvironment();
-		if (current && fs.existsSync(current.filePath)) {
-			return this.toResolvedEnvFile(rootPath, current);
-		}
-
-		if (dopplerConfig) {
-			const matched = this.findEnvironmentForConfig(environments, dopplerConfig);
-			if (matched) {
-				return this.toResolvedEnvFile(rootPath, matched);
-			}
-		}
-
-		if (environments.length === 1) {
-			return this.toResolvedEnvFile(rootPath, environments[0]);
-		}
-
-		const selected = await vscode.window.showQuickPick(
-			environments.map(env => ({
-				label: env.name,
-				description: env.fileName,
-				env
-			})),
-			{ placeHolder: 'Select environment file to sync with cloud' }
-		);
-
-		if (!selected) {
-			return null;
-		}
-
-		return this.toResolvedEnvFile(rootPath, selected.env);
+		return resolveEnvFileForSyncTarget(rootPath, dopplerConfig);
 	}
 
+	/**
+	 * Parses a plaintext env file into a secret map.
+	 */
 	static parseEnvFile(envPath: string): CloudSecrets {
-		const secrets: CloudSecrets = {};
-
-		if (!fs.existsSync(envPath)) {
-			return secrets;
-		}
-
-		const envContent = fs.readFileSync(envPath, 'utf8');
-		for (const line of envContent.split('\n')) {
-			const trimmed = line.trim();
-			if (!trimmed || trimmed.startsWith('#')) {
-				continue;
-			}
-
-			const equalIndex = trimmed.indexOf('=');
-			if (equalIndex === -1) {
-				continue;
-			}
-
-			const key = trimmed.substring(0, equalIndex).trim();
-			const value = trimmed.substring(equalIndex + 1);
-			if (key) {
-				secrets[key] = value;
-			}
-		}
-
-		return secrets;
+		return parseEnvFileContent(envPath);
 	}
 
+	/**
+	 * Copies an environment file to a sibling .backup before it is overwritten.
+	 */
 	static async backupEnvFile(envPath: string): Promise<void> {
-		if (!fs.existsSync(envPath)) {
-			return;
-		}
-
-		await fs.promises.copyFile(envPath, `${envPath}.backup`);
-	}
-
-	private static normalizeTargets(rootPath: string, targets: EnvSyncTarget[]): ResolvedSyncTarget[] {
-		return targets.map(target => ({
-			file: target.file.replace(/\\/g, '/'),
-			absolutePath: path.join(rootPath, target.file),
-			keyPrefix: target.keyPrefix ?? '',
-			prefixes: target.prefixes ?? [],
-			catchAll: !!target.catchAll,
-			label: target.label ?? path.basename(target.file)
-		}));
-	}
-
-	private static applyKeyPrefixes(targets: ResolvedSyncTarget[]): ResolvedSyncTarget[] {
-		if (targets.length <= 1) {
-			return targets.map(target => ({ ...target, keyPrefix: '' }));
-		}
-
-		return targets.map(target => ({
-			...target,
-			keyPrefix: target.keyPrefix || this.deriveKeyPrefix(target.file)
-		}));
-	}
-
-	private static deriveKeyPrefix(file: string): string {
-		const normalized = file.replace(/\\/g, '/');
-		const parent = path.dirname(normalized);
-		if (!parent || parent === '.') {
-			return '';
-		}
-
-		const folder = path.basename(parent).toLowerCase();
-		if (folder === 'backend') {
-			return 'BACKEND_';
-		}
-		if (['frontend', 'client', 'web', 'ui', 'app'].includes(folder)) {
-			return 'FRONTEND_';
-		}
-
-		return `${folder.toUpperCase()}_`;
+		return backupEnvFileOnDisk(envPath);
 	}
 
 	private static resolveTargetForCloudKey(
@@ -528,74 +266,6 @@ export class EnvSyncUtils {
 		}
 
 		return { target: fallbackTarget, localKey: cloudKey };
-	}
-
-	private static async collectEnvFilesForConfig(
-		rootPath: string,
-		dopplerConfig: string | undefined,
-		_config: QuickEnvConfig | null
-	): Promise<ResolvedSyncTarget[]> {
-		const provider = new EnvironmentProvider(rootPath);
-		let environments = await provider.getEnvironments();
-		environments = environments.filter(env => fs.existsSync(env.filePath));
-
-		if (dopplerConfig) {
-			const matched = environments.filter(env => this.environmentMatchesConfig(env, dopplerConfig));
-			if (matched.length > 0) {
-				environments = matched;
-			}
-		}
-
-		const uniquePaths = new Map<string, Environment>();
-		for (const env of environments) {
-			const relativePath = path.relative(rootPath, env.filePath).replace(/\\/g, '/');
-			if (relativePath === '.env' && environments.length > 1) {
-				continue;
-			}
-			if (!uniquePaths.has(relativePath)) {
-				uniquePaths.set(relativePath, env);
-			}
-		}
-
-		const files = Array.from(uniquePaths.entries()).map(([relativePath, env]) => ({
-			file: relativePath,
-			absolutePath: env.filePath,
-			keyPrefix: '',
-			prefixes: [] as string[],
-			catchAll: false,
-			label: env.name
-		}));
-
-		if (files.length > 1) {
-			return this.buildAutoTargets(rootPath, files);
-		}
-
-		return files;
-	}
-
-	private static buildAutoTargets(
-		rootPath: string,
-		files: ResolvedSyncTarget[]
-	): ResolvedSyncTarget[] {
-		const frontendFiles = files.filter(file => AUTO_FRONTEND_PATH_PATTERN.test(file.file));
-		const backendFiles = files.filter(file => !AUTO_FRONTEND_PATH_PATTERN.test(file.file));
-
-		if (frontendFiles.length === 0 || backendFiles.length === 0) {
-			return files.map((file, index) => ({
-				...file,
-				prefixes: index === 0 ? [] : AUTO_FRONTEND_PREFIXES,
-				catchAll: index === 0
-			}));
-		}
-
-		return files.map(file => {
-			const isFrontend = frontendFiles.some(frontend => frontend.file === file.file);
-			return {
-				...file,
-				prefixes: isFrontend ? [...AUTO_FRONTEND_PREFIXES] : [],
-				catchAll: !isFrontend
-			};
-		});
 	}
 
 	private static buildLocalKeyIndex(targets: ResolvedSyncTarget[]): Map<string, string> {
@@ -635,34 +305,5 @@ export class EnvSyncUtils {
 		}
 
 		return targets[0];
-	}
-
-	private static environmentMatchesConfig(env: Environment, dopplerConfig: string): boolean {
-		const aliases = CONFIG_ENV_ALIASES[dopplerConfig.toLowerCase()] ?? [dopplerConfig.toLowerCase()];
-		const envName = env.name.toLowerCase();
-		const fileName = path.basename(env.filePath).toLowerCase();
-
-		return aliases.some(alias => {
-			if (envName === alias || envName.endsWith(`-${alias}`)) {
-				return true;
-			}
-
-			return fileName === `.env.${alias}` || fileName === `.env.${alias}.local`;
-		});
-	}
-
-	private static findEnvironmentForConfig(
-		environments: Environment[],
-		dopplerConfig: string
-	): Environment | undefined {
-		return environments.find(env => this.environmentMatchesConfig(env, dopplerConfig));
-	}
-
-	private static toResolvedEnvFile(rootPath: string, env: Environment): ResolvedEnvFile {
-		return {
-			envPath: env.filePath,
-			envName: env.name,
-			relativePath: path.relative(rootPath, env.filePath).replace(/\\/g, '/')
-		};
 	}
 }

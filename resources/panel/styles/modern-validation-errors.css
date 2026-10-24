@@ -1,0 +1,24 @@
+/* Modern Validation Errors */
+.validation-errors {
+    margin-top: var(--space-sm);
+    padding: var(--space-sm);
+    background: rgba(255, 107, 107, 0.1);
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    border-radius: 8px;
+    animation: slideIn var(--transition-normal);
+}
+
+.error-count {
+    font-size: 0.8rem;
+    color: #ff6b6b;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.error-count::before {
+    content: '⚠️';
+    font-size: 0.7rem;
+}
+

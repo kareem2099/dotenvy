@@ -58,6 +58,9 @@ export class EntropyAnalyzer {
     static isLikelySecret(text: string): boolean {
         if (!text || text.length < 10) return false;
 
+        // Reject template literal interpolations e.g. ${escAttr(v.key)}, ${val} (dynamic code, not static secrets)
+        if (/^\$\{[^}]+\}$/.test(text)) return false;
+
         // Reject pure camelCase / PascalCase identifiers (only letters, no digits or specials)
         // e.g. "utilManager", "SecretDetector", "changePassword" → not secrets
         if (/^[a-zA-Z]+$/.test(text)) return false;

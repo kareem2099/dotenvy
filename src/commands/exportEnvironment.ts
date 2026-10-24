@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { EnvironmentExporter, ExportOptions } from '../utils/environmentExporter';
+import { t } from '../i18n';
 
 export class ExportEnvironmentCommand implements vscode.Disposable {
 	public async execute(): Promise<void> {
@@ -8,14 +9,14 @@ export class ExportEnvironmentCommand implements vscode.Disposable {
 			// Get current environment file
 			const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
 			if (!workspaceFolder) {
-				vscode.window.showErrorMessage('No workspace folder open');
+				vscode.window.showErrorMessage(t('common.noWorkspace'));
 				return;
 			}
 
 			// Get available environments
 			const environments = await EnvironmentExporter.getAvailableEnvironments();
 			if (environments.length === 0) {
-				vscode.window.showErrorMessage('No environment files found in workspace');
+				vscode.window.showErrorMessage(t('export.noEnvFiles'));
 				return;
 			}
 
@@ -23,53 +24,53 @@ export class ExportEnvironmentCommand implements vscode.Disposable {
 			const environmentItems = environments.map(env => ({
 				label: env.name,
 				description: env.path,
-				detail: env.exists ? 'Exists' : 'Not found',
+				detail: env.exists ? t('export.exists') : t('export.notFound'),
 				env
 			}));
 
 			const selectedItem = await vscode.window.showQuickPick(environmentItems, {
-				placeHolder: 'Select environment to export'
+				placeHolder: t('export.selectEnv')
 			});
 
 			if (!selectedItem) return;
 
 			// Choose export format
 			const format = await vscode.window.showQuickPick([
-				{ label: 'JSON', description: 'Full configuration with metadata', value: 'json' },
-				{ label: 'CSV', description: 'Simple key-value pairs', value: 'csv' },
-				{ label: '.env', description: 'Standard .env format', value: 'env' },
-				{ label: 'Encrypted JSON', description: 'Secure encrypted format', value: 'encrypted-json' }
+				{ label: t('export.json'), description: t('export.jsonDesc'), value: 'json' },
+				{ label: t('export.csv'), description: t('export.csvDesc'), value: 'csv' },
+				{ label: t('export.env'), description: t('export.envDesc'), value: 'env' },
+				{ label: t('export.encryptedJson'), description: t('export.encryptedJsonDesc'), value: 'encrypted-json' }
 			], {
-				placeHolder: 'Choose export format'
+				placeHolder: t('export.formatPlaceholder')
 			});
 
 			if (!format) return;
 
 			// Configure export options
 			const includeMetadata = format.value === 'json' ? await vscode.window.showQuickPick([
-				{ label: 'Include metadata', description: 'Add export timestamp and source info', value: true },
-				{ label: 'No metadata', description: 'Just variables', value: false }
+				{ label: t('export.includeMetadata'), description: t('export.includeMetadataDesc'), value: true },
+				{ label: t('export.noMetadata'), description: t('export.noMetadataDesc'), value: false }
 			], {
-				placeHolder: 'Include metadata?'
+				placeHolder: t('export.metadataPlaceholder')
 			}) : { value: false };
 
 			if (!includeMetadata) return;
 
 			const includeComments = (format.value === 'json' || format.value === 'env') ? await vscode.window.showQuickPick([
-				{ label: 'Include comments', description: 'Preserve variable comments', value: true },
-				{ label: 'No comments', description: 'Just variables', value: false }
+				{ label: t('export.includeComments'), description: t('export.includeCommentsDesc'), value: true },
+				{ label: t('export.noComments'), description: t('export.noCommentsDesc'), value: false }
 			], {
-				placeHolder: 'Include comments?'
+				placeHolder: t('export.commentsPlaceholder')
 			}) : { value: false };
 
 			if (!includeComments) return;
 
 			// Choose destination
 			const destination = await vscode.window.showQuickPick([
-				{ label: 'Save to file', description: 'Save to a file on disk', value: 'file' },
-				{ label: 'Copy to clipboard', description: 'Copy to clipboard', value: 'clipboard' }
+				{ label: t('export.saveFile'), description: t('export.saveFileDesc'), value: 'file' },
+				{ label: t('export.clipboard'), description: t('export.clipboardDesc'), value: 'clipboard' }
 			], {
-				placeHolder: 'Choose destination'
+				placeHolder: t('export.destinationPlaceholder')
 			});
 
 			if (!destination) return;
@@ -86,7 +87,7 @@ export class ExportEnvironmentCommand implements vscode.Disposable {
 			const result = await EnvironmentExporter.exportEnvironmentVariables(selectedItem.env.path, exportOptions);
 
 			if (!result.success) {
-				vscode.window.showErrorMessage(`Export failed: ${result.error}`);
+				vscode.window.showErrorMessage(t('export.failed', { message: result.error ?? '' }));
 				return;
 			}
 
@@ -94,7 +95,7 @@ export class ExportEnvironmentCommand implements vscode.Disposable {
 			if (destination.value === 'clipboard') {
 				await vscode.env.clipboard.writeText(result.content);
 				vscode.window.showInformationMessage(
-					`Environment exported to clipboard! (${result.format} format)`
+					t('export.copied', { format: result.format })
 				);
 			} else {
 				// Save to file
@@ -102,8 +103,8 @@ export class ExportEnvironmentCommand implements vscode.Disposable {
 				const fileUri = await vscode.window.showSaveDialog({
 					defaultUri: vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, suggestedName)),
 					filters: {
-						'Export Files': [format.value === 'env' ? 'env' : format.value],
-						'All Files': ['*']
+						[t('export.filters')]: [format.value === 'env' ? 'env' : format.value],
+						[t('export.allFiles')]: ['*']
 					}
 				});
 
@@ -112,13 +113,13 @@ export class ExportEnvironmentCommand implements vscode.Disposable {
 				await vscode.workspace.fs.writeFile(fileUri, Buffer.from(result.content, 'utf8'));
 
 				vscode.window.showInformationMessage(
-					`Environment exported successfully! Saved as: ${path.basename(fileUri.fsPath)}`
+					t('export.saved', { file: path.basename(fileUri.fsPath) })
 				);
 			}
 
 		} catch (error) {
 			vscode.window.showErrorMessage(
-				`Export failed: ${(error as Error).message}`
+				t('export.failed', { message: (error as Error).message })
 			);
 		}
 	}

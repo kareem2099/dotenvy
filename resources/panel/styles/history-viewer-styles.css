@@ -1,0 +1,391 @@
+/* History Viewer Styles */
+.history-container {
+    padding: var(--space-lg);
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-md);
+    border-bottom: 2px solid var(--glass-border);
+}
+
+.history-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--vscode-foreground);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.history-stats {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.history-stats .stat-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 5px 12px;
+    min-height: 26px;
+    line-height: 1.25;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    font-size: 0.8125rem;
+    font-family: var(--vscode-font-family, inherit);
+    box-sizing: border-box;
+}
+
+.history-stats .stat-chip .stat-label {
+    font-weight: 500;
+    color: var(--vscode-descriptionForeground);
+    font-size: inherit;
+    line-height: inherit;
+    display: inline;
+}
+
+.history-stats .stat-chip .stat-value {
+    font-weight: 600;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+    color: var(--vscode-foreground);
+    font-size: inherit;
+    line-height: inherit;
+    display: inline;
+    background: none;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    color: var(--vscode-descriptionForeground);
+}
+
+.stat-label {
+    font-weight: 500;
+}
+
+.stat-value {
+    font-weight: 700;
+    color: var(--vscode-foreground);
+}
+
+.history-toolbar {
+    display: flex;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-input {
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    color: var(--vscode-foreground);
+    font-size: 0.875rem;
+    min-width: 200px;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: rgba(102, 126, 234, 0.5);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.filter-select {
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--vscode-input-border, var(--glass-border));
+    border-radius: 12px;
+    background-color: var(--vscode-dropdown-background, var(--glass-bg));
+    backdrop-filter: blur(10px);
+    color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+    font-family: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+    color-scheme: light dark;
+}
+
+.filter-select option {
+    background-color: var(--vscode-dropdown-background, #2d2d2d);
+    color: var(--vscode-dropdown-foreground, #e8e8e8);
+}
+
+.history-list {
+    margin-bottom: var(--space-lg);
+}
+
+.history-item {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-normal);
+    margin-bottom: var(--space-md);
+    cursor: pointer;
+}
+
+.history-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.history-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-lg);
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.action-badge {
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.action-switch {
+    background: var(--success-gradient);
+    color: white;
+}
+
+.action-rollback {
+    background: var(--warning-gradient);
+    color: #8b4513;
+}
+
+.action-manual_edit {
+    background: var(--primary-gradient);
+    color: white;
+}
+
+.action-initial {
+    background: var(--secondary-gradient);
+    color: white;
+}
+
+.action-import {
+    background: var(--dark-gradient);
+    color: white;
+}
+
+.environment-name {
+    font-weight: 700;
+    color: var(--vscode-foreground);
+    font-size: 1.1rem;
+}
+
+.timestamp {
+    font-size: 0.875rem;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.8;
+}
+
+.history-item-details {
+    padding: var(--space-md) var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.transition,
+.environment,
+.user,
+.reason {
+    font-size: 0.875rem;
+    color: var(--vscode-descriptionForeground);
+}
+
+.history-item-actions {
+    padding: var(--space-md) var(--space-lg);
+    padding-top: 0;
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.btn-small {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.75rem;
+    min-height: 32px;
+}
+
+.btn-danger {
+    background: var(--danger-gradient);
+    color: white;
+}
+
+.history-detail {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+}
+
+.detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-lg);
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.detail-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--vscode-foreground);
+    margin: 0;
+}
+
+.detail-content {
+    padding: var(--space-lg);
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.detail-actions {
+    padding: var(--space-lg);
+    padding-top: 0;
+    display: flex;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+}
+
+.diff-content {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    background: var(--vscode-editor-background);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: var(--space-lg);
+    box-shadow: inset var(--shadow-sm);
+    margin-bottom: var(--space-lg);
+}
+
+.blame-info {
+    margin-top: var(--space-lg);
+    padding: var(--space-lg);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+}
+
+.blame-info h4 {
+    margin: 0 0 var(--space-md) 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.blame-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.blame-item {
+    padding: var(--space-md);
+    background: var(--vscode-editor-background);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    transition: all var(--transition-fast);
+}
+
+.blame-item:hover {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.blame-variable {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-sm);
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+
+.blame-variable strong {
+    color: var(--vscode-foreground);
+    font-family: var(--font-mono);
+}
+
+.blame-change {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--vscode-descriptionForeground);
+    background: rgba(255, 107, 107, 0.1);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 107, 107, 0.2);
+}
+
+.blame-details {
+    display: flex;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+    color: var(--vscode-descriptionForeground);
+}
+
+.blame-user,
+.blame-time,
+.blame-commit {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    background: rgba(255, 255, 255, 0.02);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: 6px;
+    border: 1px solid var(--glass-border);
+}
+
+.blame-unknown {
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.7;
+    font-style: italic;
+}
+
+.loading,
+.empty-state,
+.error-state {
+    text-align: center;
+    padding: var(--space-2xl);
+    color: var(--vscode-descriptionForeground);
+}
+
+.empty-state {
+    background: var(--glass-bg);
+    border: 2px dashed var(--glass-border);
+    border-radius: 20px;
+    backdrop-filter: blur(20px);
+}
+

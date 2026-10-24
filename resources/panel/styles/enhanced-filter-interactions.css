@@ -1,0 +1,10 @@
+/* Enhanced Filter Interactions */
+.filter-group:hover .filter-input {
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.filter-group:focus-within label {
+    color: var(--vscode-foreground);
+    font-weight: 600;
+}
+

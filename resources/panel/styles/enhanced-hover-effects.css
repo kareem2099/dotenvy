@@ -1,0 +1,10 @@
+/* Enhanced Hover Effects */
+.dashboard-card:hover .card-header {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.env-card:hover .env-card-icon {
+    transform: scale(1.1) rotate(5deg);
+    transition: transform var(--transition-fast);
+}
+

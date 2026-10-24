@@ -1,0 +1,6 @@
+/* Filter Error States */
+.filter-group.error .filter-input {
+    border-color: rgba(239, 68, 68, 0.5);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+

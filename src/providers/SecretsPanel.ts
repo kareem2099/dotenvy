@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { DetectedSecret } from '../utils/secretScannerTypes';
 import { FeedbackManager } from '../utils/feedbackManager';
-import { LLMAnalyzer } from '../utils/llmAnalyzer';
 import { logger } from '../utils/logger';
 import { loadWebviewHtml } from '../utils/webviewUtils';
 import { t } from '../i18n';
@@ -13,6 +12,7 @@ export class SecretsPanel {
     private readonly _panel: vscode.WebviewPanel;
     private _secrets: DetectedSecret[] = [];
     private _disposables: vscode.Disposable[] = [];
+    private _renderGeneration = 0;
 
     public static readonly viewType = 'dotenvy.secretsPanel';
 
@@ -35,6 +35,7 @@ export class SecretsPanel {
               localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'resources')] }
         );
 
+        panel.iconPath = vscode.Uri.joinPath(extensionUri, 'resources', 'icons', 'icon.png');
         SecretsPanel.currentPanel = new SecretsPanel(panel, secrets, extensionUri);
         return SecretsPanel.currentPanel;
     }
@@ -43,7 +44,7 @@ export class SecretsPanel {
         this._panel   = panel;
         this._secrets = secrets;
         this._extensionUri = extensionUri;
-        this._render();
+        void this._render();
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
         this._panel.webview.onDidReceiveMessage(
             async (msg) => { await this._handleMessage(msg); },
@@ -53,7 +54,7 @@ export class SecretsPanel {
 
     public update(secrets: DetectedSecret[]): void {
         this._secrets = secrets;
-        this._render();
+        void this._render();
     }
 
     // ─── Messages ──────────────────────────────────────────────────────────────
@@ -70,18 +71,29 @@ export class SecretsPanel {
 
     private async _viewLocation(secret: DetectedSecret): Promise<void> {
         try {
-            const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-            if (!root) { return; }
-            const filePath = path.isAbsolute(secret.file) ? secret.file : path.join(root, secret.file);
-            const doc  = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
-            const ed   = await vscode.window.showTextDocument(doc);
+            // `file` is a display label and may include the workspace-folder name.
+            // Always navigate using the original path retained by the scanner.
+            const filePath = secret.sourceFile || (path.isAbsolute(secret.file) ? secret.file : undefined);
+            if (!filePath || !path.isAbsolute(filePath)) {
+                throw new Error(t('secretsScanner.locationStale'));
+            }
+            const uri = vscode.Uri.file(filePath);
+            if (!vscode.workspace.getWorkspaceFolder(uri)) {
+                throw new Error(t('secretsScanner.locationOutsideWorkspace'));
+            }
+            const doc = await vscode.workspace.openTextDocument(uri);
             const line = secret.line - 1;
             const start = secret.column - 1;
-            const range = new vscode.Range(line, start, line, start + secret.content.length);
+            const length = secret.valueLength ?? secret.content.length;
+            const range = doc.validateRange(new vscode.Range(line, start, line, start + length));
+            const ed = await vscode.window.showTextDocument(doc, { selection: range, preview: false });
             ed.revealRange(range, vscode.TextEditorRevealType.InCenter);
             ed.selection = new vscode.Selection(range.start, range.end);
         } catch (error) {
             logger.error('Failed to view secret location', error, 'SecretsPanel');
+            void vscode.window.showErrorMessage(t('secretsScanner.viewFailed', {
+                message: error instanceof Error ? error.message : String(error)
+            }));
         }
     }
 
@@ -112,45 +124,50 @@ export class SecretsPanel {
                 await vscode.workspace.fs.writeFile(envUri, Buffer.from(newContent, 'utf8'));
             }
 
-            // ✅ Training signal: confirmed secret
+            // Remember locally that this value is a real secret
             await FeedbackManager.recordConfirmed(secret);
 
             this._remove(secret);
-            vscode.window.showInformationMessage(`✅ ${secret.suggestedEnvVar} added to .env`);
-            await FeedbackManager.offerAfterCorrection(secret, 'high');
+            vscode.window.showInformationMessage(t('secrets.addedToEnv', { name: secret.suggestedEnvVar }));
 
         } catch (error) {
             logger.error('Failed to move secret to .env', error, 'SecretsPanel');
-            vscode.window.showErrorMessage(`Failed: ${error instanceof Error ? error.message : String(error)}`);
+            vscode.window.showErrorMessage(t('common.failed', { message: error instanceof Error ? error.message : String(error) }));
         }
     }
 
     private async _ignore(secret: DetectedSecret): Promise<void> {
-        // Save the local decision first; separately ask about optional numeric sharing.
         await FeedbackManager.recordFalsePositive(secret);
         this._remove(secret);
 
         const stats = await FeedbackManager.getStats();
         if (stats.falsePositives > 0 && stats.falsePositives % 5 === 0) {
             vscode.window.showInformationMessage(
-                t('secretsScanner.correctionsSaved', {count: stats.falsePositives})
+                t('secretsScanner.correctionsSaved', { count: stats.falsePositives })
             );
         }
-        await FeedbackManager.offerAfterCorrection(secret, 'false_positive');
     }
 
     private _remove(secret: DetectedSecret): void {
         this._secrets = this._secrets.filter(s =>
             !(s.file === secret.file && s.line === secret.line && s.column === secret.column)
         );
-        this._render();
+        void this._render();
     }
 
     // ─── HTML ──────────────────────────────────────────────────────────────────
 
-    private _render(): void { this._panel.webview.html = this._getHtml(); }
+    private async _render(): Promise<void> {
+        const generation = ++this._renderGeneration;
+        const html = await this._getHtml();
+        if (generation !== this._renderGeneration) {
+            return;
+        }
+        this._panel.webview.html = html;
+    }
 
-    private _getHtml(): string {
+    private async _getHtml(): Promise<string> {
+        const feedback = await FeedbackManager.getStats();
         const secrets = this._secrets;
         const high    = secrets.filter(s => s.confidence === 'high');
         const medium  = secrets.filter(s => s.confidence === 'medium');
@@ -158,8 +175,10 @@ export class SecretsPanel {
 
         const rows = secrets.map((s, i) => {
             const badge  = `<span class="badge ${s.confidence}">${s.confidence === 'high' ? 'HIGH' : s.confidence === 'medium' ? 'MED' : 'LOW'}</span>`;
-            const method = s.detectionMethod === 'hybrid'
-                ? t('secretsScanner.methodAi')
+            const method = s.analysisSource === 'heuristics'
+                ? t('secretsScanner.methodRules')
+                : s.analysisSource === 'user-confirmed'
+                ? t('secretsScanner.methodConfirmed')
                 : s.detectionMethod === 'pattern'
                 ? t('secretsScanner.methodPattern')
                 : t('secretsScanner.methodStatistical');
@@ -168,7 +187,7 @@ export class SecretsPanel {
                 <div class="secret-header">
                     ${badge}
                     <span class="secret-type">${this._e(s.type)}</span>
-                    <span class="secret-method">${method}</span>
+                    <span class="secret-method">${this._e(method)}</span>
                     <span class="secret-loc">${this._e(s.file)}:${s.line}</span>
                 </div>
                 <div class="secret-body">
@@ -186,11 +205,9 @@ export class SecretsPanel {
 
         const json = JSON.stringify(secrets).replace(/</g, '\\u003c');
         
-        const hintText = LLMAnalyzer.getInstance().isModelAvailable()
-            ? t('secretsScanner.hintLocal') : t('secretsScanner.hintFallback');
-        const statsHint = secrets.length > 0 
-            ? `<div class="hint">${hintText}</div>`
-            : '';
+        const confirmed = secrets.filter(s => s.analysisSource === 'user-confirmed').length;
+        const reviewCounts = t('secretsScanner.reviewCounts', { rules: secrets.length - confirmed, confirmed });
+        const statsHint = `<div class="hint"><strong>${this._e(t('secretsScanner.statusLocal'))}</strong><p>${this._e(reviewCounts)}</p>${this._e(t('secretsScanner.hintLocal'))}</div>`;
             
         const secretsContent = secrets.length === 0
             ? `<div class="empty"><div class="icon">✅</div><h3>${t('secretsScanner.emptyTitle')}</h3><p>${t('secretsScanner.emptyDesc')}</p></div>`
@@ -210,6 +227,10 @@ export class SecretsPanel {
                 searchPlaceholder: t('secretsScanner.filterPlaceholder'),
                 styleUri:       this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'panel', 'panel.css')).toString(),
                 extraStyleUri:  this._panel.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'resources', 'panel', 'secrets-scanner.css')).toString(),
+                feedbackConfirmedLabel: t('secretsScanner.feedbackConfirmed'),
+                feedbackFalsePositivesLabel: t('secretsScanner.feedbackFalsePositives'),
+                feedbackConfirmed: feedback.confirmed.toString(),
+                feedbackFalsePositives: feedback.falsePositives.toString(),
                 allCount:       secrets.length.toString(),
                 highCount:      high.length.toString(),
                 mediumCount:    medium.length.toString(),
